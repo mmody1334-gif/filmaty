@@ -1,0 +1,31 @@
+{
+  "name": "filmaty",
+  "version": "2.0.0",
+  "description": "Telegram Movie & Series Bot on Cloudflare Workers with Live Health Checking, Multi-Source Aggregation, and Direct Streaming",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "telegram-bot",
+    "cloudflare-workers",
+    "movies",
+    "series",
+    "streaming",
+    "scraper",
+    "arabic-movies"
+  ],
+  "author": "Mohamed Megdy",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@types/node": "^26.6.6",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.162.0"
+  }
+}

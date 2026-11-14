@@ -1,0 +1,24 @@
+name = "filmaty"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+account_id = "0000e4925fd52a263ae76a9053eade14"
+workers_dev = true
+
+# Cron trigger for warming up cache and refreshing active domains every 15 minutes
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+PUBLIC_BASE = "https://filmaty.hudhaifa-bio.workers.dev"
+
+[observability]
+enabled = true
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "588ea1009be74467ae70ae01207fade3"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "filmaty-archive"
+database_id = "c4618332-4d89-491d-bb7a-b362ef47c1bb"
