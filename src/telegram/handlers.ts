@@ -27,6 +27,13 @@ function shortKey(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function extractMsgId(msg: any): number | undefined {
+  if (!msg) return undefined;
+  if (typeof msg.message_id === "number") return msg.message_id;
+  if (msg.result && typeof msg.result.message_id === "number") return msg.result.message_id;
+  return undefined;
+}
+
 export async function handleTelegramUpdate(update: any, env: Env): Promise<Response> {
   const bot = new TelegramClient(env.BOT_TOKEN);
   const store = new AppStore(env);
@@ -132,6 +139,7 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
 
 async function handleTikTok(url: string, chatId: number, bot: TelegramClient, _store: AppStore): Promise<void> {
   const status = await bot.sendMessage(chatId, "⏳ جاري فحص وتحميل فيديو TikTok...");
+  const statusId = extractMsgId(status);
   try {
     const result = await extractTikTok(url);
     const caption = `🎵 <b>${views.escapeHtml(result.title)}</b>\n👤 <b>${views.escapeHtml(result.author || "TikTok")}</b>`;
@@ -141,25 +149,26 @@ async function handleTikTok(url: string, chatId: number, bot: TelegramClient, _s
     const targetVideo = result.sdVideoUrl || result.hdVideoUrl;
     if (targetVideo && (!result.size || result.size < 30 * 1024 * 1024)) {
       await bot.sendVideo(chatId, targetVideo, caption, { reply_markup: keyboard });
-      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
       return;
     }
 
     // Otherwise send photo card with direct download buttons
     if (result.thumbnail) {
       await bot.sendPhoto(chatId, result.thumbnail, caption, { reply_markup: keyboard });
-      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
       return;
     }
 
-    await bot.safeEdit(chatId, status.message_id, caption, { reply_markup: keyboard });
+    await bot.safeEdit(chatId, statusId, caption, { reply_markup: keyboard });
   } catch (err: any) {
-    await bot.safeEdit(chatId, status.message_id, `❌ تعذر تحميل فيديو TikTok:\n<code>${views.escapeHtml(err.message)}</code>`);
+    await bot.safeEdit(chatId, statusId, `❌ تعذر تحميل فيديو TikTok:\n<code>${views.escapeHtml(err.message)}</code>`);
   }
 }
 
 async function handleInstagram(url: string, chatId: number, bot: TelegramClient, _store: AppStore): Promise<void> {
   const status = await bot.sendMessage(chatId, "⏳ جاري فحص وتحميل محتوى Instagram...");
+  const statusId = extractMsgId(status);
   try {
     const result = await extractInstagram(url);
     const caption = `📸 <b>${views.escapeHtml(result.title)}</b>\n👤 <b>${views.escapeHtml(result.author ? `@${result.author}` : "Instagram")}</b>`;
@@ -167,19 +176,19 @@ async function handleInstagram(url: string, chatId: number, bot: TelegramClient,
 
     if (result.videoUrl) {
       await bot.sendVideo(chatId, result.videoUrl, caption, { reply_markup: keyboard });
-      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
       return;
     }
 
     if (result.images && result.images.length > 0) {
       await bot.sendPhoto(chatId, result.images[0], caption, { reply_markup: keyboard });
-      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
       return;
     }
 
-    await bot.safeEdit(chatId, status.message_id, caption, { reply_markup: keyboard });
+    await bot.safeEdit(chatId, statusId, caption, { reply_markup: keyboard });
   } catch (err: any) {
-    await bot.safeEdit(chatId, status.message_id, `❌ تعذر تحميل محتوى Instagram:\n<code>${views.escapeHtml(err.message)}</code>`);
+    await bot.safeEdit(chatId, statusId, `❌ تعذر تحميل محتوى Instagram:\n<code>${views.escapeHtml(err.message)}</code>`);
   }
 }
 
@@ -188,6 +197,7 @@ async function handleYouTube(url: string, chatId: number, bot: TelegramClient, s
   const plTarget = parseYouTubePlaylist(url);
   if (plTarget) {
     const status = await bot.sendMessage(chatId, "⏳ جاري قراءة قائمة تشغيل YouTube (Playlist)...");
+    const statusId = extractMsgId(status);
     try {
       const pl = await fetchYouTubePlaylist(plTarget.playlistId);
       if (!pl.items.length) {
@@ -205,10 +215,10 @@ async function handleYouTube(url: string, chatId: number, bot: TelegramClient, s
 👇 اضغط على أي فيديو لعرض خيارات تحميله:`;
 
       const keyboard = kb.buildYouTubePlaylistKeyboard(key, 0, 5, pl.videoCount, pl.items);
-      await bot.safeEdit(chatId, status.message_id, text, { reply_markup: keyboard });
+      await bot.safeEdit(chatId, statusId, text, { reply_markup: keyboard });
       return;
     } catch (err: any) {
-      await bot.safeEdit(chatId, status.message_id, `❌ تعذر قراءة قائمة التشغيل:\n<code>${views.escapeHtml(err.message)}</code>`);
+      await bot.safeEdit(chatId, statusId, `❌ تعذر قراءة قائمة التشغيل:\n<code>${views.escapeHtml(err.message)}</code>`);
       return;
     }
   }
@@ -217,6 +227,7 @@ async function handleYouTube(url: string, chatId: number, bot: TelegramClient, s
   const vTarget = parseYouTubeVideo(url);
   if (vTarget) {
     const status = await bot.sendMessage(chatId, "⏳ جاري فحص فيديو YouTube...");
+    const statusId = extractMsgId(status);
     try {
       const details = await fetchYouTubeVideoDetails(vTarget.videoId);
       const key = shortKey();
@@ -231,13 +242,13 @@ async function handleYouTube(url: string, chatId: number, bot: TelegramClient, s
       const keyboard = kb.buildYouTubeFormatKeyboard(key);
       if (details.thumbnail) {
         await bot.sendPhoto(chatId, details.thumbnail, text, { reply_markup: keyboard });
-        await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+        if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
       } else {
-        await bot.safeEdit(chatId, status.message_id, text, { reply_markup: keyboard });
+        await bot.safeEdit(chatId, statusId, text, { reply_markup: keyboard });
       }
       return;
     } catch (err: any) {
-      await bot.safeEdit(chatId, status.message_id, `❌ تعذر قراءة فيديو YouTube:\n<code>${views.escapeHtml(err.message)}</code>`);
+      await bot.safeEdit(chatId, statusId, `❌ تعذر قراءة فيديو YouTube:\n<code>${views.escapeHtml(err.message)}</code>`);
       return;
     }
   }
@@ -258,11 +269,12 @@ async function executeSearch(
   _env: Env,
 ): Promise<void> {
   const statusMsg = await bot.sendMessage(chatId, views.formatSearching(query, kind || "all"));
+  const statusId = extractMsgId(statusMsg);
 
   const results = await searchAllProviders(query, kind);
 
   if (results.length === 0) {
-    await bot.safeEdit(chatId, statusMsg.message_id, views.formatNoResults(query), {
+    await bot.safeEdit(chatId, statusId, views.formatNoResults(query), {
       reply_markup: kb.buildMainMenuKeyboard(),
     });
     return;
@@ -278,12 +290,12 @@ async function executeSearch(
   if (results.length === 1 && results[0]?.poster) {
     try {
       await bot.sendPhoto(chatId, results[0].poster, text, { reply_markup: keyboard });
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => undefined);
+      if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
       return;
     } catch {}
   }
 
-  await bot.safeEdit(chatId, statusMsg.message_id, text, { reply_markup: keyboard });
+  await bot.safeEdit(chatId, statusId, text, { reply_markup: keyboard });
 }
 
 // -----------------------------------------------------------------------------
@@ -599,10 +611,11 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     await bot.safeEdit(chatId, messageId, "⏳ جاري استخراج رابط التحميل والمشاهدة المباشر...");
 
     try {
-      const akwam = new AkwamProvider();
-      const stream = chosenSource?.url
-        ? await akwam.resolveStream(chosenSource.url)
-        : await akwam.resolveStream(details.candidate.url);
+      const provider = findProvider(details.candidate.site) || new AkwamProvider();
+      const targetUrl = chosenSource?.url || details.candidate.url;
+      const stream = provider.resolveStream
+        ? await provider.resolveStream(targetUrl)
+        : await new AkwamProvider().resolveStream(targetUrl);
 
       const title = details.title;
       const quality = chosenSource?.quality || stream.quality || "720p HD";
@@ -649,10 +662,11 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     await bot.safeEdit(chatId, messageId, "⏳ جاري استخراج رابط الحلقة المباشر...");
 
     try {
-      const akwam = new AkwamProvider();
-      const stream = chosenSource?.url
-        ? await akwam.resolveStream(chosenSource.url)
-        : await akwam.resolveStream(ep.url);
+      const provider = findProvider(details.candidate.site) || new AkwamProvider();
+      const targetUrl = chosenSource?.url || ep.url;
+      const stream = provider.resolveStream
+        ? await provider.resolveStream(targetUrl)
+        : await new AkwamProvider().resolveStream(targetUrl);
 
       const title = `${details.title} - ${ep.title}`;
       const quality = chosenSource?.quality || stream.quality || "720p HD";

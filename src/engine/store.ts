@@ -27,7 +27,11 @@ export interface UserSession {
 }
 
 export class AppStore {
-  constructor(private env: Env) {}
+  private env: Env;
+
+  constructor(env: Env) {
+    this.env = env;
+  }
 
   async setSession(chatId: number, session: Partial<UserSession>): Promise<void> {
     const key = `session:${chatId}`;

@@ -18,11 +18,23 @@ export async function searchAllProviders(
   kind?: MediaKind,
   disabledSites: string[] = [],
 ): Promise<Candidate[]> {
-  const activeProviders = ALL_PROVIDERS.filter((p) => !disabledSites.includes(p.id));
+  // 1. Search Akwam first (fast, reliable, and has direct downet.net CDN)
+  if (!disabledSites.includes("akwam")) {
+    try {
+      const akwam = new AkwamProvider();
+      const akwamResults = await akwam.search(query, kind);
+      if (akwamResults.length > 0) {
+        return akwamResults;
+      }
+    } catch (err) {
+      console.error("Akwam search error in searchAllProviders:", err);
+    }
+  }
 
-  // Run in parallel with Promise.allSettled
+  // 2. Fallback to other providers if Akwam yields no results
+  const otherProviders = ALL_PROVIDERS.filter((p) => p.id !== "akwam" && !disabledSites.includes(p.id));
   const results = await Promise.allSettled(
-    activeProviders.map((provider) => provider.search(query, kind)),
+    otherProviders.map((provider) => provider.search(query, kind)),
   );
 
   const merged: Candidate[] = [];
@@ -37,13 +49,11 @@ export async function searchAllProviders(
         seenTitles.set(key, cand);
         merged.push(cand);
       } else {
-        // Boost similarity if found on multiple providers
         existing.similarity = Math.min(1.0, (existing.similarity || 0.7) + 0.15);
       }
     }
   }
 
-  // Sort by highest similarity
   return merged.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
 }
 

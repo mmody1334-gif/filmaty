@@ -18,8 +18,10 @@ export interface SendMessageOptions {
 
 export class TelegramClient {
   private apiUrl: string;
+  private token: string;
 
-  constructor(private token: string) {
+  constructor(token: string) {
+    this.token = token;
     this.apiUrl = `https://api.telegram.org/bot${token}`;
   }
 
@@ -157,28 +159,32 @@ export class TelegramClient {
 
   /**
    * Robustly edits text or caption depending on whether original message had media.
+   * If messageId is missing or edit fails, falls back cleanly to sending a new message.
    */
   async safeEdit(
     chatId: number | string,
-    messageId: number,
+    messageId: number | undefined,
     text: string,
     opts: SendMessageOptions = {},
   ): Promise<any> {
+    if (!messageId) {
+      return await this.sendMessage(chatId, text, opts);
+    }
     try {
       const res = await this.editMessageText(chatId, messageId, text, opts);
-      if (res && res.ok) return res;
-      if (res && res.description && res.description.includes("there is no text in the message")) {
-        return await this.editMessageCaption(chatId, messageId, text, opts);
-      }
-      return res;
-    } catch {
-      try {
-        return await this.editMessageCaption(chatId, messageId, text, opts);
-      } catch {
-        // Fallback: delete and send
+      if (res && (res.ok || res.message_id)) return res;
+      if (res && res.description && res.description.toLowerCase().includes("there is no text in the message")) {
+        const captionRes = await this.editMessageCaption(chatId, messageId, text.slice(0, 1024), opts);
+        if (captionRes && (captionRes.ok || captionRes.message_id)) return captionRes;
         await this.deleteMessage(chatId, messageId).catch(() => undefined);
         return await this.sendMessage(chatId, text, opts);
       }
+      if (!res?.ok && !res?.message_id) {
+        return await this.sendMessage(chatId, text, opts);
+      }
+      return res;
+    } catch {
+      return await this.sendMessage(chatId, text, opts);
     }
   }
 
@@ -190,7 +196,11 @@ export class TelegramClient {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(15000),
       });
-      return await res.json();
+      const data: any = await res.json();
+      if (data && data.result && typeof data.result === "object") {
+        return Object.assign(data.result, data);
+      }
+      return data;
     } catch (err: any) {
       console.error(`Telegram API error (${method}):`, err.message);
       return { ok: false, description: err.message };

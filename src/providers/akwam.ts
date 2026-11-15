@@ -180,7 +180,7 @@ export class AkwamProvider implements Provider {
 
   private parseSearchResults(html: string, targetKind?: MediaKind): Candidate[] {
     const results: Candidate[] = [];
-    const entryBoxes = html.match(/<div class="entry-box[^"]*">[\s\S]*?<\/div>\s*<\/div>/g) || [];
+    const entryBoxes = html.split('<div class="entry-box').slice(1);
 
     for (const box of entryBoxes) {
       const linkMatch = box.match(/href="(https:\/\/akwam\.ss\/(movie|series)\/(\d+)\/([^"]*))"/);
@@ -223,7 +223,7 @@ export class AkwamProvider implements Provider {
         similarity: 0.9,
       });
 
-      if (results.length >= 10) break;
+      if (results.length >= 12) break;
     }
 
     return results;
@@ -425,16 +425,19 @@ export class AkwamProvider implements Provider {
     }
 
     const sourceMatches = [
-      ...html.matchAll(/<source[^>]+src="(https:\/\/[^"]+\.mp4[^"]*)"/gi),
-      ...html.matchAll(/<video[^>]+src="(https:\/\/[^"]+\.mp4[^"]*)"/gi),
-      ...html.matchAll(/(https:\/\/[a-z0-9]+\.downet\.net\/download\/[^\s"'<>]+\.mp4)/gi),
+      ...html.matchAll(/<source[^>]+src="([^"]+)"/gi),
+      ...html.matchAll(/<video[^>]+src="([^"]+)"/gi),
+      ...html.matchAll(/(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)/gi),
     ];
 
     let directVideoUrl: string | undefined;
     for (const m of sourceMatches) {
       if (m && m[1]) {
-        directVideoUrl = m[1].replace(/#Intent;.*$/i, "");
-        break;
+        const clean = m[1].replace(/#Intent;.*$/i, "").trim();
+        if (clean.includes("downet.net") || clean.match(/\.(mp4|mkv|webm|mov|avi)($|\?)/i)) {
+          directVideoUrl = clean;
+          break;
+        }
       }
     }
 
@@ -447,9 +450,15 @@ export class AkwamProvider implements Provider {
         });
         if (dlRes.ok) {
           const dlHtml = await dlRes.text();
-          const dlMatch = dlHtml.match(/href="(https:\/\/[a-z0-9]+\.downet\.net\/download\/[^\s"'<>]+\.mp4)"/i);
-          if (dlMatch) {
-            directVideoUrl = dlMatch[1];
+          const dlMatches = [
+            ...dlHtml.matchAll(/href="(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)"/gi),
+            ...dlHtml.matchAll(/(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)/gi),
+          ];
+          for (const dm of dlMatches) {
+            if (dm && dm[1]) {
+              directVideoUrl = dm[1].replace(/#Intent;.*$/i, "").trim();
+              break;
+            }
           }
         }
       } catch {
