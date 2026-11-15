@@ -6,9 +6,9 @@ import { MyCimaProvider } from "./mycima.ts";
 import type { Candidate, MediaKind, Provider } from "./types.ts";
 
 export const ALL_PROVIDERS: Provider[] = [
+  new AkwamProvider(),
   new LarozaProvider(),
   new FaselHdProvider(),
-  new AkwamProvider(),
   new MyCimaProvider(),
   new UniversalEmbedProvider(),
 ];

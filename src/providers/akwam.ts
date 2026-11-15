@@ -1,134 +1,245 @@
-import { cleanTitle, computeSimilarity, parseQuality, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
-import type { Candidate, Episode, MediaDetails, MediaKind, Provider, SeasonGroup, SourceLink } from "./types.ts";
+import { cleanTitle, computeSimilarity, parseQuality, parseYear } from "../engine/normalize.ts";
+import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
+
+export const AKWAM_BASE = "https://akwam.ss";
+
+export function akwamHeaders(): Record<string, string> {
+  return {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "ar,en-US;q=0.9",
+    Referer: `${AKWAM_BASE}/`,
+  };
+}
+
+export const FILLER_WORDS = new Set([
+  "marvel",
+  "مارفل",
+  "disney",
+  "ديزني",
+  "netflix",
+  "نتفلكس",
+  "نتفليكس",
+  "dc",
+  "دي سي",
+  "فيلم",
+  "مسلسل",
+  "movie",
+  "film",
+  "series",
+]);
+
+export const POPULAR_ALIASES: Record<string, string> = {
+  "ثانوس": "Avengers Endgame",
+  "thanos": "Avengers Endgame",
+  "اندجيم": "Endgame",
+  "اند جيم": "Endgame",
+  "مارفل اندجيم": "Avengers Endgame",
+  "marvel endgame": "Avengers Endgame",
+  "انفنتي وور": "Avengers Infinity War",
+  "انفينيتي وور": "Avengers Infinity War",
+  "infinity war": "Avengers Infinity War",
+  "افنجرز": "Avengers",
+  "avengers": "Avengers",
+  "سبايدر مان": "Spider-Man",
+  "سبايدرمان": "Spider-Man",
+  "spiderman": "Spider-Man",
+  "باتمان": "Batman",
+  "الرجل الوطواط": "Batman",
+  "سوبرمان": "Superman",
+  "سوبر مان": "Superman",
+  "ديدبول": "Deadpool",
+  "ولفرين": "Wolverine",
+  "جون ويك": "John Wick",
+  "فاست اند فيورس": "Fast & Furious",
+  "فاست اند فيريوس": "Fast & Furious",
+  "هاري بوتر": "Harry Potter",
+  "سيد الخواتم": "Lord of the Rings",
+  "صراع العروش": "Game of Thrones",
+  "قيم اوف ثرونز": "Game of Thrones",
+  "بريكنج باد": "Breaking Bad",
+  "بيكي بلاندرز": "Peaky Blinders",
+  "سترينجر ثينقز": "Stranger Things",
+  "فايكنج": "Vikings",
+  "فايكنجز": "Vikings",
+  "بريزون بريك": "Prison Break",
+  "ذا بويز": "The Boys",
+};
+
+export function buildSmartQueries(query: string): string[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const qLower = trimmed.toLowerCase();
+  const queries: string[] = [trimmed];
+
+  for (const [alias, mapped] of Object.entries(POPULAR_ALIASES)) {
+    if (qLower === alias || qLower.includes(alias)) {
+      if (!queries.includes(mapped)) queries.push(mapped);
+    }
+  }
+
+  const tokens = qLower.split(/\s+/).filter((w) => !FILLER_WORDS.has(w));
+  if (tokens.length > 0 && tokens.length < qLower.split(/\s+/).length) {
+    const stripped = tokens.join(" ");
+    if (!queries.includes(stripped)) queries.push(stripped);
+  }
+
+  return queries;
+}
+
+export function scoreMovieItem(item: Candidate, terms: Set<string>): number {
+  const tLower = item.title.toLowerCase();
+  let score = 0;
+
+  for (const term of terms) {
+    if (!term || term.length < 2) continue;
+    if (tLower.includes(term)) {
+      score += 15;
+      const wordRegex = new RegExp(`(^|\\s|[:\\-_])${term}($|\\s|[:\\-_])`, "i");
+      if (wordRegex.test(tLower)) {
+        score += 20;
+      }
+    }
+  }
+
+  if (terms.has("endgame") && tLower.includes("endgame")) {
+    score += 50;
+    if (tLower.includes("avengers")) score += 50;
+  }
+
+  return score;
+}
+
+export function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'");
+}
 
 export class AkwamProvider implements Provider {
   id = "akwam";
-  label = "أكوام";
+  label = "أكوام (سيرفرات فائقة السرعة)";
   kinds: MediaKind[] = ["movie", "series"];
 
-  private baseUrls = ["https://akwam.cx", "https://akwam.to", "https://akwam.im"];
-  private currentBase = "https://akwam.cx";
-
-  private headers = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  };
-
   async search(query: string, kind?: MediaKind): Promise<Candidate[]> {
-    const searchUrl = `${this.currentBase}/search?q=${encodeURIComponent(query)}`;
-    try {
-      const res = await fetch(searchUrl, {
-        headers: this.headers,
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!res.ok) return [];
-      const html = await res.text();
+    const trimmed = query.trim();
+    if (!trimmed) return [];
 
-      const candidates: Candidate[] = [];
-      const re = /<a\s+href="([^"]*(?:movie|series)\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-      let m;
-      const seen = new Set<string>();
+    const queries = buildSmartQueries(trimmed);
+    const seenUrls = new Set<string>();
+    const allResults: Candidate[] = [];
 
-      while ((m = re.exec(html))) {
-        const url = m[1];
-        if (seen.has(url)) continue;
-        seen.add(url);
-
-        const cardHtml = m[2];
-        const titleMatch = cardHtml.match(/<h\d[^>]*>([^<]+)<\/h\d>/i) || cardHtml.match(/class="[^"]*title[^"]*"[^>]*>([^<]+)</i);
-        const rawTitle = titleMatch ? titleMatch[1].trim() : cardHtml.replace(/<[^>]+>/g, "").trim();
-
-        if (!rawTitle || rawTitle.length < 2) continue;
-
-        const isSeries = url.includes("/series/") || rawTitle.includes("مسلسل");
-        const detectedKind: MediaKind = isSeries ? "series" : "movie";
-
-        if (kind && kind !== detectedKind) continue;
-
-        const year = parseYear(rawTitle);
-        const similarity = computeSimilarity(query, rawTitle);
-
-        let poster: string | undefined;
-        const posterMatch = cardHtml.match(/src="([^"]+\.(?:jpg|png|webp)[^"]*)"/i);
-        if (posterMatch) poster = posterMatch[1];
-
-        candidates.push({
-          id: `akwam:${url.split("/").filter(Boolean).pop()}`,
-          title: cleanTitle(rawTitle),
-          year,
-          kind: detectedKind,
-          site: this.id,
-          siteLabel: this.label,
-          url: url.startsWith("http") ? url : `${this.currentBase}/${url.replace(/^\//, "")}`,
-          poster,
-          similarity,
+    const searchPromises = queries.map(async (q) => {
+      const searchUrl = `${AKWAM_BASE}/search?q=${encodeURIComponent(q)}`;
+      try {
+        const res = await fetch(searchUrl, {
+          headers: akwamHeaders(),
+          signal: AbortSignal.timeout(10000),
         });
+        if (!res.ok) return [];
+        const html = await res.text();
+        return this.parseSearchResults(html, kind);
+      } catch {
+        return [];
       }
+    });
 
-      return candidates.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
-    } catch (err) {
-      console.error("Akwam search error:", err);
-      return [];
+    const settled = await Promise.allSettled(searchPromises);
+    for (const res of settled) {
+      if (res.status === "fulfilled") {
+        for (const item of res.value) {
+          if (!seenUrls.has(item.url)) {
+            seenUrls.add(item.url);
+            allResults.push(item);
+          }
+        }
+      }
     }
+
+    if (!allResults.length) return [];
+
+    // Collect terms for scoring
+    const terms = new Set<string>();
+    for (const q of queries) {
+      for (const word of q.toLowerCase().split(/[\s:\-_]+/)) {
+        if (word.length >= 2 && !FILLER_WORDS.has(word)) {
+          terms.add(word);
+        }
+      }
+    }
+
+    allResults.sort((a, b) => scoreMovieItem(b, terms) - scoreMovieItem(a, terms));
+    return allResults.slice(0, 12);
+  }
+
+  private parseSearchResults(html: string, targetKind?: MediaKind): Candidate[] {
+    const results: Candidate[] = [];
+    const entryBoxes = html.match(/<div class="entry-box[^"]*">[\s\S]*?<\/div>\s*<\/div>/g) || [];
+
+    for (const box of entryBoxes) {
+      const linkMatch = box.match(/href="(https:\/\/akwam\.ss\/(movie|series)\/(\d+)\/([^"]*))"/);
+      if (!linkMatch) continue;
+
+      const fullUrl = linkMatch[1];
+      const kind = linkMatch[2] as MediaKind;
+      const rawId = linkMatch[3];
+
+      if (targetKind && targetKind !== kind) continue;
+
+      const titleMatch =
+        box.match(/<h3[^>]*class="entry-title[^"]*"[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i) ||
+        box.match(/<h3[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i) ||
+        box.match(/alt="([^"]+)"/i);
+      const rawTitle = titleMatch ? decodeHtmlEntities(titleMatch[1]).trim() : "";
+      if (!rawTitle) continue;
+
+      const posterMatch =
+        box.match(/data-src="(https:\/\/img\.downet\.net\/[^"]+)"/i) ||
+        box.match(/src="(https:\/\/img\.downet\.net\/[^"]+)"/i);
+      const poster = posterMatch ? posterMatch[1] : undefined;
+
+      const ratingMatch = box.match(/<span class="label rating"[^>]*>[\s\S]*?([0-9.]+)\s*<\/span>/i);
+      const rating = ratingMatch ? ratingMatch[1].trim() : undefined;
+
+      const yearMatch = box.match(/<span class="badge badge-pill badge-secondary[^"]*"[^>]*>\s*(\d{4})\s*<\/span>/i);
+      const year = yearMatch ? Number(yearMatch[1].trim()) : parseYear(rawTitle);
+
+      results.push({
+        id: `akwam:${kind}:${rawId}`,
+        title: cleanTitle(rawTitle),
+        url: fullUrl,
+        kind,
+        poster,
+        year,
+        rating,
+        site: this.id,
+        siteLabel: this.label,
+        similarity: 0.9,
+      });
+
+      if (results.length >= 10) break;
+    }
+
+    return results;
   }
 
   async getDetails(candidate: Candidate): Promise<MediaDetails> {
     try {
       const res = await fetch(candidate.url, {
-        headers: this.headers,
-        signal: AbortSignal.timeout(6000),
+        headers: akwamHeaders(),
+        signal: AbortSignal.timeout(12000),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const html = await res.text();
 
-      const seasons: SeasonGroup[] = [];
-      const sources: SourceLink[] = [];
-
-      if (candidate.kind === "series") {
-        // Find episode links
-        const epLinks = [...html.matchAll(/<a\s+href="([^"]*\/episode\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
-        const episodes: Episode[] = [];
-
-        for (const ep of epLinks) {
-          const epUrl = ep[1];
-          const text = ep[2].replace(/<[^>]+>/g, "").trim();
-          const se = parseSeasonEpisode(text);
-          episodes.push({
-            season: se.season || 1,
-            episode: se.episode || episodes.length + 1,
-            title: text || `الحلقة ${episodes.length + 1}`,
-            url: epUrl.startsWith("http") ? epUrl : `${this.currentBase}/${epUrl.replace(/^\//, "")}`,
-          });
-        }
-
-        seasons.push({ season: 1, episodes });
-      } else {
-        // Direct download and watch links
-        const links = [...html.matchAll(/<a\s+href="([^"]*(?:watch|download)\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
-        for (const l of links) {
-          const linkUrl = l[1];
-          const text = l[2].replace(/<[^>]+>/g, "").trim();
-          const quality = parseQuality(text) || "HD";
-          sources.push({
-            name: `أكوام ${quality}`,
-            url: linkUrl.startsWith("http") ? linkUrl : `${this.currentBase}/${linkUrl.replace(/^\//, "")}`,
-            quality,
-            kind: linkUrl.includes(".mp4") ? "mp4" : "embed",
-            referer: candidate.url,
-          });
-        }
-      }
-
-      return {
-        candidate,
-        title: candidate.title,
-        year: candidate.year,
-        kind: candidate.kind,
-        poster: candidate.poster,
-        seasons,
-        sources,
-      };
-    } catch (err) {
+      return this.parseDetails(html, candidate);
+    } catch (err: any) {
       console.error("Akwam getDetails error:", err);
       return {
         candidate,
@@ -140,28 +251,228 @@ export class AkwamProvider implements Provider {
     }
   }
 
-  async getEpisodeSources(episode: Episode): Promise<SourceLink[]> {
-    try {
-      const res = await fetch(episode.url, { headers: this.headers, signal: AbortSignal.timeout(5000) });
-      const html = await res.text();
-      const sources: SourceLink[] = [];
+  private parseDetails(html: string, candidate: Candidate): MediaDetails {
+    const isSeries = candidate.url.includes("/series/") || html.includes("/episode/");
+    const kind: MediaKind = isSeries ? "series" : "movie";
 
-      const links = [...html.matchAll(/<a\s+href="([^"]*(?:watch|download)\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
-      for (const l of links) {
-        const linkUrl = l[1];
-        const text = l[2].replace(/<[^>]+>/g, "").trim();
-        const quality = parseQuality(text) || "HD";
-        sources.push({
-          name: `أكوام ${quality}`,
-          url: linkUrl.startsWith("http") ? linkUrl : `${this.currentBase}/${linkUrl.replace(/^\//, "")}`,
-          quality,
-          kind: linkUrl.includes(".mp4") ? "mp4" : "embed",
-          referer: episode.url,
+    const titleMatch =
+      html.match(/<h1[^>]*class="entry-title[^"]*"[^>]*>([^<]+)<\/h1>/i) ||
+      html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch
+      ? decodeHtmlEntities(titleMatch[1]).replace(/\s*\|\s*اكوام.*$/i, "").trim()
+      : candidate.title;
+
+    const posterMatch =
+      html.match(/<picture>[\s\S]*?<img[^>]+(?:src|data-src)="(https:\/\/img\.downet\.net\/[^"]+)"/i) ||
+      html.match(/<img[^>]+(?:src|data-src)="(https:\/\/img\.downet\.net\/[^"]+)"/i);
+    const poster = posterMatch ? posterMatch[1] : candidate.poster;
+
+    const yearMatch = html.match(/السنة\s*:\s*(\d{4})/i) || html.match(/>(\d{4})<\/span>/i);
+    const year = yearMatch ? Number(yearMatch[1].trim()) : candidate.year;
+
+    const ratingMatch = html.match(/10\s*\/\s*([0-9.]+)/i) || html.match(/rating"[^>]*>[\s\S]*?([0-9.]+)/i);
+    const rating = ratingMatch ? ratingMatch[1].trim() : candidate.rating;
+
+    let story: string | undefined;
+    const storyWidgetMatch = html.match(/قصة[\s\S]*?<\/h2>[\s\S]*?<div class="widget-body[^"]*">([\s\S]*?)<\/div>/i);
+    if (storyWidgetMatch) {
+      story = storyWidgetMatch[1].replace(/<[^>]+>/g, "").trim();
+    } else {
+      const generalStoryMatch = html.match(/<p class="text-white[^"]*">([\s\S]*?)<\/p>/i);
+      if (generalStoryMatch) {
+        story = generalStoryMatch[1].replace(/<[^>]+>/g, "").trim();
+      }
+    }
+
+    const sources: SourceLink[] = [];
+    const watchLinkRegex = /href="(https:\/\/akwam\.ss\/watch\/(\d+)\/(\d+)\/([^"]*))"/g;
+    let wMatch: RegExpExecArray | null;
+    const seenStreams = new Set<string>();
+
+    while ((wMatch = watchLinkRegex.exec(html)) !== null) {
+      const watchUrl = wMatch[1];
+      const streamId = wMatch[2];
+      const itemId = wMatch[3];
+      const slug = wMatch[4];
+      if (seenStreams.has(streamId)) continue;
+      seenStreams.add(streamId);
+
+      const downloadUrl = `https://akwam.ss/download/${streamId}/${itemId}/${slug}`;
+
+      let quality = "720p HD";
+      let size: string | undefined;
+
+      const dlButtonRegex = new RegExp(
+        `href="https:\\/\\/akwam\\.ss\\/download\\/${streamId}\\/${itemId}\\/[^"]*"[^>]*>([\\s\\S]*?)<\\/a>`,
+        "i",
+      );
+      const dlMatch = html.match(dlButtonRegex);
+      if (dlMatch) {
+        const btnText = dlMatch[1].replace(/<[^>]+>/g, "").trim();
+        const sizeMatch = btnText.match(/(\d+(?:\.\d+)?\s*(?:GB|MB|KB|جيجا|ميجابايت))/i);
+        if (sizeMatch) size = sizeMatch[1];
+      }
+
+      const beforeSnippet = html.slice(Math.max(0, wMatch.index - 200), wMatch.index);
+      const afterSnippet = html.slice(wMatch.index, Math.min(html.length, wMatch.index + 200));
+      const qBeforeMatches = [...beforeSnippet.matchAll(/(1080p|720p|480p|360p|FHD|HD|SD|4K|2160p)/gi)];
+      const qBefore = qBeforeMatches.length ? qBeforeMatches[qBeforeMatches.length - 1][1] : undefined;
+      const qAfter = afterSnippet.match(/(1080p|720p|480p|360p|FHD|HD|SD|4K|2160p)/i)?.[1];
+      const chosenQ = qBefore || qAfter;
+
+      if (chosenQ) {
+        quality = chosenQ.toUpperCase();
+        if (quality === "1080P") quality = "1080p FHD";
+        else if (quality === "720P") quality = "720p HD";
+        else if (quality === "480P") quality = "480p SD";
+      } else if (sources.length === 0) {
+        quality = "1080p FHD";
+      } else if (sources.length === 1) {
+        quality = "720p HD";
+      } else {
+        quality = "480p SD";
+      }
+
+      sources.push({
+        name: `أكوام ${quality}${size ? ` (${size})` : ""}`,
+        url: watchUrl,
+        quality,
+        kind: "mp4",
+        fileSize: size,
+        downloadUrl,
+        streamId,
+        referer: candidate.url,
+      });
+    }
+
+    const seasons: SeasonGroup[] = [];
+    if (isSeries) {
+      const epRegex = /href="(https:\/\/akwam\.ss\/episode\/(\d+)\/[^"]*\/[^\d"]*(\d+))"/g;
+      let epMatch: RegExpExecArray | null;
+      const seenEpisodes = new Set<string>();
+      const episodes: Episode[] = [];
+
+      while ((epMatch = epRegex.exec(html)) !== null) {
+        const epUrl = epMatch[1];
+        const epId = epMatch[2];
+        const epNumber = Number(epMatch[3]) || 1;
+        if (seenEpisodes.has(epId)) continue;
+        seenEpisodes.add(epId);
+
+        episodes.push({
+          id: epId,
+          season: 1,
+          episode: epNumber,
+          title: `الحلقة ${epNumber}`,
+          url: epUrl,
         });
       }
-      return sources;
+
+      episodes.sort((a, b) => a.episode - b.episode);
+      if (episodes.length > 0) {
+        seasons.push({ season: 1, episodes });
+      }
+    }
+
+    return {
+      candidate: { ...candidate, title, poster, year, rating, kind },
+      title,
+      description: story,
+      poster,
+      year,
+      rating,
+      kind,
+      seasons,
+      sources,
+    };
+  }
+
+  async getEpisodeSources(episode: Episode): Promise<SourceLink[]> {
+    try {
+      const res = await fetch(episode.url, {
+        headers: akwamHeaders(),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return [];
+      const html = await res.text();
+
+      const details = this.parseDetails(html, {
+        id: `akwam:ep:${episode.id || episode.episode}`,
+        title: episode.title,
+        kind: "series",
+        site: this.id,
+        siteLabel: this.label,
+        url: episode.url,
+      });
+
+      return details.sources;
     } catch {
       return [];
     }
+  }
+
+  async resolveStream(watchUrl: string): Promise<ResolvedStream> {
+    let html: string;
+    try {
+      const res = await fetch(watchUrl, {
+        headers: akwamHeaders(),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      html = await res.text();
+    } catch (error: any) {
+      throw new Error(`تعذر فتح صفحة البث في أكوام (${error.message})`);
+    }
+
+    const sourceMatches = [
+      ...html.matchAll(/<source[^>]+src="(https:\/\/[^"]+\.mp4[^"]*)"/gi),
+      ...html.matchAll(/<video[^>]+src="(https:\/\/[^"]+\.mp4[^"]*)"/gi),
+      ...html.matchAll(/(https:\/\/[a-z0-9]+\.downet\.net\/download\/[^\s"'<>]+\.mp4)/gi),
+    ];
+
+    let directVideoUrl: string | undefined;
+    for (const m of sourceMatches) {
+      if (m && m[1]) {
+        directVideoUrl = m[1].replace(/#Intent;.*$/i, "");
+        break;
+      }
+    }
+
+    if (!directVideoUrl) {
+      const downloadUrl = watchUrl.replace("/watch/", "/download/");
+      try {
+        const dlRes = await fetch(downloadUrl, {
+          headers: akwamHeaders(),
+          signal: AbortSignal.timeout(10000),
+        });
+        if (dlRes.ok) {
+          const dlHtml = await dlRes.text();
+          const dlMatch = dlHtml.match(/href="(https:\/\/[a-z0-9]+\.downet\.net\/download\/[^\s"'<>]+\.mp4)"/i);
+          if (dlMatch) {
+            directVideoUrl = dlMatch[1];
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!directVideoUrl) {
+      throw new Error("تعذر استخراج رابط الفيديو المباشر (.mp4) لهذا الخيار.");
+    }
+
+    let fileName = "";
+    try {
+      fileName = decodeURIComponent(new URL(directVideoUrl).pathname.split("/").pop() || "");
+    } catch {}
+
+    const qualityMatch = fileName.match(/(1080p|720p|480p|360p|4K)/i);
+    const quality = qualityMatch ? qualityMatch[1].toUpperCase() : "HD";
+
+    return {
+      quality,
+      directVideoUrl,
+      fileName,
+    };
   }
 }

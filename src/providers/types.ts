@@ -4,6 +4,7 @@ export interface Candidate {
   id: string;
   title: string;
   year?: number;
+  rating?: string;
   kind: MediaKind;
   site: string;
   siteLabel: string;
@@ -13,6 +14,7 @@ export interface Candidate {
 }
 
 export interface Episode {
+  id?: string;
   season: number;
   episode: number;
   title: string;
@@ -31,7 +33,9 @@ export interface SourceLink {
   kind: "mp4" | "hls" | "embed";
   referer?: string;
   downloadUrl?: string;
+  directVideoUrl?: string;
   fileSize?: string;
+  streamId?: string;
 }
 
 export interface MediaDetails {
@@ -40,9 +44,17 @@ export interface MediaDetails {
   description?: string;
   poster?: string;
   year?: number;
+  rating?: string;
   kind: MediaKind;
   seasons: SeasonGroup[];
   sources: SourceLink[];
+}
+
+export interface ResolvedStream {
+  directVideoUrl: string;
+  quality: string;
+  size?: string;
+  fileName?: string;
 }
 
 export interface Provider {
@@ -52,4 +64,5 @@ export interface Provider {
   search(query: string, kind?: MediaKind): Promise<Candidate[]>;
   getDetails(candidate: Candidate): Promise<MediaDetails>;
   getEpisodeSources(episode: Episode): Promise<SourceLink[]>;
+  resolveStream?(watchUrl: string): Promise<ResolvedStream>;
 }

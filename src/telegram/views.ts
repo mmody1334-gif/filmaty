@@ -2,22 +2,36 @@ import type { Candidate, Episode, MediaDetails } from "../providers/types.ts";
 import type { ProbeResult } from "../engine/probe.ts";
 import type { ArchiveEntry } from "../engine/store.ts";
 
+export function escapeHtml(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function formatWelcome(): string {
   return `<b>مرحبًا بك في بوت فيلماتي 🎬🍿 (Filmaty Bot)</b>
 
-محرك بحث وبث وسائط فائق السرعة، يجمع لك الأفلام والمسلسلات من أقوى السيرفرات العربية والعالمية مع الفحص المباشر للروابط قبل إرسالها!
+محرك بحث وتحميل وسائط متكامل وسريع:
+• أفلام ومسلسلات بروابط تحميل ومشاهدة مباشرة فائقة السرعة
+• تحميل فيديوهات TikTok بدون علامة مائية
+• تحميل ريلز وبوستات Instagram
+• تحميل فيديوهات وبلاي ليستات YouTube الفردية والكاملة
 
 <b>📌 الأوامر الأساسية:</b>
 • <code>/film اسم الفيلم</code> - بحث مخصص عن الأفلام (مثال: <code>/film marvel</code>)
-• <code>/series اسم المسلسل</code> - بحث عن المسلسلات مقسمة لمواسم وحلقات (مثال: <code>/series breaking bad</code>)
-• يمكنك أيضًا إرسال اسم أي عمل مباشرة بدون أوامر!
+• <code>/series اسم المسلسل</code> - بحث عن المسلسلات مقسمة لمواسم وحلقات
+• يمكنك أيضاً إرسال اسم أي عمل مباشرة بدون أوامر!
+• أو الصق رابط فيديو من TikTok أو Instagram أو YouTube ليتم تحميله فوراً!
 
-<b>⚡️ المميزات الفائقة:</b>
-✅ <b>فحص حي للروابط:</b> لا توجد روابط معطلة أو ميتة
+<b>⚡️ المميزات:</b>
+✅ <b>تحميل مباشر وفوري:</b> روابط CDN سريعة وتدعم برامج التحميل مثل IDM
 ✅ <b>تقسيم تلقائي:</b> مواسم ⬅️ حلقات ⬅️ جودات (1080p, 720p, 480p)
-✅ <b>مشاهدة مباشرة:</b> مشغل فيديو سينمائي داخل التليجرام
-✅ <b>تحميل مباشر:</b> روابط صاروخية مع عرض حجم الملف بدقة
-✅ <b>أرشيف شخصي:</b> حفظ ومزامنة أعمالك وسجل المشاهدة
+✅ <b>مشاهدة مباشرة:</b> تشغيل الفيديو داخل التليجرام والمتصفح
+✅ <b>أرشيف شخصي:</b> <code>/archive</code> لحفظ أعمالك المفضلة
 
 <i>اختر من القائمة أدناه للبدء:</i>`;
 }
@@ -25,12 +39,12 @@ export function formatWelcome(): string {
 export function formatSearching(query: string, kind: string): string {
   const icon = kind === "series" ? "📺" : kind === "movie" ? "🎬" : "🔍";
   return `${icon} <b>جاري البحث عن:</b> <code>${escapeHtml(query)}</code>
-⏳ يتم فحص السيرفرات والمصادر النشطة الآن...`;
+⏳ يتم البحث في أقوى السيرفرات والمصادر الآن...`;
 }
 
 export function formatSearchResults(query: string, count: number): string {
   return `🔍 <b>نتائج البحث عن:</b> <code>${escapeHtml(query)}</code>
-تم العثور على <b>${count}</b> عمل. اختر العمل المطلوب لتحديد الجودة والمشاهدة:`;
+تم العثور على <b>${count}</b> عمل. اختر العمل المطلوب لعرض التفاصيل والجودات:`;
 }
 
 export function formatNoResults(query: string): string {
@@ -38,54 +52,55 @@ export function formatNoResults(query: string): string {
 
 💡 <b>نصائح للبحث:</b>
 • تأكد من كتابة الاسم بدون أخطاء إملائية.
-• جرب البحث بالاسم الإنجليزي (مثال: <code>Batman</code> بدلاً من <code>باتمان</code>).
+• جرب البحث بالاسم الإنجليزي (مثال: <code>Endgame</code> أو <code>Batman</code>).
 • جرب كلمة واحدة مميزة من العنوان.`;
 }
 
 export function formatFilmDetails(details: MediaDetails): string {
-  const yearText = details.year ? ` • 📅 <b>سنة الإنتاج:</b> ${details.year}` : "";
-  return `🎬 <b>${escapeHtml(details.title)}</b>${yearText}
-🏷 <b>المصدر الأساسي:</b> ${details.candidate.siteLabel}
-🛡 <b>حالة الروابط:</b> تم التحقق والفحص ✅
+  const yearText = details.year ? ` • 📅 ${details.year}` : "";
+  const ratingText = details.rating ? ` • ⭐ ${details.rating}` : "";
+  const story = details.description ? `\n\n📖 <b>القصة:</b>\n${escapeHtml(details.description.slice(0, 450))}` : "";
 
-اختر <b>الجودة المناسبة</b> لاقتراح أفضل وأسرع سيرفر:`;
+  return `🎬 <b>${escapeHtml(details.title)}</b>${yearText}${ratingText}${story}
+
+👇 <b>اختر الجودة للتحميل أو المشاهدة:</b>`;
 }
 
 export function formatSeriesDetails(details: MediaDetails): string {
   const yearText = details.year ? ` • 📅 ${details.year}` : "";
-  const seasonsCount = details.seasons.length;
-  return `📺 <b>${escapeHtml(details.title)}</b>${yearText}
-🏷 <b>المصدر:</b> ${details.candidate.siteLabel}
-🗂 <b>عدد المواسم المتاحة:</b> ${seasonsCount} موسم
+  const ratingText = details.rating ? ` • ⭐ ${details.rating}` : "";
+  const story = details.description ? `\n\n📖 <b>القصة:</b>\n${escapeHtml(details.description.slice(0, 450))}` : "";
 
-اختر <b>الموسم</b> لعرض الحلقات:`;
+  return `📺 <b>${escapeHtml(details.title)}</b>${yearText}${ratingText}${story}
+
+👇 <b>اختر الحلقة:</b>`;
 }
 
-export function formatEpisodesList(title: string, seasonNum: number, count: number): string {
-  return `📺 <b>${escapeHtml(title)}</b> - الموسم ${seasonNum}
-يحتوي هذا الموسم على <b>${count}</b> حلقة.
-اختر <b>الحلقة</b> لعرض الجودات والسيرفرات:`;
+export function formatEpisodeDetails(seriesTitle: string, epTitle: string): string {
+  return `📺 <b>${escapeHtml(seriesTitle)}</b>
+▶️ <b>${escapeHtml(epTitle)}</b>
+
+👇 <b>اختر الجودة المطلوبة:</b>`;
 }
 
-export function formatProbeRecommendation(
+/**
+ * Exact card requested by user in Image 3
+ */
+export function formatStreamReadyCard(
   title: string,
   quality: string,
-  probe: ProbeResult,
-  episode?: Episode,
+  size?: string,
+  isSeries = false,
 ): string {
-  const epText = episode ? ` • الموسم ${episode.season} - الحلقة ${episode.episode}` : "";
-  const sizeText = probe.sizeFormatted ? `\n📦 <b>حجم الملف:</b> <code>${probe.sizeFormatted}</code>` : "";
-  const latencyText = `⚡️ <b>زمن الاستجابة:</b> <code>${probe.latencyMs}ms</code>`;
+  const icon = isSeries ? "📺" : "🎬";
+  const sizeText = size ? size : "N/A";
 
-  return `🎬 <b>${escapeHtml(title)}</b>${epText}
-🌟 <b>الجودة المختارة:</b> <code>${quality}</code>
+  return `✅ <b>Ready to stream and download!</b>
+${icon} <b>${escapeHtml(title)}</b>
+🎯 <b>Quality:</b> ${quality}
+📦 <b>Size:</b> ${sizeText}
 
-🏆 <b>الخيار الأفضل والمقترح:</b>
-${probe.serverTag} (${probe.host})
-${latencyText}${sizeText}
-🟢 <b>الحالة:</b> شغال 100% ومفحوص مسبقًا
-
-جاهز للمشاهدة المباشرة والتحميل الفوري:`;
+👇 <b>Use the direct links below:</b>`;
 }
 
 export function formatArchive(items: ArchiveEntry[]): string {
@@ -110,15 +125,6 @@ export function formatStatus(activeSites: string[]): string {
 🟢 <b>المصادر النشطة والمتصلة:</b>
 ${activeSites.map((s) => `• ✅ ${s}`).join("\n")}
 
-⏱ <b>وقت الاستجابة:</b> ممتاز (&lt; 250ms)
-🛡 <b>نظام فحص الروابط (Health Probe):</b> فعال ومفعل`;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+⏱ <b>وقت الاستجابة:</b> ممتاز (&lt; 200ms)
+🛡 <b>نظام التحميل المباشر:</b> فعال وجاهز 100%`;
 }

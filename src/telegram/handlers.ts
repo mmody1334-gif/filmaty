@@ -1,13 +1,31 @@
 import type { Env } from "../env.ts";
 import { parseOwnerIds } from "../env.ts";
-import { probeCached, type ProbeResult } from "../engine/probe.ts";
 import { AppStore } from "../engine/store.ts";
-import { signToken } from "../engine/token.ts";
 import { ALL_PROVIDERS, findProvider, searchAllProviders } from "../providers/index.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, SourceLink } from "../providers/types.ts";
+import { AkwamProvider } from "../providers/akwam.ts";
+import {
+  detectSocialPlatform,
+  extractFirstUrl,
+  parseYouTubePlaylist,
+  parseYouTubeVideo,
+} from "../social/detector.ts";
+import { extractTikTok } from "../social/tiktok.ts";
+import { extractInstagram } from "../social/instagram.ts";
+import {
+  extractYouTubeStream,
+  fetchYouTubePlaylist,
+  fetchYouTubeVideoDetails,
+  formatDuration,
+  type YouTubePlaylistResult,
+} from "../social/youtube.ts";
 import { TelegramClient } from "./client.ts";
 import * as kb from "./keyboards.ts";
 import * as views from "./views.ts";
+
+function shortKey(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 export async function handleTelegramUpdate(update: any, env: Env): Promise<Response> {
   const bot = new TelegramClient(env.BOT_TOKEN);
@@ -19,7 +37,7 @@ export async function handleTelegramUpdate(update: any, env: Env): Promise<Respo
     } else if (update.callback_query) {
       await handleCallbackQuery(update.callback_query, bot, store, env);
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("Telegram handler error:", err);
   }
 
@@ -40,6 +58,25 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
     return;
   }
 
+  // 1. Social Media Links Auto-Detection
+  const firstUrl = extractFirstUrl(text);
+  if (firstUrl) {
+    const platform = detectSocialPlatform(firstUrl);
+    if (platform === "tiktok") {
+      await handleTikTok(firstUrl, chatId, bot, store);
+      return;
+    }
+    if (platform === "instagram") {
+      await handleInstagram(firstUrl, chatId, bot, store);
+      return;
+    }
+    if (platform === "youtube") {
+      await handleYouTube(firstUrl, chatId, bot, store);
+      return;
+    }
+  }
+
+  // 2. Commands
   if (text === "/start") {
     await bot.sendMessage(chatId, views.formatWelcome(), {
       reply_markup: kb.buildMainMenuKeyboard(),
@@ -63,12 +100,11 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
     return;
   }
 
-  // /film command
-  if (text.startsWith("/film")) {
-    const query = text.replace(/^\/film\s*/i, "").trim();
+  // /film or /movie command
+  if (text.startsWith("/film") || text.startsWith("/movie")) {
+    const query = text.replace(/^\/(?:film|movie)\s*/i, "").trim();
     if (!query) {
-      await store.setSession(chatId, { step: "results", kind: "movie" });
-      await bot.sendMessage(chatId, "🎬 أرسل اسم الفيلم أو كلمة البحث (مثال: <code>marvel</code> أو <code>Interstellar</code>):");
+      await bot.sendMessage(chatId, "🎬 أرسل اسم الفيلم للبحث (مثال: <code>marvel</code> أو <code>Interstellar</code>):");
       return;
     }
     await executeSearch(chatId, query, "movie", bot, store, env);
@@ -79,21 +115,139 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
   if (text.startsWith("/series")) {
     const query = text.replace(/^\/series\s*/i, "").trim();
     if (!query) {
-      await store.setSession(chatId, { step: "results", kind: "series" });
-      await bot.sendMessage(chatId, "📺 أرسل اسم المسلسل أو كلمة البحث (مثال: <code>Breaking Bad</code> أو <code>Game of Thrones</code>):");
+      await bot.sendMessage(chatId, "📺 أرسل اسم المسلسل للبحث (مثال: <code>Breaking Bad</code> أو <code>Game of Thrones</code>):");
       return;
     }
     await executeSearch(chatId, query, "series", bot, store, env);
     return;
   }
 
-  // Direct text query (search both films and series)
-  const session = await store.getSession(chatId);
-  const targetKind: MediaKind | undefined =
-    session?.kind === "movie" || session?.kind === "series" ? session.kind : undefined;
-
-  await executeSearch(chatId, text, targetKind, bot, store, env);
+  // Direct text query (search across all movies & series)
+  await executeSearch(chatId, text, undefined, bot, store, env);
 }
+
+// -----------------------------------------------------------------------------
+// Social Media Handlers (TikTok, Instagram, YouTube)
+// -----------------------------------------------------------------------------
+
+async function handleTikTok(url: string, chatId: number, bot: TelegramClient, _store: AppStore): Promise<void> {
+  const status = await bot.sendMessage(chatId, "⏳ جاري فحص وتحميل فيديو TikTok...");
+  try {
+    const result = await extractTikTok(url);
+    const caption = `🎵 <b>${views.escapeHtml(result.title)}</b>\n👤 <b>${views.escapeHtml(result.author || "TikTok")}</b>`;
+    const keyboard = kb.buildTikTokKeyboard(result.hdVideoUrl || result.sdVideoUrl, result.audioUrl);
+
+    // If SD video exists and is within 25MB, send directly to Telegram chat
+    const targetVideo = result.sdVideoUrl || result.hdVideoUrl;
+    if (targetVideo && (!result.size || result.size < 30 * 1024 * 1024)) {
+      await bot.sendVideo(chatId, targetVideo, caption, { reply_markup: keyboard });
+      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      return;
+    }
+
+    // Otherwise send photo card with direct download buttons
+    if (result.thumbnail) {
+      await bot.sendPhoto(chatId, result.thumbnail, caption, { reply_markup: keyboard });
+      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      return;
+    }
+
+    await bot.safeEdit(chatId, status.message_id, caption, { reply_markup: keyboard });
+  } catch (err: any) {
+    await bot.safeEdit(chatId, status.message_id, `❌ تعذر تحميل فيديو TikTok:\n<code>${views.escapeHtml(err.message)}</code>`);
+  }
+}
+
+async function handleInstagram(url: string, chatId: number, bot: TelegramClient, _store: AppStore): Promise<void> {
+  const status = await bot.sendMessage(chatId, "⏳ جاري فحص وتحميل محتوى Instagram...");
+  try {
+    const result = await extractInstagram(url);
+    const caption = `📸 <b>${views.escapeHtml(result.title)}</b>\n👤 <b>${views.escapeHtml(result.author ? `@${result.author}` : "Instagram")}</b>`;
+    const keyboard = kb.buildInstagramKeyboard(result.videoUrl || result.images?.[0]);
+
+    if (result.videoUrl) {
+      await bot.sendVideo(chatId, result.videoUrl, caption, { reply_markup: keyboard });
+      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      return;
+    }
+
+    if (result.images && result.images.length > 0) {
+      await bot.sendPhoto(chatId, result.images[0], caption, { reply_markup: keyboard });
+      await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      return;
+    }
+
+    await bot.safeEdit(chatId, status.message_id, caption, { reply_markup: keyboard });
+  } catch (err: any) {
+    await bot.safeEdit(chatId, status.message_id, `❌ تعذر تحميل محتوى Instagram:\n<code>${views.escapeHtml(err.message)}</code>`);
+  }
+}
+
+async function handleYouTube(url: string, chatId: number, bot: TelegramClient, store: AppStore): Promise<void> {
+  // 1. YouTube Playlist
+  const plTarget = parseYouTubePlaylist(url);
+  if (plTarget) {
+    const status = await bot.sendMessage(chatId, "⏳ جاري قراءة قائمة تشغيل YouTube (Playlist)...");
+    try {
+      const pl = await fetchYouTubePlaylist(plTarget.playlistId);
+      if (!pl.items.length) {
+        throw new Error("قائمة التشغيل فارغة أو خاصة.");
+      }
+
+      const key = shortKey();
+      await store.put(`ytpl:${key}`, JSON.stringify(pl), 3600);
+
+      const text = `📋 <b>قائمة تشغيل يوتيوب (Playlist):</b>
+🎬 <b>${views.escapeHtml(pl.title)}</b>
+👤 <b>القناة:</b> ${views.escapeHtml(pl.author)}
+🔢 <b>عدد الفيديوهات:</b> ${pl.videoCount}
+
+👇 اضغط على أي فيديو لعرض خيارات تحميله:`;
+
+      const keyboard = kb.buildYouTubePlaylistKeyboard(key, 0, 5, pl.videoCount, pl.items);
+      await bot.safeEdit(chatId, status.message_id, text, { reply_markup: keyboard });
+      return;
+    } catch (err: any) {
+      await bot.safeEdit(chatId, status.message_id, `❌ تعذر قراءة قائمة التشغيل:\n<code>${views.escapeHtml(err.message)}</code>`);
+      return;
+    }
+  }
+
+  // 2. YouTube Single Video
+  const vTarget = parseYouTubeVideo(url);
+  if (vTarget) {
+    const status = await bot.sendMessage(chatId, "⏳ جاري فحص فيديو YouTube...");
+    try {
+      const details = await fetchYouTubeVideoDetails(vTarget.videoId);
+      const key = shortKey();
+      await store.put(`ytv:${key}`, JSON.stringify({ ...details, url }), 3600);
+
+      const text = `▶️ <b>YouTube:</b> ${views.escapeHtml(details.title)}
+👤 <b>القناة:</b> ${views.escapeHtml(details.author)}
+⏱ <b>المدة:</b> ${formatDuration(details.duration)}
+
+👇 اختر صيغة التحميل:`;
+
+      const keyboard = kb.buildYouTubeFormatKeyboard(key);
+      if (details.thumbnail) {
+        await bot.sendPhoto(chatId, details.thumbnail, text, { reply_markup: keyboard });
+        await bot.deleteMessage(chatId, status.message_id).catch(() => undefined);
+      } else {
+        await bot.safeEdit(chatId, status.message_id, text, { reply_markup: keyboard });
+      }
+      return;
+    } catch (err: any) {
+      await bot.safeEdit(chatId, status.message_id, `❌ تعذر قراءة فيديو YouTube:\n<code>${views.escapeHtml(err.message)}</code>`);
+      return;
+    }
+  }
+
+  await bot.sendMessage(chatId, "🚫 هذا الرابط غير مدعوم.");
+}
+
+// -----------------------------------------------------------------------------
+// Movie & Series Search & Flow
+// -----------------------------------------------------------------------------
 
 async function executeSearch(
   chatId: number,
@@ -101,31 +255,40 @@ async function executeSearch(
   kind: MediaKind | undefined,
   bot: TelegramClient,
   store: AppStore,
-  env: Env,
+  _env: Env,
 ): Promise<void> {
-  const searchingMsg = await bot.sendMessage(chatId, views.formatSearching(query, kind || "all"));
+  const statusMsg = await bot.sendMessage(chatId, views.formatSearching(query, kind || "all"));
 
   const results = await searchAllProviders(query, kind);
 
   if (results.length === 0) {
-    await bot.sendMessage(chatId, views.formatNoResults(query), {
+    await bot.safeEdit(chatId, statusMsg.message_id, views.formatNoResults(query), {
       reply_markup: kb.buildMainMenuKeyboard(),
     });
     return;
   }
 
-  // Store search results in session
-  await store.setSession(chatId, {
-    query,
-    kind: kind || "all",
-    step: "results",
-    selectedCandidate: results, // Store candidates array in session
-  });
+  const searchKey = shortKey();
+  await store.put(`mov_s:${searchKey}`, JSON.stringify({ query, results, kind }), 3600);
 
-  await bot.sendMessage(chatId, views.formatSearchResults(query, results.length), {
-    reply_markup: kb.buildSearchResultsKeyboard(results, 0),
-  });
+  const text = views.formatSearchResults(query, results.length);
+  const keyboard = kb.buildSearchResultsKeyboard(results, searchKey, 0);
+
+  // If only 1 result and has poster, show directly
+  if (results.length === 1 && results[0]?.poster) {
+    try {
+      await bot.sendPhoto(chatId, results[0].poster, text, { reply_markup: keyboard });
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => undefined);
+      return;
+    } catch {}
+  }
+
+  await bot.safeEdit(chatId, statusMsg.message_id, text, { reply_markup: keyboard });
 }
+
+// -----------------------------------------------------------------------------
+// Callback Query Router
+// -----------------------------------------------------------------------------
 
 async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore, env: Env): Promise<void> {
   const callbackId = cb.id;
@@ -137,15 +300,13 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
 
   await bot.answerCallbackQuery(callbackId);
 
-  // Main menu navigation
+  // Main navigation
   if (data === "cmd:film") {
-    await store.setSession(chatId, { step: "results", kind: "movie" });
-    await bot.sendMessage(chatId, "🎬 أرسل اسم الفيلم للبحث:");
+    await bot.sendMessage(chatId, "🎬 أرسل اسم الفيلم للبحث (مثال: <code>marvel</code> أو <code>Interstellar</code>):");
     return;
   }
   if (data === "cmd:series") {
-    await store.setSession(chatId, { step: "results", kind: "series" });
-    await bot.sendMessage(chatId, "📺 أرسل اسم المسلسل للبحث:");
+    await bot.sendMessage(chatId, "📺 أرسل اسم المسلسل للبحث (مثال: <code>Breaking Bad</code> أو <code>Game of Thrones</code>):");
     return;
   }
   if (data === "cmd:archive") {
@@ -162,223 +323,360 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     });
     return;
   }
-  if (data === "nav:menu" || data === "nav:search") {
+  if (data === "nav:search" || data === "nav:menu") {
     await bot.sendMessage(chatId, views.formatWelcome(), {
       reply_markup: kb.buildMainMenuKeyboard(),
     });
     return;
   }
 
-  // Pagination: pg:<page>
-  if (data.startsWith("pg:")) {
-    const page = Number(data.split(":")[1]) || 0;
-    const session = await store.getSession(chatId);
-    const candidates: Candidate[] = Array.isArray(session?.selectedCandidate)
-      ? session.selectedCandidate
-      : [];
-    if (candidates.length > 0) {
-      await bot.editMessageText(chatId, messageId, views.formatSearchResults(session?.query || "", candidates.length), {
-        reply_markup: kb.buildSearchResultsKeyboard(candidates, page),
+  // --- YouTube Callbacks ---
+  if (data.startsWith("ytf|")) {
+    const [, key, format] = data.split("|");
+    const raw = await store.get(`ytv:${key}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت صلاحية الجلسة. أعد إرسال الرابط.");
+      return;
+    }
+    const video = JSON.parse(raw);
+    const isAudio = format === "audio";
+    const text = `▶️ <b>${views.escapeHtml(video.title)}</b>\nاختر جودة ${isAudio ? "الصوت" : "الفيديو"} للتحميل:`;
+    const keyboard = kb.buildYouTubeQualityKeyboard(key, isAudio);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  if (data.startsWith("ytb|")) {
+    const [, key] = data.split("|");
+    const raw = await store.get(`ytv:${key}`);
+    if (!raw) return;
+    const video = JSON.parse(raw);
+    const text = `▶️ <b>YouTube:</b> ${views.escapeHtml(video.title)}\n👇 اختر صيغة التحميل:`;
+    const keyboard = kb.buildYouTubeFormatKeyboard(key);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  if (data.startsWith("ytq|")) {
+    const [, key, quality] = data.split("|");
+    const raw = await store.get(`ytv:${key}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت صلاحية الجلسة. أعد إرسال الرابط.");
+      return;
+    }
+    const video = JSON.parse(raw);
+    const isAudio = ["320", "128"].includes(quality);
+    const mode = isAudio ? "audio" : "video";
+
+    await bot.safeEdit(chatId, messageId, `⏳ جاري استخراج رابط التحميل المباشر (${quality})...`);
+
+    try {
+      const stream = await extractYouTubeStream(video.videoId, mode, quality);
+      const text = `✅ <b>جاهز للتحميل والمشاهدة!</b>\n${isAudio ? "🎵" : "📹"} <b>${views.escapeHtml(stream.title)}</b>\n🎯 <b>الجودة:</b> ${stream.quality}\n\n👇 <b>استخدم الرابط المباشر أدناه:</b>`;
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: `⬇️ تحميل مباشر (${stream.quality})`, url: stream.streamUrl }],
+          [{ text: "▶️ تشغيل مباشر", url: stream.streamUrl }],
+          [{ text: "🔙 اختيار جودة أخرى", callback_data: `ytb|${key}` }],
+        ],
+      };
+      await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    } catch (err: any) {
+      await bot.safeEdit(chatId, messageId, `❌ تعذر استخراج الرابط المباشر: ${views.escapeHtml(err.message)}`, {
+        reply_markup: {
+          inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `ytb|${key}` }]],
+        },
       });
     }
     return;
   }
 
-  // Select Search Result: sr:<idx>
-  if (data.startsWith("sr:")) {
-    const idx = Number(data.split(":")[1]);
-    const session = await store.getSession(chatId);
-    const candidates: Candidate[] = Array.isArray(session?.selectedCandidate)
-      ? session.selectedCandidate
-      : [];
-    const chosen = candidates[idx];
-    if (!chosen) {
-      await bot.sendMessage(chatId, "❌ انتهت الجلسة، الرجاء إعادة البحث.");
-      return;
-    }
-
-    const provider = findProvider(chosen.site) || ALL_PROVIDERS[0];
-    const details = await provider.getDetails(chosen);
-
-    await store.setSession(chatId, {
-      selectedCandidate: chosen,
-      step: details.kind === "series" ? "seasons" : "qualities",
-    });
-
-    if (details.kind === "series" && details.seasons.length > 0) {
-      await bot.sendMessage(chatId, views.formatSeriesDetails(details), {
-        reply_markup: kb.buildSeasonsKeyboard(details.seasons),
-      });
-    } else {
-      await bot.sendMessage(chatId, views.formatFilmDetails(details), {
-        reply_markup: kb.buildQualitiesKeyboard(),
-      });
-    }
+  // YouTube Playlist Browse / Page
+  if (data.startsWith("ytplp|")) {
+    const [, key, pageStr] = data.split("|");
+    const page = Number(pageStr) || 0;
+    const raw = await store.get(`ytpl:${key}`);
+    if (!raw) return;
+    const pl = JSON.parse(raw) as YouTubePlaylistResult;
+    const text = `📋 <b>قائمة تشغيل يوتيوب:</b> ${views.escapeHtml(pl.title)}\n🔢 عدد الفيديوهات: ${pl.videoCount}\n👇 اختر الفيديو:`;
+    const keyboard = kb.buildYouTubePlaylistKeyboard(key, page, 5, pl.videoCount, pl.items);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
     return;
   }
 
-  // Select Season: sn:<season_num>
-  if (data.startsWith("sn:")) {
-    const seasonNum = Number(data.split(":")[1]);
-    const session = await store.getSession(chatId);
-    const chosen: Candidate = session?.selectedCandidate;
-    if (!chosen) return;
+  if (data.startsWith("ytpls|")) {
+    const [, key, idxStr] = data.split("|");
+    const idx = Number(idxStr) || 0;
+    const raw = await store.get(`ytpl:${key}`);
+    if (!raw) return;
+    const pl = JSON.parse(raw) as YouTubePlaylistResult;
+    const item = pl.items[idx];
+    if (!item) return;
 
-    const provider = findProvider(chosen.site) || ALL_PROVIDERS[0];
-    const details = await provider.getDetails(chosen);
-    const season = details.seasons.find((s) => s.season === seasonNum) || details.seasons[0];
+    const vKey = shortKey();
+    await store.put(`ytv:${vKey}`, JSON.stringify({ videoId: item.videoId, title: item.title, author: item.author || pl.author, url: `https://www.youtube.com/watch?v=${item.videoId}` }), 3600);
 
-    if (!season) {
-      await bot.sendMessage(chatId, "❌ لم يتم العثور على حلقات لهذا الموسم.");
-      return;
-    }
-
-    await store.setSession(chatId, {
-      selectedSeason: seasonNum,
-      step: "episodes",
-    });
-
-    await bot.sendMessage(
-      chatId,
-      views.formatEpisodesList(details.title, seasonNum, season.episodes.length),
-      {
-        reply_markup: kb.buildEpisodesKeyboard(seasonNum, season.episodes),
-      },
-    );
+    const text = `▶️ <b>YouTube:</b> ${views.escapeHtml(item.title)}\n👇 اختر صيغة التحميل:`;
+    const keyboard = kb.buildYouTubeFormatKeyboard(vKey);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
     return;
   }
 
-  // Select Episode: ep:<season_num>:<ep_num>
-  if (data.startsWith("ep:")) {
-    const [, sStr, epStr] = data.split(":");
-    const seasonNum = Number(sStr);
-    const epNum = Number(epStr);
+  // --- Movie & Series Callbacks (`mov|...`) ---
 
-    await store.setSession(chatId, {
-      selectedSeason: seasonNum,
-      selectedEpisode: epNum,
-      step: "qualities",
-    });
-
-    await bot.sendMessage(chatId, `📺 تم اختيار الموسم ${seasonNum} - الحلقة ${epNum}.\nاختر الجودة المطلوبة:`, {
-      reply_markup: kb.buildQualitiesKeyboard(),
+  // Pagination: mov|p|{searchKey}|{page}
+  if (data.startsWith("mov|p|")) {
+    const [, , searchKey, pageStr] = data.split("|");
+    const page = Number(pageStr) || 0;
+    const raw = await store.get(`mov_s:${searchKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد كتابة اسم العمل للبحث.");
+      return;
+    }
+    const stored = JSON.parse(raw);
+    const keyboard = kb.buildSearchResultsKeyboard(stored.results, searchKey, page);
+    await bot.safeEdit(chatId, messageId, views.formatSearchResults(stored.query, stored.results.length), {
+      reply_markup: keyboard,
     });
     return;
   }
 
-  // Select Quality: ql:<quality>
-  if (data.startsWith("ql:")) {
-    const quality = data.split(":")[1] || "720p";
-    const session = await store.getSession(chatId);
-    const candidate: Candidate = session?.selectedCandidate;
-    if (!candidate) {
-      await bot.sendMessage(chatId, "❌ انتهت الجلسة. أرسل اسم العمل من جديد للبحث.");
+  // Back to search: mov|b|{searchKey}
+  if (data.startsWith("mov|b|")) {
+    const [, , searchKey] = data.split("|");
+    const raw = await store.get(`mov_s:${searchKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد كتابة اسم العمل للبحث.");
       return;
     }
+    const stored = JSON.parse(raw);
+    const keyboard = kb.buildSearchResultsKeyboard(stored.results, searchKey, 0);
+    await bot.safeEdit(chatId, messageId, views.formatSearchResults(stored.query, stored.results.length), {
+      reply_markup: keyboard,
+    });
+    return;
+  }
 
-    await bot.sendMessage(chatId, `⏳ يتم فحص السيرفرات المتاحة لجودة <b>${quality}</b> واختيار الأسرع...`);
+  // Pick search result: mov|s|{searchKey}|{idx}
+  if (data.startsWith("mov|s|")) {
+    const [, , searchKey, idxStr] = data.split("|");
+    const idx = Number(idxStr) || 0;
+    const raw = await store.get(`mov_s:${searchKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد كتابة اسم العمل للبحث.");
+      return;
+    }
+    const stored = JSON.parse(raw);
+    const candidate: Candidate = stored.results[idx];
+    if (!candidate) return;
+
+    await bot.safeEdit(chatId, messageId, `⏳ جاري جلب تفاصيل <b>${views.escapeHtml(candidate.title)}</b>...`);
 
     const provider = findProvider(candidate.site) || ALL_PROVIDERS[0];
     const details = await provider.getDetails(candidate);
 
-    let rawSources: SourceLink[] = details.sources;
+    const itemKey = shortKey();
+    await store.put(`mov_d:${itemKey}`, JSON.stringify({ details, searchKey }), 3600);
 
-    // If series, get episode sources
-    let currentEpisode: Episode | undefined;
-    if (candidate.kind === "series" && session?.selectedSeason && session?.selectedEpisode) {
-      const seasonGroup = details.seasons.find((s) => s.season === session.selectedSeason);
-      currentEpisode = seasonGroup?.episodes.find((e) => e.episode === session.selectedEpisode);
-      if (currentEpisode) {
-        rawSources = await provider.getEpisodeSources(currentEpisode);
+    if (details.kind === "series" && details.seasons.length > 0) {
+      const episodes = details.seasons[0].episodes;
+      const text = views.formatSeriesDetails(details);
+      const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, searchKey, episodes);
+
+      if (details.poster) {
+        try {
+          await bot.sendPhoto(chatId, details.poster, text, { reply_markup: keyboard });
+          await bot.deleteMessage(chatId, messageId).catch(() => undefined);
+          return;
+        } catch {}
       }
+      await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+      return;
     }
 
-    // Filter or rank sources by live health probe
-    const probeResults: Array<{ source: SourceLink; probe: ProbeResult }> = [];
-    for (const s of rawSources) {
-      const pr = await probeCached(s.url, s.referer, env.CACHE);
-      if (pr.playable) {
-        probeResults.push({ source: s, probe: pr });
-      }
+    // Movie flow
+    const text = views.formatFilmDetails(details);
+    const keyboard = kb.buildMovieDetailsKeyboard(itemKey, searchKey, details.sources);
+
+    if (details.poster) {
+      try {
+        await bot.sendPhoto(chatId, details.poster, text, { reply_markup: keyboard });
+        await bot.deleteMessage(chatId, messageId).catch(() => undefined);
+        return;
+      } catch {}
     }
-
-    // Sort by highest score
-    probeResults.sort((a, b) => b.probe.score - a.probe.score);
-
-    const best = probeResults[0] || {
-      source: rawSources[0] || {
-        name: "سيرفر البث الافتراضي",
-        url: candidate.url,
-        quality: "HD",
-        kind: "embed",
-      },
-      probe: {
-        url: rawSources[0]?.url || candidate.url,
-        playable: true,
-        kind: "embed" as const,
-        status: 200,
-        contentType: "text/html",
-        contentLength: 0,
-        acceptRanges: false,
-        latencyMs: 180,
-        score: 60,
-        serverTag: "⚡️ سيرفر معتمد",
-        host: "filmaty.stream",
-      },
-    };
-
-    // Generate signed web player URL
-    const token = await signToken(
-      {
-        u: best.source.url,
-        r: best.source.referer,
-        n: details.title,
-        k: best.probe.kind,
-        e: Math.floor(Date.now() / 1000) + 7200, // 2 hours
-      },
-      env.SIGNING_SECRET,
-    );
-
-    const publicBase = env.PUBLIC_BASE || "https://filmaty.hudhaifa-bio.workers.dev";
-    const playerUrl = `${publicBase}/watch?t=${encodeURIComponent(token)}`;
-    const downloadUrl = best.source.downloadUrl || (best.probe.kind === "mp4" ? best.source.url : undefined);
-
-    const mirrorServers = probeResults.slice(1, 4).map((p) => p.source);
-
-    // Save item in current session for quick archiving
-    await store.setSession(chatId, {
-      selectedQuality: quality,
-      step: "servers",
-    });
-
-    await bot.sendMessage(
-      chatId,
-      views.formatProbeRecommendation(details.title, quality, best.probe, currentEpisode),
-      {
-        reply_markup: kb.buildPlayOptionsKeyboard(playerUrl, downloadUrl, mirrorServers),
-      },
-    );
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
     return;
   }
 
-  // Save to Archive: ar:save
-  if (data === "ar:save") {
-    const session = await store.getSession(chatId);
-    const cand = session?.selectedCandidate;
-    if (cand) {
-      await store.addToArchive({
-        userId: String(cb.from?.id || chatId),
-        title: cand.title,
-        kind: cand.kind,
-        season: session.selectedSeason,
-        episode: session.selectedEpisode,
-        quality: session.selectedQuality,
-        site: cand.site,
-        url: cand.url,
-      });
-      await bot.sendMessage(chatId, "✅ <b>تم الحفظ في أرشيفك الشخصي بنجاح!</b>");
-    } else {
-      await bot.sendMessage(chatId, "⚠️ لا يوجد عمل نشط لحفظه حاليًا.");
+  // Pick series episode: mov|e|{itemKey}|{epIdx}
+  if (data.startsWith("mov|e|")) {
+    const [, , itemKey, epIdxStr] = data.split("|");
+    const epIdx = Number(epIdxStr) || 0;
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد البحث.");
+      return;
+    }
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    const ep = details.seasons?.[0]?.episodes?.[epIdx];
+    if (!ep) return;
+
+    await bot.safeEdit(chatId, messageId, `⏳ جاري جلب جودات <b>${views.escapeHtml(ep.title)}</b>...`);
+
+    const provider = findProvider(details.candidate.site) || ALL_PROVIDERS[0];
+    const epSources = await provider.getEpisodeSources(ep);
+
+    const epKey = shortKey();
+    await store.put(`mov_e:${epKey}`, JSON.stringify({ ep, epSources, itemKey, details }), 3600);
+
+    const text = views.formatEpisodeDetails(details.title, ep.title);
+    const keyboard = kb.buildEpisodeQualitiesKeyboard(epKey, itemKey, epSources);
+
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  // Back to episodes: mov|be|{itemKey}
+  if (data.startsWith("mov|be|")) {
+    const [, , itemKey] = data.split("|");
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    const episodes = details.seasons?.[0]?.episodes || [];
+    const text = views.formatSeriesDetails(details);
+    const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, stored.searchKey || "", episodes);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  // Back to movie details: mov|d|{itemKey}
+  if (data.startsWith("mov|d|")) {
+    const [, , itemKey] = data.split("|");
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    const text = views.formatFilmDetails(details);
+    const keyboard = kb.buildMovieDetailsKeyboard(itemKey, stored.searchKey || "", details.sources);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  // Save to archive: mov|ar|{itemKey}
+  if (data.startsWith("mov|ar|")) {
+    const [, , itemKey] = data.split("|");
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    await store.addToArchive({
+      userId: String(cb.from?.id || chatId),
+      title: details.title,
+      kind: details.kind,
+      url: details.candidate.url,
+      site: details.candidate.site,
+    });
+    await bot.answerCallbackQuery(callbackId, "✅ تم الحفظ في أرشيفك الشخصي بنجاح!", true);
+    return;
+  }
+
+  // Pick Movie Quality: mov|q|{itemKey}|{qIdx}
+  if (data.startsWith("mov|q|")) {
+    const [, , itemKey, qIdxStr] = data.split("|");
+    const qIdx = Number(qIdxStr) || 0;
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد كتابة اسم العمل للبحث.");
+      return;
+    }
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    const chosenSource = details.sources[qIdx];
+
+    await bot.safeEdit(chatId, messageId, "⏳ جاري استخراج رابط التحميل والمشاهدة المباشر...");
+
+    try {
+      const akwam = new AkwamProvider();
+      const stream = chosenSource?.url
+        ? await akwam.resolveStream(chosenSource.url)
+        : await akwam.resolveStream(details.candidate.url);
+
+      const title = details.title;
+      const quality = chosenSource?.quality || stream.quality || "720p HD";
+      const size = chosenSource?.fileSize || stream.size;
+
+      const text = views.formatStreamReadyCard(title, quality, size, false);
+      const keyboard = kb.buildStreamReadyKeyboard(
+        stream.directVideoUrl,
+        `mov|d|${itemKey}`,
+        stored.searchKey || "",
+      );
+
+      await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    } catch (err: any) {
+      await bot.safeEdit(
+        chatId,
+        messageId,
+        `❌ تعذر استخراج الرابط المباشر:\n<code>${views.escapeHtml(err.message)}</code>`,
+        {
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 اختيار جودة أخرى", callback_data: `mov|d|${itemKey}` }]],
+          },
+        },
+      );
+    }
+    return;
+  }
+
+  // Pick Episode Quality: mov|eq|{epKey}|{qIdx}
+  if (data.startsWith("mov|eq|")) {
+    const [, , epKey, qIdxStr] = data.split("|");
+    const qIdx = Number(qIdxStr) || 0;
+    const raw = await store.get(`mov_e:${epKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد البحث.");
+      return;
+    }
+    const stored = JSON.parse(raw);
+    const epSources: SourceLink[] = stored.epSources;
+    const chosenSource = epSources[qIdx];
+    const details: MediaDetails = stored.details;
+    const ep: Episode = stored.ep;
+
+    await bot.safeEdit(chatId, messageId, "⏳ جاري استخراج رابط الحلقة المباشر...");
+
+    try {
+      const akwam = new AkwamProvider();
+      const stream = chosenSource?.url
+        ? await akwam.resolveStream(chosenSource.url)
+        : await akwam.resolveStream(ep.url);
+
+      const title = `${details.title} - ${ep.title}`;
+      const quality = chosenSource?.quality || stream.quality || "720p HD";
+      const size = chosenSource?.fileSize || stream.size;
+
+      const text = views.formatStreamReadyCard(title, quality, size, true);
+      const keyboard = kb.buildStreamReadyKeyboard(
+        stream.directVideoUrl,
+        `mov|be|${stored.itemKey}`,
+        stored.searchKey || "",
+      );
+
+      await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    } catch (err: any) {
+      await bot.safeEdit(
+        chatId,
+        messageId,
+        `❌ تعذر استخراج الرابط المباشر:\n<code>${views.escapeHtml(err.message)}</code>`,
+        {
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 رجوع للحلقات", callback_data: `mov|be|${stored.itemKey}` }]],
+          },
+        },
+      );
     }
     return;
   }

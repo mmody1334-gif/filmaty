@@ -55,6 +55,22 @@ export class AppStore {
     await this.env.CACHE.delete(`session:${chatId}`);
   }
 
+  async put(key: string, value: string, ttlSeconds = 3600): Promise<void> {
+    try {
+      await this.env.CACHE.put(key, value, { expirationTtl: ttlSeconds });
+    } catch (err) {
+      console.error(`KV put error for key ${key}:`, err);
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.env.CACHE.get(key);
+    } catch {
+      return null;
+    }
+  }
+
   async setCache<T>(key: string, value: T, ttlSeconds = 1800): Promise<void> {
     try {
       await this.env.CACHE.put(key, JSON.stringify(value), { expirationTtl: ttlSeconds });
