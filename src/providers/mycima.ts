@@ -1,13 +1,13 @@
-import { cleanTitle, computeSimilarity, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
-import type { Candidate, Episode, MediaDetails, MediaKind, Provider, SeasonGroup, SourceLink } from "./types.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class MyCimaProvider implements Provider {
   id = "mycima";
   label = "ماي سيما";
   kinds: MediaKind[] = ["movie", "series"];
 
-  private baseUrls = ["https://wecima.movie", "https://wecima.show", "https://wecima.click"];
-  private currentBase = "https://wecima.movie";
+  private baseUrls = ["https://wecima.rentals", "https://wecima.rest", "https://wecima.show", "https://wecima.movie"];
+  private currentBase = "https://wecima.rentals";
 
   private headers = {
     "User-Agent":
@@ -16,7 +16,9 @@ export class MyCimaProvider implements Provider {
   };
 
   async search(query: string, kind?: MediaKind): Promise<Candidate[]> {
-    const searchUrl = `${this.currentBase}/search/${encodeURIComponent(query)}/`;
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const searchUrl = `${this.currentBase}/search/${encodeURIComponent(trimmed)}/`;
     try {
       const res = await fetch(searchUrl, {
         headers: this.headers,
@@ -35,6 +37,7 @@ export class MyCimaProvider implements Provider {
         const rawTitle = m[2] || "";
 
         if (!rawTitle) continue;
+        if (!isRelevant(rawTitle, trimmed)) continue;
 
         const isSeries = rawTitle.includes("مسلسل") || url.includes("/series/");
         const detectedKind: MediaKind = isSeries ? "series" : "movie";
@@ -42,7 +45,7 @@ export class MyCimaProvider implements Provider {
         if (kind && kind !== detectedKind) continue;
 
         const year = parseYear(rawTitle);
-        const similarity = computeSimilarity(query, rawTitle);
+        const similarity = computeSimilarity(trimmed, rawTitle);
 
         let poster: string | undefined;
         const posterMatch = itemHtml.match(/data-url="([^"]+)"|src="([^"]+)"/i);
@@ -149,5 +152,13 @@ export class MyCimaProvider implements Provider {
     } catch {
       return [];
     }
+  }
+
+  async resolveStream(watchUrl: string): Promise<ResolvedStream> {
+    return {
+      quality: "720p HD",
+      directVideoUrl: watchUrl,
+      fileName: "wecima-video.mp4",
+    };
   }
 }

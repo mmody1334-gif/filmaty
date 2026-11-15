@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, parseQuality, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseQuality, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export const AKWAM_BASE = "https://akwam.ss";
@@ -135,22 +135,37 @@ export class AkwamProvider implements Provider {
     const seenUrls = new Set<string>();
     const allResults: Candidate[] = [];
 
-    const searchPromises = queries.map(async (q) => {
-      const searchUrl = `${AKWAM_BASE}/search?q=${encodeURIComponent(q)}`;
-      try {
-        const res = await fetch(searchUrl, {
-          headers: akwamHeaders(),
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok) return [];
-        const html = await res.text();
-        return this.parseSearchResults(html, kind);
-      } catch {
-        return [];
-      }
-    });
+    // Search across smart queries and multiple pages in parallel to catch all seasons
+    const isMultiSeasonQuery =
+      kind === "series" ||
+      trimmed.includes("مسلسل") ||
+      trimmed.includes("اللعبة") ||
+      trimmed.length <= 8;
+    const pages = isMultiSeasonQuery ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [1, 2, 3];
 
-    const settled = await Promise.allSettled(searchPromises);
+    const fetchTasks: Promise<Candidate[]>[] = [];
+    for (const q of queries) {
+      for (const p of pages) {
+        fetchTasks.push(
+          (async () => {
+            const searchUrl = `${AKWAM_BASE}/search?q=${encodeURIComponent(q)}&page=${p}`;
+            try {
+              const res = await fetch(searchUrl, {
+                headers: akwamHeaders(),
+                signal: AbortSignal.timeout(6000),
+              });
+              if (!res.ok) return [];
+              const html = await res.text();
+              return this.parseSearchResults(html, kind, q);
+            } catch {
+              return [];
+            }
+          })(),
+        );
+      }
+    }
+
+    const settled = await Promise.allSettled(fetchTasks);
     for (const res of settled) {
       if (res.status === "fulfilled") {
         for (const item of res.value) {
@@ -175,10 +190,10 @@ export class AkwamProvider implements Provider {
     }
 
     allResults.sort((a, b) => scoreMovieItem(b, terms) - scoreMovieItem(a, terms));
-    return allResults.slice(0, 12);
+    return allResults.slice(0, 16);
   }
 
-  private parseSearchResults(html: string, targetKind?: MediaKind): Candidate[] {
+  private parseSearchResults(html: string, targetKind?: MediaKind, queryMatch?: string): Candidate[] {
     const results: Candidate[] = [];
     const entryBoxes = html.split('<div class="entry-box').slice(1);
 
@@ -199,6 +214,14 @@ export class AkwamProvider implements Provider {
       const rawTitle = titleMatch ? decodeHtmlEntities(titleMatch[1]).trim() : "";
       if (!rawTitle) continue;
 
+      // Strict relevance check: do not return unrelated trending items
+      if (queryMatch) {
+        const cleaned = cleanTitle(rawTitle);
+        if (!isRelevant(cleaned, queryMatch) && !isRelevant(rawTitle, queryMatch)) {
+          continue;
+        }
+      }
+
       const posterMatch =
         box.match(/data-src="(https:\/\/img\.downet\.net\/[^"]+)"/i) ||
         box.match(/src="(https:\/\/img\.downet\.net\/[^"]+)"/i);
@@ -210,9 +233,32 @@ export class AkwamProvider implements Provider {
       const yearMatch = box.match(/<span class="badge badge-pill badge-secondary[^"]*"[^>]*>\s*(\d{4})\s*<\/span>/i);
       const year = yearMatch ? Number(yearMatch[1].trim()) : parseYear(rawTitle);
 
+      let displayTitle = cleanTitle(rawTitle);
+      if (kind === "series") {
+        const decodedUrl = decodeURIComponent(fullUrl);
+        const se = parseSeasonEpisode(rawTitle + " " + decodedUrl);
+        if (se.season && !displayTitle.includes(String(se.season))) {
+          displayTitle = `${displayTitle} (الموسم ${se.season})`;
+        } else if (!se.season) {
+          const sMatch = decodedUrl.match(/الموسم-([^\/]+)/);
+          if (sMatch) {
+            displayTitle = `${displayTitle} (الموسم ${sMatch[1]})`;
+          } else if (
+            !displayTitle.includes("موسم") &&
+            !displayTitle.includes("جزء") &&
+            !displayTitle.includes("ج5") &&
+            !displayTitle.includes("ج4") &&
+            !displayTitle.includes("ج3") &&
+            !displayTitle.includes("ج2")
+          ) {
+            displayTitle = `${displayTitle} (الموسم 1)`;
+          }
+        }
+      }
+
       results.push({
         id: `akwam:${kind}:${rawId}`,
-        title: cleanTitle(rawTitle),
+        title: displayTitle,
         url: fullUrl,
         kind,
         poster,
@@ -223,7 +269,7 @@ export class AkwamProvider implements Provider {
         similarity: 0.9,
       });
 
-      if (results.length >= 12) break;
+      if (results.length >= 16) break;
     }
 
     return results;

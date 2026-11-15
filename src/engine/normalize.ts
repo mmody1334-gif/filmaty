@@ -268,3 +268,25 @@ export function hostOf(urlStr: string): string {
     return urlStr;
   }
 }
+
+export function isRelevant(title: string, query: string): boolean {
+  const tNorm = normalizeArabic(cleanTitle(title));
+  const qNorm = normalizeArabic(cleanTitle(query));
+
+  if (!tNorm || !qNorm) return false;
+  if (tNorm.includes(qNorm) || qNorm.includes(tNorm)) return true;
+
+  const qTokens = qNorm.split(/[\s:\-_]+/).filter((w) => w.length >= 2);
+  if (qTokens.length === 0) return true;
+
+  let matches = 0;
+  for (const token of qTokens) {
+    if (tNorm.includes(token)) {
+      matches++;
+    }
+  }
+
+  if (matches > 0) return true;
+
+  return computeSimilarity(query, title) >= 0.45;
+}

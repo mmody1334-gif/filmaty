@@ -1,15 +1,18 @@
 import { AkwamProvider } from "./akwam.ts";
+import { EgyBestProvider } from "./egybest.ts";
 import { UniversalEmbedProvider } from "./embed.ts";
 import { FaselHdProvider } from "./faselhd.ts";
 import { LarozaProvider } from "./laroza.ts";
 import { MyCimaProvider } from "./mycima.ts";
+import { isRelevant } from "../engine/normalize.ts";
 import type { Candidate, MediaKind, Provider } from "./types.ts";
 
 export const ALL_PROVIDERS: Provider[] = [
   new AkwamProvider(),
-  new LarozaProvider(),
+  new EgyBestProvider(),
   new FaselHdProvider(),
   new MyCimaProvider(),
+  new LarozaProvider(),
   new UniversalEmbedProvider(),
 ];
 
@@ -18,32 +21,33 @@ export async function searchAllProviders(
   kind?: MediaKind,
   disabledSites: string[] = [],
 ): Promise<Candidate[]> {
-  // 1. Search Akwam first (fast, reliable, and has direct downet.net CDN)
-  if (!disabledSites.includes("akwam")) {
-    try {
-      const akwam = new AkwamProvider();
-      const akwamResults = await akwam.search(query, kind);
-      if (akwamResults.length > 0) {
-        return akwamResults;
-      }
-    } catch (err) {
-      console.error("Akwam search error in searchAllProviders:", err);
-    }
-  }
+  const activeProviders = ALL_PROVIDERS.filter((p) => !disabledSites.includes(p.id));
 
-  // 2. Fallback to other providers if Akwam yields no results
-  const otherProviders = ALL_PROVIDERS.filter((p) => p.id !== "akwam" && !disabledSites.includes(p.id));
-  const results = await Promise.allSettled(
-    otherProviders.map((provider) => provider.search(query, kind)),
+  // Run all active providers in parallel
+  const settled = await Promise.allSettled(
+    activeProviders.map(async (p) => {
+      try {
+        return await p.search(query, kind);
+      } catch (err) {
+        console.error(`Search error on provider ${p.id}:`, err);
+        return [];
+      }
+    }),
   );
 
   const merged: Candidate[] = [];
+  const seenUrls = new Set<string>();
   const seenTitles = new Map<string, Candidate>();
 
-  for (const res of results) {
+  for (const res of settled) {
     if (res.status !== "fulfilled") continue;
     for (const cand of res.value) {
-      const key = `${cand.kind}:${cand.title.toLowerCase().replace(/\s+/g, "")}:${cand.year || ""}`;
+      if (seenUrls.has(cand.url)) continue;
+      seenUrls.add(cand.url);
+
+      if (!isRelevant(cand.title, query)) continue;
+
+      const key = `${cand.kind}:${cand.title.toLowerCase().replace(/[\s\-_:]+/g, "")}:${cand.year || ""}`;
       const existing = seenTitles.get(key);
       if (!existing) {
         seenTitles.set(key, cand);
@@ -54,7 +58,14 @@ export async function searchAllProviders(
     }
   }
 
-  return merged.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
+  // Sort by highest similarity, prioritizing Akwam direct CDN if similarity is close
+  return merged.sort((a, b) => {
+    const simDiff = (b.similarity || 0) - (a.similarity || 0);
+    if (Math.abs(simDiff) > 0.15) return simDiff;
+    if (a.site === "akwam" && b.site !== "akwam") return -1;
+    if (b.site === "akwam" && a.site !== "akwam") return 1;
+    return simDiff;
+  });
 }
 
 export function findProvider(siteId: string): Provider | undefined {

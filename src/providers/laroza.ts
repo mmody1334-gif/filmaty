@@ -1,12 +1,12 @@
-import { cleanTitle, computeSimilarity, parseQuality, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
-import type { Candidate, Episode, MediaDetails, MediaKind, Provider, SeasonGroup, SourceLink } from "./types.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseQuality, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class LarozaProvider implements Provider {
   id = "laroza";
   label = "لاروزا";
   kinds: MediaKind[] = ["movie", "series"];
 
-  private baseUrls = ["https://laroza1.quest", "https://laroza.lol"];
+  private baseUrls = ["https://laroza1.quest", "https://laroza1.site", "https://laroza.lol"];
   private currentBase = "https://laroza1.quest";
 
   private headers = {
@@ -16,7 +16,9 @@ export class LarozaProvider implements Provider {
   };
 
   async search(query: string, kind?: MediaKind): Promise<Candidate[]> {
-    const searchUrl = `${this.currentBase}/search.php?keywords=${encodeURIComponent(query)}`;
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const searchUrl = `${this.currentBase}/search.php?keywords=${encodeURIComponent(trimmed)}`;
     try {
       const res = await fetch(searchUrl, {
         headers: this.headers,
@@ -36,6 +38,7 @@ export class LarozaProvider implements Provider {
 
         if (!rawTitle || rawTitle.includes("ابحث") || seen.has(url)) continue;
         if (!url.includes("video.php") && !url.includes("view-serie") && !url.includes("/video/")) continue;
+        if (!isRelevant(rawTitle, trimmed)) continue;
 
         seen.add(url);
 
@@ -49,7 +52,7 @@ export class LarozaProvider implements Provider {
         if (kind && kind !== detectedKind) continue;
 
         const year = parseYear(rawTitle);
-        const similarity = computeSimilarity(query, rawTitle);
+        const similarity = computeSimilarity(trimmed, rawTitle);
 
         // Extract poster if present in markup
         let poster: string | undefined;
@@ -222,6 +225,35 @@ export class LarozaProvider implements Provider {
     }
 
     return sources;
+  }
+
+  async resolveStream(watchUrl: string): Promise<ResolvedStream> {
+    const vid = extractVidOrSer(watchUrl);
+    if (vid) {
+      const servers = await this.extractServersForVid(vid);
+      const direct = servers.find((s) => s.kind === "mp4" && s.downloadUrl);
+      if (direct?.downloadUrl) {
+        return {
+          quality: direct.quality || "720p HD",
+          size: direct.fileSize,
+          directVideoUrl: direct.downloadUrl,
+          fileName: "laroza-video.mp4",
+        };
+      }
+      const cloud = servers.find((s) => s.downloadUrl);
+      if (cloud?.downloadUrl) {
+        return {
+          quality: cloud.quality || "720p HD",
+          directVideoUrl: cloud.downloadUrl,
+          fileName: "laroza-video.mp4",
+        };
+      }
+    }
+    return {
+      quality: "720p HD",
+      directVideoUrl: watchUrl,
+      fileName: "laroza-video.mp4",
+    };
   }
 }
 

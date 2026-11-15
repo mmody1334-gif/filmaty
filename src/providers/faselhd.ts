@@ -1,5 +1,5 @@
-import { cleanTitle, computeSimilarity, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
-import type { Candidate, Episode, MediaDetails, MediaKind, Provider, SeasonGroup, SourceLink } from "./types.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class FaselHdProvider implements Provider {
   id = "faselhd";
@@ -16,7 +16,10 @@ export class FaselHdProvider implements Provider {
   };
 
   async search(query: string, kind?: MediaKind): Promise<Candidate[]> {
-    const searchUrl = `${this.currentBase}/?s=${encodeURIComponent(query)}`;
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const searchUrl = `${this.currentBase}/search?q=${encodeURIComponent(trimmed)}`;
     try {
       const res = await fetch(searchUrl, {
         headers: this.headers,
@@ -37,6 +40,9 @@ export class FaselHdProvider implements Provider {
         if (seen.has(fullUrl)) continue;
         if (!slug.startsWith("فيلم-") && !slug.startsWith("مسلسل-") && !slug.startsWith("سلسلة-")) continue;
 
+        const rawTitle = slug.replace(/-/g, " ");
+        if (!isRelevant(rawTitle, trimmed)) continue;
+
         seen.add(fullUrl);
 
         const isSeries = slug.startsWith("مسلسل-");
@@ -44,10 +50,9 @@ export class FaselHdProvider implements Provider {
 
         if (kind && kind !== detectedKind) continue;
 
-        const rawTitle = slug.replace(/-/g, " ");
         const title = cleanTitle(rawTitle);
         const year = parseYear(rawTitle);
-        const similarity = computeSimilarity(query, rawTitle);
+        const similarity = computeSimilarity(trimmed, rawTitle);
 
         // Poster matching near this slug
         let poster: string | undefined;
@@ -173,5 +178,13 @@ export class FaselHdProvider implements Provider {
     } catch {
       return [];
     }
+  }
+
+  async resolveStream(watchUrl: string): Promise<ResolvedStream> {
+    return {
+      quality: "720p HD",
+      directVideoUrl: watchUrl,
+      fileName: "faselhd-video.mp4",
+    };
   }
 }

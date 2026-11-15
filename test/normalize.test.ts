@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   cleanTitle,
   computeSimilarity,
+  isRelevant,
   normalizeArabic,
   parseQuality,
   parseSeasonEpisode,
@@ -52,4 +53,17 @@ test("computes title similarity accurately", () => {
 
   const simUnrelated = computeSimilarity("superman", "Barbie");
   assert.ok(simUnrelated < 0.3, `Expected low sim, got ${simUnrelated}`);
+});
+
+test("isRelevant verifies token overlap and filters unrelated noise", () => {
+  // Positive matches
+  assert.ok(isRelevant("مسلسل مفترق طرق الحلقة 14", "مفترق طرق"));
+  assert.ok(isRelevant("اللعبة ج5 : الكلاسيكو", "اللعبة"));
+  assert.ok(isRelevant("Avengers: Endgame", "marvel endgame"));
+
+  // Negative matches (must reject unrelated trending items)
+  assert.ok(!isRelevant("الخليفة 2026", "مفترق طرق"));
+  assert.ok(!isRelevant("Perfect Crown 2026", "مفترق طرق"));
+  assert.ok(!isRelevant("التمثيلية 2026", "مفترق طرق"));
+  assert.ok(!isRelevant("المتشرد 2024", "مفترق طرق"));
 });
