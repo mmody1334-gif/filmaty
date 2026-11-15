@@ -94,10 +94,47 @@ export function buildMovieDetailsKeyboard(
   return { inline_keyboard: keyboard };
 }
 
+export function buildSeriesSeasonsKeyboard(
+  itemKey: string,
+  searchKey: string,
+  seasons: SeasonGroup[],
+): InlineKeyboardMarkup {
+  const keyboard: InlineKeyboardButton[][] = [];
+  let currentRow: InlineKeyboardButton[] = [];
+
+  for (let i = 0; i < seasons.length; i++) {
+    const s = seasons[i];
+    currentRow.push({
+      text: `📺 الموسم ${s.season}`,
+      callback_data: `mov|sn|${itemKey}|${i}`,
+    });
+
+    if (currentRow.length === 3) {
+      keyboard.push(currentRow);
+      currentRow = [];
+    }
+  }
+
+  if (currentRow.length > 0) {
+    keyboard.push(currentRow);
+  }
+
+  const backRow: InlineKeyboardButton[] = [];
+  if (searchKey) {
+    backRow.push({ text: "🔙 رجوع للبحث", callback_data: `mov|b|${searchKey}` });
+  }
+  backRow.push({ text: "💾 حفظ بالأرشيف", callback_data: `mov|ar|${itemKey}` });
+  keyboard.push(backRow);
+
+  return { inline_keyboard: keyboard };
+}
+
 export function buildSeriesEpisodesKeyboard(
   itemKey: string,
   searchKey: string,
   episodes: Episode[],
+  seasonIdx = 0,
+  hasMultipleSeasons = false,
 ): InlineKeyboardMarkup {
   const keyboard: InlineKeyboardButton[][] = [];
   let currentRow: InlineKeyboardButton[] = [];
@@ -106,7 +143,7 @@ export function buildSeriesEpisodesKeyboard(
     const ep = episodes[i];
     currentRow.push({
       text: `حلقة ${ep.episode}`,
-      callback_data: `mov|e|${itemKey}|${i}`,
+      callback_data: `mov|e|${itemKey}|${seasonIdx}|${i}`,
     });
 
     if (currentRow.length === 4) {
@@ -120,6 +157,9 @@ export function buildSeriesEpisodesKeyboard(
   }
 
   const backRow: InlineKeyboardButton[] = [];
+  if (hasMultipleSeasons) {
+    backRow.push({ text: "🔙 اختيار موسم آخر", callback_data: `mov|sns|${itemKey}` });
+  }
   if (searchKey) {
     backRow.push({ text: "🔙 رجوع للبحث", callback_data: `mov|b|${searchKey}` });
   }

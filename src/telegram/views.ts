@@ -66,12 +66,23 @@ export function formatFilmDetails(details: MediaDetails): string {
 👇 <b>اختر الجودة للتحميل أو المشاهدة:</b>`;
 }
 
-export function formatSeriesDetails(details: MediaDetails): string {
+export function formatSeriesSeasons(details: MediaDetails): string {
   const yearText = details.year ? ` • 📅 ${details.year}` : "";
   const ratingText = details.rating ? ` • ⭐ ${details.rating}` : "";
   const story = details.description ? `\n\n📖 <b>القصة:</b>\n${escapeHtml(details.description.slice(0, 450))}` : "";
 
   return `📺 <b>${escapeHtml(details.title)}</b>${yearText}${ratingText}${story}
+
+👇 <b>اختر الموسم المطلوب:</b>`;
+}
+
+export function formatSeriesDetails(details: MediaDetails, seasonNum?: number): string {
+  const yearText = details.year ? ` • 📅 ${details.year}` : "";
+  const ratingText = details.rating ? ` • ⭐ ${details.rating}` : "";
+  const seasonBadge = seasonNum ? ` • 📺 الموسم ${seasonNum}` : "";
+  const story = details.description ? `\n\n📖 <b>القصة:</b>\n${escapeHtml(details.description.slice(0, 450))}` : "";
+
+  return `📺 <b>${escapeHtml(details.title)}</b>${seasonBadge}${yearText}${ratingText}${story}
 
 👇 <b>اختر الحلقة:</b>`;
 }

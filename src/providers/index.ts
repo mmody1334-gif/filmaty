@@ -2,17 +2,23 @@ import { AkwamProvider } from "./akwam.ts";
 import { EgyBestProvider } from "./egybest.ts";
 import { UniversalEmbedProvider } from "./embed.ts";
 import { FaselHdProvider } from "./faselhd.ts";
+import { FushaarProvider } from "./fushaar.ts";
 import { LarozaProvider } from "./laroza.ts";
 import { MyCimaProvider } from "./mycima.ts";
+import { NetflixGlobalProvider } from "./netflix-global.ts";
+import { TopCinemaProvider } from "./topcinema.ts";
 import { isRelevant } from "../engine/normalize.ts";
 import type { Candidate, MediaKind, Provider } from "./types.ts";
 
 export const ALL_PROVIDERS: Provider[] = [
   new AkwamProvider(),
+  new NetflixGlobalProvider(),
   new EgyBestProvider(),
-  new FaselHdProvider(),
+  new TopCinemaProvider(),
+  new FushaarProvider(),
   new MyCimaProvider(),
   new LarozaProvider(),
+  new FaselHdProvider(),
   new UniversalEmbedProvider(),
 ];
 

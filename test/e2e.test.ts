@@ -21,3 +21,21 @@ test("e2e: YouTube video details fetches metadata cleanly", async () => {
   assert.ok(details.title);
   assert.ok(details.videoId === "dQw4w9WgXcQ");
 });
+
+test("e2e: NetflixGlobalProvider searches Netflix series and extracts seasons", async () => {
+  const { NetflixGlobalProvider } = await import("../src/providers/netflix-global.ts");
+  const p = new NetflixGlobalProvider();
+  const results = await p.search("Stranger Things", "series");
+  assert.ok(Array.isArray(results));
+  assert.ok(results.length > 0);
+  const first = results[0];
+  assert.ok(first.title.includes("Stranger Things"));
+
+  const details = await p.getDetails(first);
+  assert.ok(details.seasons.length > 0);
+  assert.ok(details.seasons[0].episodes.length > 0);
+
+  const sources = await p.getEpisodeSources(details.seasons[0].episodes[0]);
+  assert.ok(sources.length >= 2);
+  assert.ok(sources[0].url.startsWith("https://"));
+});

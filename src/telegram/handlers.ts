@@ -491,9 +491,25 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     await store.put(`mov_d:${itemKey}`, JSON.stringify({ details, searchKey }), 3600);
 
     if (details.kind === "series" && details.seasons.length > 0) {
+      if (details.seasons.length > 1) {
+        // Multi-season series: show season picker first
+        const text = views.formatSeriesSeasons(details);
+        const keyboard = kb.buildSeriesSeasonsKeyboard(itemKey, searchKey, details.seasons);
+        if (details.poster) {
+          try {
+            await bot.sendPhoto(chatId, details.poster, text, { reply_markup: keyboard });
+            await bot.deleteMessage(chatId, messageId).catch(() => undefined);
+            return;
+          } catch {}
+        }
+        await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+        return;
+      }
+
+      // Single season: show episodes directly
       const episodes = details.seasons[0].episodes;
-      const text = views.formatSeriesDetails(details);
-      const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, searchKey, episodes);
+      const text = views.formatSeriesDetails(details, details.seasons[0].season);
+      const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, searchKey, episodes, 0, false);
 
       if (details.poster) {
         try {
@@ -521,10 +537,10 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     return;
   }
 
-  // Pick series episode: mov|e|{itemKey}|{epIdx}
-  if (data.startsWith("mov|e|")) {
-    const [, , itemKey, epIdxStr] = data.split("|");
-    const epIdx = Number(epIdxStr) || 0;
+  // Pick series season: mov|sn|{itemKey}|{seasonIdx}
+  if (data.startsWith("mov|sn|")) {
+    const [, , itemKey, sIdxStr] = data.split("|");
+    const sIdx = Number(sIdxStr) || 0;
     const raw = await store.get(`mov_d:${itemKey}`);
     if (!raw) {
       await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد البحث.");
@@ -532,7 +548,50 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     }
     const stored = JSON.parse(raw);
     const details: MediaDetails = stored.details;
-    const ep = details.seasons?.[0]?.episodes?.[epIdx];
+    const season = details.seasons?.[sIdx];
+    if (!season) return;
+
+    const text = views.formatSeriesDetails(details, season.season);
+    const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, stored.searchKey || "", season.episodes, sIdx, true);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  // Back to seasons: mov|sns|{itemKey}
+  if (data.startsWith("mov|sns|")) {
+    const [, , itemKey] = data.split("|");
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    const text = views.formatSeriesSeasons(details);
+    const keyboard = kb.buildSeriesSeasonsKeyboard(itemKey, stored.searchKey || "", details.seasons);
+    await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+    return;
+  }
+
+  // Pick series episode: mov|e|{itemKey}|{seasonIdx}|{epIdx} OR mov|e|{itemKey}|{epIdx}
+  if (data.startsWith("mov|e|")) {
+    const parts = data.split("|");
+    const itemKey = parts[2];
+    let seasonIdx = 0;
+    let epIdx = 0;
+    if (parts.length >= 5) {
+      seasonIdx = Number(parts[3]) || 0;
+      epIdx = Number(parts[4]) || 0;
+    } else {
+      epIdx = Number(parts[3]) || 0;
+    }
+
+    const raw = await store.get(`mov_d:${itemKey}`);
+    if (!raw) {
+      await bot.sendMessage(chatId, "⌛ انتهت الجلسة. أعد البحث.");
+      return;
+    }
+    const stored = JSON.parse(raw);
+    const details: MediaDetails = stored.details;
+    const season = details.seasons?.[seasonIdx] || details.seasons?.[0];
+    const ep = season?.episodes?.[epIdx];
     if (!ep) return;
 
     await bot.safeEdit(chatId, messageId, `⏳ جاري جلب جودات <b>${views.escapeHtml(ep.title)}</b>...`);
@@ -541,7 +600,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     const epSources = await provider.getEpisodeSources(ep);
 
     const epKey = shortKey();
-    await store.put(`mov_e:${epKey}`, JSON.stringify({ ep, epSources, itemKey, details }), 3600);
+    await store.put(`mov_e:${epKey}`, JSON.stringify({ ep, epSources, itemKey, details, seasonIdx }), 3600);
 
     const text = views.formatEpisodeDetails(details.title, ep.title);
     const keyboard = kb.buildEpisodeQualitiesKeyboard(epKey, itemKey, epSources);
@@ -550,16 +609,20 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     return;
   }
 
-  // Back to episodes: mov|be|{itemKey}
+  // Back to episodes: mov|be|{itemKey}|{seasonIdx}
   if (data.startsWith("mov|be|")) {
-    const [, , itemKey] = data.split("|");
+    const parts = data.split("|");
+    const itemKey = parts[2];
+    const seasonIdx = Number(parts[3]) || 0;
     const raw = await store.get(`mov_d:${itemKey}`);
     if (!raw) return;
     const stored = JSON.parse(raw);
     const details: MediaDetails = stored.details;
-    const episodes = details.seasons?.[0]?.episodes || [];
-    const text = views.formatSeriesDetails(details);
-    const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, stored.searchKey || "", episodes);
+    const season = details.seasons?.[seasonIdx] || details.seasons?.[0];
+    const episodes = season?.episodes || [];
+    const hasMultiple = (details.seasons?.length || 0) > 1;
+    const text = views.formatSeriesDetails(details, season?.season);
+    const keyboard = kb.buildSeriesEpisodesKeyboard(itemKey, stored.searchKey || "", episodes, seasonIdx, hasMultiple);
     await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
     return;
   }
@@ -675,7 +738,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
       const text = views.formatStreamReadyCard(title, quality, size, true);
       const keyboard = kb.buildStreamReadyKeyboard(
         stream.directVideoUrl,
-        `mov|be|${stored.itemKey}`,
+        `mov|be|${stored.itemKey}|${stored.seasonIdx || 0}`,
         stored.searchKey || "",
       );
 
@@ -687,7 +750,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
         `❌ تعذر استخراج الرابط المباشر:\n<code>${views.escapeHtml(err.message)}</code>`,
         {
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 رجوع للحلقات", callback_data: `mov|be|${stored.itemKey}` }]],
+            inline_keyboard: [[{ text: "🔙 رجوع للحلقات", callback_data: `mov|be|${stored.itemKey}|${stored.seasonIdx || 0}` }]],
           },
         },
       );
