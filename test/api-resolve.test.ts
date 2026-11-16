@@ -139,8 +139,8 @@ test("resolves Interstellar to a signed stream + download link", async () => {
     assert.equal(payload!.k, "mp4");
     assert.equal(payload!.n, "Interstellar");
 
-    // Success is cached for 6h under srv7:<type>:<id>:<s>:<e>.
-    const cached = map.get("srv7:movie:157336:0:0");
+    // Success is cached for 6h under srv8:<type>:<id>:<s>:<e>.
+    const cached = map.get("srv8:movie:157336:0:0");
     assert.ok(cached, "expected cached resolve result");
     assert.equal(JSON.parse(cached!).ok, true);
   } finally {
@@ -156,7 +156,7 @@ test("unknown TMDB id returns {ok:false} with 404 (not 500)", async () => {
     assert.equal(res.status, 404);
     assert.equal((await res.json() as any).ok, false);
     // Failures are cached too (30 min) so the lookup is not repeated.
-    const cached = map.get("srv7:movie:999999999:0:0");
+    const cached = map.get("srv8:movie:999999999:0:0");
     assert.ok(cached, "expected cached failure");
     assert.equal(JSON.parse(cached!).ok, false);
   } finally {
