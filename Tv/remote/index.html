@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>فيلماتي 📱 ريموت التلفزيون</title>
+  <!-- Phone remote for the TV mode: scan the TV's QR (or type its code),
+       then search and pick — the TV plays it. No video plays here and
+       nothing downloads: every pick is a POST to /api/tv-command, and the
+       TV polls that endpoint and plays the newest command. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              red: '#e50914',
+              gold: '#f59e0b',
+              dark: '#0b0f19',
+              card: '#161e2e',
+              border: '#26334d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+    * { font-family: 'Cairo', system-ui, -apple-system, sans-serif; }
+    body { background-color: #0b0f19; color: #f8fafc; }
+    .glass { background: rgba(22, 30, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <div class="max-w-md mx-auto">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 glass border-b border-brand-border px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">📱</span>
+        <h1 class="text-lg font-extrabold text-white">ريموت التلفزيون</h1>
+      </div>
+      <span id="remoteStatus" class="text-xs font-bold px-3 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">📺 جاهز</span>
+    </header>
+
+    <!-- Session: from the QR (?s=CODE), or type the code shown on the TV. -->
+    <div id="remoteConnect" class="px-4 pt-4 hidden">
+      <p class="text-slate-300 text-sm font-bold mb-2">اكتب الكود اللي ظاهر على التلفزيون:</p>
+      <div class="flex gap-2">
+        <input id="remoteCodeInput" type="text" maxlength="6" placeholder="مثال: K7M2P9" autocomplete="off"
+          class="flex-1 min-w-0 px-4 py-3 rounded-2xl bg-brand-card border border-brand-border text-white text-xl font-black tracking-[0.3em] text-center placeholder:text-slate-500" dir="ltr">
+        <button id="remoteConnectBtn" class="px-5 py-3 rounded-2xl bg-red-600 text-white text-base font-extrabold">اتصال</button>
+      </div>
+    </div>
+    <p id="remoteSessionLine" class="px-4 pt-3 text-slate-400 text-sm font-bold hidden">التلفزيون: <span id="remoteSessionCode" class="text-amber-300 tracking-[0.2em]" dir="ltr"></span></p>
+
+    <!-- Transport: pause/resume + stop what the TV is playing. -->
+    <div id="remoteTransport" class="px-4 pt-4 flex gap-2 hidden">
+      <button id="remoteToggle" class="flex-1 py-3 rounded-2xl bg-brand-card border border-brand-border text-white text-base font-extrabold">⏸ إيقاف مؤقت / ▶ تشغيل</button>
+      <button id="remoteClose" class="px-5 py-3 rounded-2xl bg-slate-800 border border-brand-border text-slate-200 text-base font-extrabold">✕ إيقاف</button>
+    </div>
+
+    <!-- Tabs -->
+    <nav class="px-4 pt-4 flex gap-2 overflow-x-auto" aria-label="التصنيفات">
+      <button data-tab="home" class="remote-tab whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-extrabold bg-red-600 text-white transition">🏠 الرئيسية</button>
+      <button data-tab="movie-ar" class="remote-tab whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🎬 أفلام عربي</button>
+      <button data-tab="movie-en" class="remote-tab whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🇺🇸 أفلام إنجليزي</button>
+      <button data-tab="tv-ar" class="remote-tab whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">📺 مسلسلات عربي</button>
+      <button data-tab="tv-en" class="remote-tab whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🇺🇸 مسلسلات إنجليزي</button>
+      <button data-tab="top" class="remote-tab whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">⭐ الأعلى تقييمًا</button>
+    </nav>
+
+    <!-- Search -->
+    <div class="px-4 pt-3">
+      <form id="remoteSearchForm" class="flex gap-2">
+        <input id="remoteSearchInput" type="search" placeholder="🔍 ابحث عن فيلم أو مسلسل…" autocomplete="off"
+          class="flex-1 min-w-0 px-4 py-3 rounded-2xl bg-brand-card border border-brand-border text-white text-base font-bold placeholder:text-slate-500">
+        <button type="submit" class="px-5 py-3 rounded-2xl bg-red-600 text-white text-base font-extrabold">بحث</button>
+      </form>
+    </div>
+
+    <!-- Lists -->
+    <main class="px-4 pt-4 space-y-6">
+      <div id="remoteHome" class="space-y-6"></div>
+      <div id="remoteGridWrap" class="hidden">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="remoteGridTitle" class="text-lg font-extrabold text-white"></h2>
+          <span id="remoteGridCount" class="text-sm text-slate-400 font-bold"></span>
+        </div>
+        <div id="remoteGrid" class="grid grid-cols-3 gap-3"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Series episode picker -->
+  <div id="remoteSheet" class="fixed inset-0 z-50 bg-black/90 overflow-y-auto hidden" role="dialog" aria-modal="true">
+    <div class="max-w-md mx-auto px-4 py-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 id="remoteSheetTitle" class="text-lg font-extrabold text-white"></h2>
+        <button id="remoteSheetClose" class="w-10 h-10 rounded-full bg-slate-800 text-white text-lg font-bold flex items-center justify-center">✕</button>
+      </div>
+      <div>
+        <p class="text-sm font-extrabold text-slate-400 mb-2">الموسم</p>
+        <div id="remoteSeasons" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <p class="text-sm font-extrabold text-slate-400 mb-2">الحلقة</p>
+        <div id="remoteEpisodes" class="flex flex-wrap gap-2"></div>
+      </div>
+      <p class="text-slate-500 text-xs font-semibold text-center">دوس على الحلقة وهتشتغل على التلفزيون على طول.</p>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="remoteToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] hidden px-5 py-3 rounded-2xl bg-emerald-600 text-white text-base font-extrabold shadow-2xl"></div>
+
+  <script>
+    const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
+    const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+    const TMDB_BASE = 'https://api.themoviedb.org/3';
+    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+
+    const params = new URLSearchParams(location.search);
+    let session = (params.get('s') || '').trim().toUpperCase();
+    let sheetItem = null;
+    let sheetSeason = 1;
+
+    const toastEl = document.getElementById('remoteToast');
+    let toastTimer = null;
+    function toast(msg) {
+      toastEl.innerText = msg;
+      toastEl.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 3500);
+    }
+
+    function showConnected() {
+      document.getElementById('remoteConnect').classList.add('hidden');
+      document.getElementById('remoteSessionLine').classList.remove('hidden');
+      document.getElementById('remoteSessionCode').innerText = session;
+      document.getElementById('remoteTransport').classList.remove('hidden');
+      document.getElementById('remoteStatus').innerText = '📺 جاهز';
+    }
+
+    if (/^[A-Za-z0-9]{6}$/.test(session)) {
+      showConnected();
+    } else {
+      document.getElementById('remoteConnect').classList.remove('hidden');
+      document.getElementById('remoteStatus').innerText = '⌨️ اكتب الكود';
+    }
+
+    document.getElementById('remoteConnectBtn').addEventListener('click', () => {
+      const code = document.getElementById('remoteCodeInput').value.trim().toUpperCase();
+      if (!/^[A-Za-z0-9]{6}$/.test(code)) {
+        toast('الكود 6 حروف وأرقام');
+        return;
+      }
+      session = code;
+      history.replaceState(null, '', `${location.pathname}?s=${session}`);
+      showConnected();
+      toast('📺 متصل بالتلفزيون');
+    });
+
+    // Every pick is one POST; the TV polls and plays it within ~2 seconds.
+    async function sendCommand(action, extra = {}) {
+      if (!session) {
+        toast('اكتب كود التلفزيون الأول');
+        return false;
+      }
+      const cmdId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        const res = await fetch(`${API_BASE}/api/tv-command`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session, action, cmdId, ...extra }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!data || !data.ok) {
+          toast('تعذر الإرسال — جرّب تاني');
+          return false;
+        }
+        return true;
+      } catch (e) {
+        toast('تعذر الإرسال — تحقق من النت');
+        return false;
+      }
+    }
+
+    document.getElementById('remoteToggle').addEventListener('click', async () => {
+      if (await sendCommand('toggle')) toast('⏸ / ▶ تم الإرسال');
+    });
+    document.getElementById('remoteClose').addEventListener('click', async () => {
+      if (await sendCommand('close')) toast('✕ تم الإيقاف');
+    });
+
+    // ---------- Lists (same Worker API as the TV page) ----------
+    const remoteHome = document.getElementById('remoteHome');
+    const remoteGridWrap = document.getElementById('remoteGridWrap');
+    const remoteGrid = document.getElementById('remoteGrid');
+    const remoteGridTitle = document.getElementById('remoteGridTitle');
+    const remoteGridCount = document.getElementById('remoteGridCount');
+
+    function showHomeView() {
+      remoteGridWrap.classList.add('hidden');
+      remoteHome.classList.remove('hidden');
+    }
+    function showGridView() {
+      remoteHome.classList.add('hidden');
+      remoteGridWrap.classList.remove('hidden');
+    }
+    function cardHtml(item) {
+      const title = item.title || item.name || 'بدون عنوان';
+      const date = item.release_date || item.first_air_date || '';
+      const year = date ? date.slice(0, 4) : '';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
+      const poster = item.poster || (item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster');
+      const type = item.media_type || (item.name ? 'tv' : 'movie');
+      return `
+        <div class="remote-card cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border active:border-red-500" data-id="${item.id}" data-type="${type}">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover">
+            <span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/75 text-amber-400 text-[11px] font-extrabold">⭐ ${rating}</span>
+          </div>
+          <div class="p-2">
+            <h4 class="text-xs font-bold text-white truncate">${title}</h4>
+            <p class="text-[11px] text-slate-400 font-medium mt-0.5">${year}</p>
+          </div>
+        </div>`;
+    }
+    function bindCards(root) {
+      root.querySelectorAll('.remote-card').forEach((card) => {
+        card.addEventListener('click', () => pickTitle(Number(card.dataset.id), card.dataset.type));
+      });
+    }
+    function sectionHtml(title, items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h2 class="text-lg font-extrabold text-white mb-3">${title}</h2>
+          <div class="grid grid-cols-3 gap-3">
+            ${items.map(cardHtml).join('')}
+          </div>
+        </section>`;
+    }
+
+    async function loadHome() {
+      showHomeView();
+      remoteHome.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
+      try {
+        const res = await fetch(`${API_BASE}/api/home`);
+        const data = await res.json();
+        remoteHome.innerHTML =
+          sectionHtml('🔥 الأكثر مشاهدة', data.mostWatched || []) +
+          sectionHtml('⭐ الأعلى تقييمًا', data.topRated || []);
+        bindCards(remoteHome);
+      } catch (e) {
+        remoteHome.innerHTML = '<div class="text-center py-12 text-slate-400 text-sm font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
+      }
+    }
+
+    async function loadBrowse(params, title) {
+      showGridView();
+      remoteGridTitle.innerText = title;
+      remoteGrid.innerHTML = Array(9).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-48 border border-brand-border"></div>').join('');
+      try {
+        const qs = new URLSearchParams(params);
+        const res = await fetch(`${API_BASE}/api/browse?${qs.toString()}`);
+        const data = await res.json();
+        const items = data.results || [];
+        remoteGridCount.innerText = `${items.length} عمل`;
+        if (!items.length) {
+          remoteGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-sm font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
+          return;
+        }
+        remoteGrid.innerHTML = items.map(cardHtml).join('');
+        bindCards(remoteGrid);
+      } catch (e) {
+        remoteGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 text-sm font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
+      }
+    }
+
+    async function runSearch(query) {
+      showGridView();
+      remoteGridTitle.innerText = `🔍 ${query}`;
+      remoteGrid.innerHTML = Array(9).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-48 border border-brand-border"></div>').join('');
+      try {
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        const items = (data.results || []).filter((i) => !i.providerUrl);
+        remoteGridCount.innerText = `${items.length} عمل`;
+        if (!items.length) {
+          remoteGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-sm font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
+          return;
+        }
+        remoteGrid.innerHTML = items.map(cardHtml).join('');
+        bindCards(remoteGrid);
+      } catch (e) {
+        remoteGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 text-sm font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
+      }
+    }
+
+    document.querySelectorAll('.remote-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.remote-tab').forEach((b) => {
+          b.classList.remove('bg-red-600', 'text-white');
+          b.classList.add('bg-brand-card', 'text-slate-300');
+        });
+        btn.classList.remove('bg-brand-card', 'text-slate-300');
+        btn.classList.add('bg-red-600', 'text-white');
+        document.getElementById('remoteSearchInput').value = '';
+        const tab = btn.dataset.tab;
+        if (tab === 'home') loadHome();
+        else if (tab === 'movie-ar') loadBrowse({ type: 'movie', lang: 'ar', sort: 'popular', page: '1' }, '🎬 أفلام عربي');
+        else if (tab === 'movie-en') loadBrowse({ type: 'movie', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 أفلام إنجليزي');
+        else if (tab === 'tv-ar') loadBrowse({ type: 'tv', lang: 'ar', sort: 'popular', page: '1' }, '📺 مسلسلات عربي');
+        else if (tab === 'tv-en') loadBrowse({ type: 'tv', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 مسلسلات إنجليزي');
+        else if (tab === 'top') loadBrowse({ sort: 'top_rated', page: '1' }, '⭐ الأعلى تقييمًا');
+      });
+    });
+
+    document.getElementById('remoteSearchForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = document.getElementById('remoteSearchInput').value.trim();
+      if (q) runSearch(q);
+    });
+
+    // ---------- Picking: a film plays on the TV at once; a series opens
+    // its episode picker here, and the picked episode plays on the TV.
+    async function pickTitle(id, type) {
+      if (type === 'movie') {
+        if (await sendCommand('play', { type: 'movie', id })) {
+          toast('▶ جاري التشغيل على التلفزيون');
+        }
+        return;
+      }
+      try {
+        const res = await fetch(`${TMDB_BASE}/tv/${id}?api_key=${TMDB_KEY}&language=ar`);
+        const tv = await res.json();
+        sheetItem = { id, title: tv.name || 'مسلسل' };
+        sheetSeason = (tv.seasons || []).filter((s) => s.season_number > 0)[0]?.season_number || 1;
+        document.getElementById('remoteSheetTitle').innerText = sheetItem.title;
+        renderSheetSeasons(tv.seasons || []);
+      } catch (e) {
+        toast('تعذر فتح المسلسل');
+      }
+    }
+
+    function renderSheetSeasons(seasons) {
+      const list = seasons.filter((s) => s.season_number > 0);
+      document.getElementById('remoteSeasons').innerHTML = list.map((s) => `
+        <button data-season="${s.season_number}" class="remote-season ${s.season_number === sheetSeason ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-4 py-2.5 text-sm font-bold border border-brand-border">الموسم ${s.season_number}</button>
+      `).join('');
+      const current = list.find((s) => s.season_number === sheetSeason) || list[0];
+      renderSheetEpisodes(current?.episode_count || 10);
+      document.getElementById('remoteSheet').classList.remove('hidden');
+      document.querySelectorAll('.remote-season').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          sheetSeason = Number(btn.dataset.season);
+          renderSheetSeasons(seasons);
+        });
+      });
+    }
+
+    function renderSheetEpisodes(count) {
+      document.getElementById('remoteEpisodes').innerHTML = Array.from({ length: count }, (_, i) => i + 1).map((ep) => `
+        <button data-ep="${ep}" class="remote-ep bg-slate-800 text-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold border border-brand-border">حلقة ${ep}</button>
+      `).join('');
+      document.querySelectorAll('.remote-ep').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const ep = Number(btn.dataset.ep);
+          document.getElementById('remoteSheet').classList.add('hidden');
+          if (await sendCommand('play', { type: 'tv', id: sheetItem.id, s: sheetSeason, e: ep })) {
+            toast(`▶ الحلقة ${ep} جاري تشغيلها على التلفزيون`);
+          }
+        });
+      });
+    }
+
+    document.getElementById('remoteSheetClose').addEventListener('click', () => {
+      document.getElementById('remoteSheet').classList.add('hidden');
+    });
+
+    loadHome();
+  </script>
+</body>
+</html>
