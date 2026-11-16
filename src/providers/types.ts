@@ -11,6 +11,10 @@ export interface Candidate {
   url: string;
   poster?: string;
   similarity?: number;
+  // TMDB id when the candidate was attached to a TMDB title by the bot's
+  // unified search (attachProviderCandidate). Raw provider-search results
+  // have no tmdbId. Used to match a stored episode preference exactly.
+  tmdbId?: number;
 }
 
 export interface Episode {
