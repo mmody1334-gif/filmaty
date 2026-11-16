@@ -290,7 +290,16 @@ test("حب متنكر S1E1 resolves via the Arabic display title when the origin
       return jsonResponse({ results: [] });
     }
     if (url.includes("laroza1.bond/search.php")) {
-      return new Response(HM_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
+      // Laroza's site search only finds the show by its Arabic name —
+      // the English/Korean query rounds must yield nothing here, so the
+      // resolve has to fall through to the Arabic round (the lazy
+      // multi-round path). Returning the candidate for every query
+      // would let the English round resolve it and hide a regression
+      // of that fall-through.
+      if (decodeURIComponent(url).includes("حب متنكر")) {
+        return new Response(HM_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
+      }
+      return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
     }
     if (url.includes("laroza1.bond/video.php?vid=hmep1")) {
       return new Response(HM_DETAILS_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
