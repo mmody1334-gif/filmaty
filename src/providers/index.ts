@@ -35,8 +35,22 @@ export async function searchAllProviders(
   // merge dropped Laroza entirely so the resolver never saw it.
   // UI callers keep the default merge (one entry per title).
   keepPerSite = false,
+  // When set, search ONLY these provider ids. The direct resolver uses
+  // this: a resolve runs up to 4 query rounds, and 9 providers per round
+  // (plus details/probes, plus redirect hops) exhausts the Worker's
+  // subrequest budget (~50/request) before the working copy is ever
+  // tried — حب متنكر died exactly this way (Laroza's details came back
+  // empty and round 3 never ran, while the same candidate resolved fine
+  // in isolation). Only Akwam, Laroza and the embed scraper (whose
+  // vidsrc/streamwish pages sometimes carry a direct mp4) have ever
+  // yielded a validated direct mp4; the others return file hosts,
+  // stubs, or embeds, which cannot serve the native player or a direct
+  // download anyway.
+  onlySites?: string[],
 ): Promise<Candidate[]> {
-  const activeProviders = ALL_PROVIDERS.filter((p) => !disabledSites.includes(p.id));
+  const activeProviders = ALL_PROVIDERS.filter(
+    (p) => !disabledSites.includes(p.id) && (!onlySites || onlySites.includes(p.id)),
+  );
 
   // Run all active providers in parallel
   const settled = await Promise.allSettled(
