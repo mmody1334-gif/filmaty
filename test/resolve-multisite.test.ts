@@ -242,3 +242,80 @@ test("Laroza series page: episode <select> maps every episode to its own page", 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("matchesKnownTitles: Arabic+English combined title matches, spin-off does not", async () => {
+  const { matchesKnownTitles } = await import("../src/engine/resolve.ts");
+  const known = ["나의 유죄인간", "Love in Disguise", "حب متنكر"];
+  assert.equal(matchesKnownTitles("حب متنكر Love in Disguise", known), true);
+  assert.equal(matchesKnownTitles("Love in Disguise حب متنكر", known), true);
+  assert.equal(matchesKnownTitles("Dexter: Resurrection", ["Dexter"]), false);
+  assert.equal(matchesKnownTitles("VisionQuest (الموسم 1)", ["VisionQuest"]), true);
+  assert.equal(matchesKnownTitles("The 100 (الموسم 7)", ["The 100"]), true);
+  assert.equal(matchesKnownTitles("حب متنكر الموسم 1", known), true);
+});
+
+test("حب متنكر S1E1 resolves via the Arabic display title when the original is Korean", async () => {
+  const HM_SEARCH_HTML = `
+<html><body>
+<a href="https://laroza1.bond/video.php?vid=hmep1" title="مسلسل حب متنكر Love in Disguise">حب متنكر Love in Disguise</a>
+</body></html>
+`;
+  const HM_DETAILS_HTML = `
+<html><head><title>مسلسل حب متنكر Love in Disguise الموسم الاول الحلقة 1 مترجمة</title></head><body>
+<ul aria-label="اختيار الموسم">
+  <li data-serie="1" class="active"><button class="lr-episode-season-tab" type="button">الموسم 1</button></li>
+</ul>
+<select aria-label="Episodes" class="episodeoption" id="MSeason1">
+  <option value="select-ep">قائمه الحلقات</option>
+  <option selected value='video.php?vid=hmep1'> الحلقة 1</option>
+  <option value='video.php?vid=hmep2'> الحلقة 2</option>
+</select>
+</body></html>
+`;
+  const HM_DL_HTML = `
+<html><body>
+<a href="https://okprimeone.site/v/02/00029/hm/HM.S01E01.mp4">720p (400 MB)</a>
+</body></html>
+`;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes("api.themoviedb.org/3/tv/303745") && url.includes("language=en-US")) {
+      return jsonResponse({ id: 303745, name: "Love in Disguise", original_name: "나의 유죄인간", first_air_date: "2026-01-01" });
+    }
+    if (url.includes("api.themoviedb.org/3/tv/303745") && url.includes("language=ar")) {
+      return jsonResponse({ id: 303745, name: "حب متنكر", original_name: "나의 유죄인간", first_air_date: "2026-01-01" });
+    }
+    if (url.includes("api.themoviedb.org")) {
+      return jsonResponse({ results: [] });
+    }
+    if (url.includes("laroza1.bond/search.php")) {
+      return new Response(HM_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
+    if (url.includes("laroza1.bond/video.php?vid=hmep1")) {
+      return new Response(HM_DETAILS_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
+    if (url.includes("laroza1.bond/download.php?vid=hmep1")) {
+      return new Response(HM_DL_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
+    if (url.includes("okprimeone.site")) {
+      return new Response("x", {
+        status: 206,
+        headers: { "Content-Type": "video/mp4", "Content-Range": "bytes 0-0/400000000", "Content-Length": "1" },
+      });
+    }
+    return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
+  };
+  try {
+    const { env } = mockEnv();
+    const result = await resolveServersByTmdb(env, "tv", 303745, 1, 1);
+    assert.ok(result, "resolve must succeed via the Arabic display title");
+    assert.match(result!.servers[0].name, /لاروزا|laroza/i);
+    assert.equal(
+      result!.servers[0].qualities[0].directVideoUrl,
+      "https://okprimeone.site/v/02/00029/hm/HM.S01E01.mp4",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
