@@ -80,7 +80,7 @@ const EGYBEST_SEARCH_HTML = `
 
 const LAROZA_SEARCH_HTML = `
 <html><body>
-<a href="https://laroza1.quest/video.php?vid=935f0b66d" title="مسلسل VisionQuest">VisionQuest</a>
+<a href="https://laroza1.bond/video.php?vid=935f0b66d" title="مسلسل VisionQuest">VisionQuest</a>
 </body></html>
 `;
 
@@ -126,13 +126,13 @@ function installMock() {
     if (url.includes("iegybest.cimawbas.tv/search.php")) {
       return new Response(EGYBEST_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.quest/search.php")) {
+    if (url.includes("laroza1.bond/search.php")) {
       return new Response(LAROZA_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.quest/video.php?vid=935f0b66d")) {
+    if (url.includes("laroza1.bond/video.php?vid=935f0b66d")) {
       return new Response(LAROZA_DETAILS_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.quest/download.php?vid=935f0b66d")) {
+    if (url.includes("laroza1.bond/download.php?vid=935f0b66d")) {
       return new Response(LAROZA_DL_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
     // The dead Akwam node: accepts the connection, never answers.
