@@ -741,8 +741,8 @@
 
     // Ask the Worker for the servers/qualities of a title. 12s timeout;
     // null on network failure or timeout. A parsed body is returned even
-    // when ok:false (it still carries the vidlink server); the caller
-    // decides whether to play natively or fall back to vidlink.
+    // when ok:false (it still carries the embedwave server); the caller
+    // decides whether to play natively or fall back to embedwave.
     async function fetchResolve(type, id, s, e) {
       const params = new URLSearchParams({ type, id: String(id) });
       if (s) params.set('s', String(s));
@@ -782,9 +782,9 @@
     }
 
     // Native-player failure handling: a dead stream (e.g. the CDN host is
-    // down) must fall back to the vidlink iframe instead of leaving a
-    // broken black player — and the dead link must not be reused by the
-    // download button.
+    // down) must fall back to the sandboxed embedwave iframe instead of
+    // leaving a broken black player — and the dead link must not be
+    // reused by the download button.
     let nativeActive = false;
     let nativePlayTimer = null;
 
@@ -816,7 +816,7 @@
     videoNative.addEventListener('playing', clearNativePlayTimeout);
 
     // Server + quality selection. currentServers is the servers array from
-    // the last /api/resolve (native server first, vidlink last).
+    // the last /api/resolve (native server first, embedwave last).
     function selectedServer() {
       return currentServers ? currentServers[selectedServerIdx] : null;
     }
@@ -826,18 +826,14 @@
       return server ? server.qualities[selectedQualityIdx] : null;
     }
 
-    function isVidlinkServer(server) {
-      return server && server.name === 'vidlink';
-    }
-
     function isEmbedwaveServer(server) {
       return server && server.name === 'embedwave';
     }
 
-    // Either iframe embed server (embedwave or vidlink), as opposed to a
-    // native direct-stream server.
+    // The iframe embed server (embedwave), as opposed to a native
+    // direct-stream server.
     function isEmbedServer(server) {
-      return isVidlinkServer(server) || isEmbedwaveServer(server);
+      return isEmbedwaveServer(server);
     }
 
     // Sandbox flags for the embedwave iframe: scripts + same-origin so the
@@ -900,13 +896,10 @@
       playerContainer.classList.remove('hidden');
       if (isEmbedServer(server)) {
         resetPlayer();
-        // embedwave plays sandboxed (ads blocked); vidlink refuses any
-        // sandbox, so its attribute is removed for that server.
-        if (isEmbedwaveServer(server)) {
-          videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
-        } else {
-          videoIframe.removeAttribute('sandbox');
-        }
+        // embedwave always plays sandboxed (ads blocked): scripts +
+        // same-origin so the player can run, but no popups or
+        // top-navigation.
+        videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
         videoIframe.src = quality.stream;
         playerContainer.classList.remove('hidden');
         return;
@@ -922,8 +915,8 @@
     }
 
     // Native player failure: try the next quality of the same server
-    // first; only when no quality is left, fall back to the embed
-    // servers (embedwave first, then vidlink).
+    // first; only when no quality is left, fall back to the sandboxed
+    // embedwave server.
     function tryNextQualityOrFallback() {
       const server = selectedServer();
       if (server && !isEmbedServer(server) && selectedQualityIdx < server.qualities.length - 1) {
@@ -937,10 +930,23 @@
     }
 
     // Embed fallback: pick the embedwave server if it exists and is not
-    // already selected (sandboxed, ads blocked); otherwise the vidlink
-    // server (unsandboxed last resort).
+    // already selected (sandboxed, ads blocked). When there is no embed
+    // server at all, say so — never open an unsandboxed player, so no
+    // popup can appear. Also forgets a dead native resolve result for
+    // this key so the download button re-resolves instead of reusing
+    // the dead link.
     function loadEmbedFallback() {
-      if (!currentServers) { loadVidlinkFallback(); return; }
+      if (!currentItem) return;
+      playerContainer.classList.remove('hidden');
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      const key = resolveKey(type, currentItem.id, s, e);
+      if (lastResolved && lastResolved.key === key) lastResolved = null;
+      if (!currentServers) {
+        showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
+        return;
+      }
       const embedwaveIdx = currentServers.findIndex((s) => s.name === 'embedwave');
       if (embedwaveIdx >= 0 && embedwaveIdx !== selectedServerIdx) {
         selectedServerIdx = embedwaveIdx;
@@ -949,39 +955,7 @@
         playSelected();
         return;
       }
-      loadVidlinkFallback();
-    }
-
-    // Vidlink fallback for the current item/season/episode. The iframe is
-    // unsandboxed: vidlink refuses to play inside a sandboxed iframe
-    // ("Please Disable Sandbox"), so its own ads/popups are no longer
-    // blocked there — the native server stays the ad-free default.
-    // Also forgets a dead native resolve result for this key so the
-    // download button re-resolves instead of reusing the dead link.
-    function loadVidlinkFallback() {
-      if (!currentItem) return;
-      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
-      const s = type === 'tv' ? selectedSeason : undefined;
-      const e = type === 'tv' ? selectedEpisode : undefined;
-      const key = resolveKey(type, currentItem.id, s, e);
-      if (lastResolved && lastResolved.key === key) lastResolved = null;
-      // Mark the vidlink server as selected in the server picker.
-      if (currentServers) {
-        const vidIdx = currentServers.findIndex((s) => s.name === 'vidlink');
-        if (vidIdx >= 0) { selectedServerIdx = vidIdx; selectedQualityIdx = 0; renderServerControls(); }
-      }
-      resetPlayer();
-      // Vidlink refuses any sandbox, so drop the attribute (the embedwave
-      // server may have left it on) before loading it.
-      videoIframe.removeAttribute('sandbox');
-      let streamUrl = '';
-      if (type === 'tv') {
-        streamUrl = `https://vidlink.pro/tv/${currentItem.id}/${selectedSeason}/${selectedEpisode}`;
-      } else {
-        streamUrl = `https://vidlink.pro/movie/${currentItem.id}`;
-      }
-      videoIframe.src = streamUrl;
-      playerContainer.classList.remove('hidden');
+      showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
     }
 
     function showToast(msg) {
@@ -1013,7 +987,8 @@
     }
 
     // In-App Instant Player: ad-free native <video> first, then the
-    // sandboxed embedwave embed, then the vidlink fallback
+    // sandboxed embedwave embed. No unsandboxed fallback exists anymore,
+    // so no popup can open from the player.
     btnPlayInApp.addEventListener('click', playActiveStream);
 
     async function playActiveStream() {
@@ -1036,8 +1011,7 @@
         playSelected();
         return;
       }
-      // No direct source: fall back to the embed servers (embedwave
-      // sandboxed first, then vidlink unsandboxed).
+      // No direct source: fall back to the sandboxed embedwave server.
       loadEmbedFallback();
     }
 
