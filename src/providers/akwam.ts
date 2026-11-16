@@ -450,7 +450,7 @@ export class AkwamProvider implements Provider {
         // list order: Akwam lists newest first, so order numbering labels
         // the last episode (E16) as episode 1 and an E1 request resolves
         // to the wrong file. A link whose number cannot be determined is
-        // skipped — the caller then tries the next candidate or vidlink.
+        // skipped — the caller then tries the next candidate or embedwave.
         const fromText = parseSeasonEpisode(linkText).episode;
         const slugMatch = epUrl.match(/الحلقة-(\d+)/);
         const epNumber =
