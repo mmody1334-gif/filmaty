@@ -342,7 +342,7 @@ async function fetchResolveCandidates(
   const enTitle = tmdbTitleOf(enData, type);
   if (!enTitle) return null;
 
-  let candidates = await searchAllProviders(enTitle.originalTitle, kind, disabled);
+  let candidates = await searchAllProviders(enTitle.originalTitle, kind, disabled, true);
   // Strict title filter: provider search is loose (isRelevant accepts a
   // substring), so a spin-off such as "Dexter: Resurrection" can outrank
   // the real "Dexter" and resolve to the wrong show/episode. Drop every
@@ -354,7 +354,7 @@ async function fetchResolveCandidates(
     const arData = await fetchTmdbDetails(env, type, tmdbId, "ar");
     const arTitle = tmdbTitleOf(arData, type);
     if (arTitle && arTitle.originalTitle !== enTitle.originalTitle) {
-      const arCandidates = await searchAllProviders(arTitle.originalTitle, kind, disabled);
+      const arCandidates = await searchAllProviders(arTitle.originalTitle, kind, disabled, true);
       candidates = arCandidates.filter((c) =>
         titlesMatch(c.title, arTitle.originalTitle),
       );
@@ -437,10 +437,12 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv2: after the bare-"حلقة N" episode fix — the srv: entries
-  // cached before it can hold a wrong episode (e.g. The 100 S7E1 cached
-  // as the S07E16 file) and must not be reused.
-  const cacheKey = `srv2:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv3: after the per-site candidate fix — the srv2: entries
+  // cached before it can hold a resolve that never saw the second
+  // provider's copy of the same title (e.g. VisionQuest S1E1 cached as
+  // "no download" because only Akwam's dead file was ever tried) and
+  // must not be reused.
+  const cacheKey = `srv3:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
