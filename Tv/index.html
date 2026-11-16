@@ -20,9 +20,9 @@
             brand: {
               red: '#e50914',
               gold: '#f59e0b',
-              dark: '#0b0f19',
-              card: '#161e2e',
-              border: '#26334d'
+              dark: '#141414',
+              card: '#1f1f1f',
+              border: '#2a2a2a'
             }
           }
         }
@@ -32,7 +32,7 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
     * { font-family: 'Cairo', system-ui, -apple-system, sans-serif; }
-    body { background-color: #0b0f19; color: #f8fafc; }
+    body { background-color: #141414; color: #f8fafc; }
     .glass { background: rgba(22, 30, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
     .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -45,25 +45,34 @@
       border-radius: 1rem;
       box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.25);
     }
-    .tv-card:focus { transform: scale(1.04); }
+    .tv-card:focus { transform: scale(1.06); }
     .tv-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+    /* Netflix-style rows: one horizontal strip per section. */
+    .tv-row { scroll-behavior: smooth; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col pb-12">
 
-  <!-- Header -->
-  <header class="sticky top-0 z-40 glass border-b border-brand-border px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-2">
+  <!-- Header: Netflix-style — red logo, text nav, actions on the side. -->
+  <header class="sticky top-0 z-40 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10 px-4 md:px-8 py-3 flex items-center gap-3">
+    <div class="flex items-center gap-2 shrink-0">
       <span class="text-2xl">🎬</span>
-      <h1 class="text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300">
-        فيلماتي <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-500/40">📺 وضع التلفزيون</span>
-      </h1>
+      <h1 class="text-2xl md:text-3xl font-black tracking-wide text-red-600">فيلماتي</h1>
     </div>
-    <div class="flex items-center gap-2">
+    <nav class="flex items-center gap-1 md:gap-2 overflow-x-auto scrollbar-hide" aria-label="التصنيفات">
+      <button data-tab="home" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-white border-b-2 border-red-600 transition">🏠 الرئيسية</button>
+      <button data-tab="movie-ar" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🎬 أفلام عربي</button>
+      <button data-tab="movie-en" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 أفلام إنجليزي</button>
+      <button data-tab="tv-ar" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">📺 مسلسلات عربي</button>
+      <button data-tab="tv-en" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 مسلسلات إنجليزي</button>
+      <button data-tab="top" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">⭐ الأعلى تقييمًا</button>
+    </nav>
+    <div class="flex-1"></div>
+    <div class="flex items-center gap-2 shrink-0">
       <button id="tvPairBtn" class="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500 hover:text-white transition">
         <span>📱 ربط الموبايل</span>
       </button>
-      <a href="../" class="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-700/40 text-slate-200 border border-white/10 text-xs font-bold hover:bg-slate-700 transition">
+      <a href="../" class="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 border border-white/10 text-xs font-bold hover:bg-white/20 transition">
         <span>🌐 الموقع العادي</span>
       </a>
     </div>
@@ -90,28 +99,41 @@
     </div>
   </div>
 
-  <!-- Top tabs: the only navigation. No drawer, no menus that trap focus. -->
-  <nav class="px-4 pt-4 flex flex-wrap gap-2 items-center" aria-label="التصنيفات">
-    <button data-tab="home" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-red-600 text-white transition">🏠 الرئيسية</button>
-    <button data-tab="movie-ar" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🎬 أفلام عربي</button>
-    <button data-tab="movie-en" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🇺🇸 أفلام إنجليزي</button>
-    <button data-tab="tv-ar" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">📺 مسلسلات عربي</button>
-    <button data-tab="tv-en" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🇺🇸 مسلسلات إنجليزي</button>
-    <button data-tab="top" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">⭐ الأعلى تقييمًا</button>
-  </nav>
-
   <!-- Search: one big field; the TV on-screen keyboard types into it. -->
-  <div class="px-4 pt-4">
+  <div class="px-4 md:px-8 pt-4">
     <form id="tvSearchForm" class="flex gap-2">
       <input id="tvSearchInput" type="search" placeholder="🔍 ابحث عن فيلم أو مسلسل…" autocomplete="off"
-        class="tv-focus flex-1 min-w-0 px-5 py-3 rounded-2xl bg-brand-card border border-brand-border text-white text-lg font-bold placeholder:text-slate-500">
-      <button type="submit" class="tv-focus px-6 py-3 rounded-2xl bg-red-600 text-white text-lg font-extrabold transition">بحث</button>
+        class="tv-focus flex-1 min-w-0 px-5 py-3 rounded-full bg-black/60 border border-white/20 text-white text-lg font-bold placeholder:text-slate-500">
+      <button type="submit" class="tv-focus px-6 py-3 rounded-full bg-red-600 text-white text-lg font-extrabold transition">بحث</button>
     </form>
   </div>
 
   <!-- Home sections / grid -->
-  <main class="px-4 pt-4 space-y-6">
-    <div id="tvHome" class="space-y-6"></div>
+  <main class="px-4 md:px-8 pt-4 space-y-8">
+    <!-- Hero: the top most-watched title, Netflix-style, with a backdrop,
+         big title and a Play button. Home view only. -->
+    <section id="tvHero" class="hidden relative -mx-4 md:-mx-8 -mt-4 overflow-hidden" aria-label="مميز">
+      <div class="relative aspect-[16/9] md:aspect-[21/9] max-h-[70vh] w-full">
+        <img id="tvHeroImg" src="" alt="" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/40 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-l from-[#141414]/80 via-transparent to-transparent"></div>
+        <div class="absolute bottom-0 right-0 left-0 px-4 md:px-8 pb-8 space-y-3">
+          <p class="text-red-500 font-black tracking-widest text-sm">فـيـلـمـاتـي • مميز</p>
+          <h2 id="tvHeroTitle" class="text-3xl md:text-5xl font-black text-white"></h2>
+          <div class="flex flex-wrap gap-2 text-sm font-bold">
+            <span id="tvHeroRating" class="px-3 py-1 rounded-lg bg-black/60 text-amber-400 border border-amber-500/20"></span>
+            <span id="tvHeroYear" class="px-3 py-1 rounded-lg bg-black/60 text-slate-200 border border-white/10"></span>
+            <span id="tvHeroKind" class="px-3 py-1 rounded-lg bg-black/60 text-slate-200 border border-white/10"></span>
+          </div>
+          <p id="tvHeroStory" class="text-slate-200 text-base md:text-lg leading-relaxed max-w-2xl line-clamp-2"></p>
+          <div class="flex gap-3 pt-1">
+            <button id="tvHeroPlay" class="tv-focus px-8 py-4 rounded-xl bg-red-600 text-white text-xl font-black hover:bg-red-500 transition">▶ تشغيل</button>
+            <button id="tvHeroDetails" class="tv-focus px-8 py-4 rounded-xl bg-white/20 text-white text-xl font-black hover:bg-white/30 transition">تفاصيل</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div id="tvHome" class="space-y-8"></div>
     <div id="tvGridWrap" class="hidden">
       <div class="flex items-center justify-between mb-3">
         <h2 id="tvGridTitle" class="text-xl font-extrabold text-white"></h2>
@@ -125,6 +147,11 @@
   <!-- Details + player overlay: everything inline, same page, no pop-ups. -->
   <div id="tvOverlay" class="fixed inset-0 z-50 bg-black/95 overflow-y-auto hidden" role="dialog" aria-modal="true">
     <div class="max-w-6xl mx-auto px-4 py-6 space-y-5">
+      <!-- Cinematic backdrop for the open title. -->
+      <div id="tvBackdropWrap" class="hidden relative -mx-4 -mt-6 aspect-[16/9] max-h-[46vh] overflow-hidden">
+        <img id="tvBackdropImg" src="" alt="" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent"></div>
+      </div>
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-extrabold text-white">التفاصيل</h2>
         <button id="tvClose" class="tv-focus w-12 h-12 rounded-full bg-slate-800 text-white text-xl font-bold flex items-center justify-center hover:bg-red-600 transition" aria-label="إغلاق">✕</button>
@@ -184,11 +211,13 @@
     const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
     const TMDB_BASE = 'https://api.themoviedb.org/3';
     const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+    const IMG_BACKDROP = 'https://image.tmdb.org/t/p/w1280';
     // Sandbox flags for the embed iframe: scripts + same-origin so the
     // player can run, but NO allow-popups / allow-top-navigation.
     const EMBED_SANDBOX = 'allow-same-origin allow-scripts allow-presentation allow-forms';
 
     let currentItem = null;
+    let heroItem = null;
     let selectedSeason = 1;
     let selectedEpisode = 1;
     let currentServers = null;
@@ -363,10 +392,12 @@
     function showHomeView() {
       tvGridWrap.classList.add('hidden');
       tvHome.classList.remove('hidden');
+      if (heroItem) document.getElementById('tvHero').classList.remove('hidden');
     }
     function showGridView() {
       tvHome.classList.add('hidden');
       tvGridWrap.classList.remove('hidden');
+      document.getElementById('tvHero').classList.add('hidden');
     }
     function cardHtml(item) {
       const title = item.title || item.name || 'بدون عنوان';
@@ -377,15 +408,15 @@
       const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
       const type = item.media_type || (item.name ? 'tv' : 'movie');
       return `
-        <div class="tv-card tv-focus group cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60" tabindex="0" role="button" data-id="${item.id}" data-type="${type}">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover">
+        <div class="tv-card tv-focus group cursor-pointer" tabindex="0" role="button" data-id="${item.id}" data-type="${type}">
+          <div class="relative aspect-[2/3] bg-[#1f1f1f] overflow-hidden rounded-xl">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover rounded-xl group-hover:opacity-90 transition">
             <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 text-amber-400 text-sm font-extrabold border border-amber-500/20">⭐ ${rating}</span>
             <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 text-slate-300 text-xs font-bold border border-white/10">${kind}</span>
           </div>
-          <div class="p-3">
-            <h4 class="text-base font-bold text-white truncate">${title}</h4>
-            <div class="flex items-center justify-between mt-1 text-sm text-slate-400 font-medium">
+          <div class="pt-2 px-1">
+            <h4 class="text-sm md:text-base font-bold text-white truncate">${title}</h4>
+            <div class="flex items-center justify-between mt-0.5 text-xs md:text-sm text-slate-400 font-medium">
               <span>${year}</span>
               <span class="text-red-400 font-semibold">عرض ◀</span>
             </div>
@@ -409,12 +440,42 @@
       if (!items.length) return '';
       return `
         <section>
-          <h2 class="text-xl font-extrabold text-white mb-3">${title}</h2>
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            ${items.map(cardHtml).join('')}
+          <h2 class="text-xl md:text-2xl font-extrabold text-white mb-3 px-1">${title}</h2>
+          <div class="tv-row flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x">
+            ${items.map((it) => `<div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(it)}</div>`).join('')}
           </div>
         </section>`;
     }
+
+    // Hero: the first most-watched title, big backdrop + Play button.
+    // Home view only; hidden in grid/search views.
+    function renderHero(item) {
+      heroItem = item || null;
+      const hero = document.getElementById('tvHero');
+      if (!heroItem || !heroItem.backdrop_path) { hero.classList.add('hidden'); return; }
+      const title = heroItem.title || heroItem.name || 'بدون عنوان';
+      const date = heroItem.release_date || heroItem.first_air_date || '';
+      const year = date ? date.slice(0, 4) : '';
+      const rating = heroItem.vote_average ? heroItem.vote_average.toFixed(1) : '7.5';
+      const kind = heroItem.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+      document.getElementById('tvHeroImg').src = `${IMG_BACKDROP}${heroItem.backdrop_path}`;
+      document.getElementById('tvHeroTitle').innerText = title;
+      document.getElementById('tvHeroRating').innerText = `⭐ ${rating}`;
+      document.getElementById('tvHeroYear').innerText = year;
+      document.getElementById('tvHeroKind').innerText = kind;
+      document.getElementById('tvHeroStory').innerText = heroItem.overview || '';
+      hero.classList.remove('hidden');
+    }
+    document.getElementById('tvHeroPlay').addEventListener('click', () => {
+      if (!heroItem) return;
+      const type = heroItem.media_type || (heroItem.name ? 'tv' : 'movie');
+      openDetails(heroItem.id, type, type === 'movie');
+    });
+    document.getElementById('tvHeroDetails').addEventListener('click', () => {
+      if (!heroItem) return;
+      const type = heroItem.media_type || (heroItem.name ? 'tv' : 'movie');
+      openDetails(heroItem.id, type, false);
+    });
 
     async function loadHome() {
       showHomeView();
@@ -425,8 +486,10 @@
         tvHome.innerHTML =
           sectionHtml('🔥 الأكثر مشاهدة', data.mostWatched || []) +
           sectionHtml('⭐ الأعلى تقييمًا', data.topRated || []);
+        renderHero((data.mostWatched || [])[0] || (data.topRated || [])[0] || null);
         bindCards(tvHome);
       } catch (e) {
+        renderHero(null);
         tvHome.innerHTML = '<div class="text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
       }
     }
@@ -476,11 +539,11 @@
     document.querySelectorAll('.tv-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tv-tab').forEach((b) => {
-          b.classList.remove('bg-red-600', 'text-white');
-          b.classList.add('bg-brand-card', 'text-slate-300');
+          b.classList.remove('text-white', 'border-red-600');
+          b.classList.add('text-slate-400', 'border-transparent');
         });
-        btn.classList.remove('bg-brand-card', 'text-slate-300');
-        btn.classList.add('bg-red-600', 'text-white');
+        btn.classList.remove('text-slate-400', 'border-transparent');
+        btn.classList.add('text-white', 'border-red-600');
         document.getElementById('tvSearchInput').value = '';
         const tab = btn.dataset.tab;
         if (tab === 'home') loadHome();
@@ -519,6 +582,14 @@
         document.getElementById('tvYear').innerText = year;
         document.getElementById('tvKind').innerText = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
         document.getElementById('tvStory').innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
+        const backdrop = currentItem.backdrop_path ? `${IMG_BACKDROP}${currentItem.backdrop_path}` : '';
+        const backdropWrap = document.getElementById('tvBackdropWrap');
+        if (backdrop) {
+          document.getElementById('tvBackdropImg').src = backdrop;
+          backdropWrap.classList.remove('hidden');
+        } else {
+          backdropWrap.classList.add('hidden');
+        }
         resetPlayer();
         document.getElementById('tvPlayerWrap').classList.add('hidden');
         document.getElementById('tvServerWrap').classList.add('hidden');
