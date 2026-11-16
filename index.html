@@ -440,6 +440,8 @@
     }
 
     function resetPlayer() {
+      nativeActive = false;
+      clearNativePlayTimeout();
       videoNative.pause();
       videoNative.removeAttribute('src');
       videoNative.load();
@@ -447,6 +449,57 @@
       videoIframe.src = '';
       videoIframe.classList.remove('hidden');
       hidePlayerStatus();
+    }
+
+    // Native-player failure handling: a dead stream (e.g. the CDN host is
+    // down) must fall back to the sandboxed vidlink iframe instead of
+    // leaving a broken black player — and the dead link must not be reused
+    // by the download button.
+    let nativeActive = false;
+    let nativePlayTimer = null;
+
+    function clearNativePlayTimeout() {
+      if (nativePlayTimer) { clearTimeout(nativePlayTimer); nativePlayTimer = null; }
+    }
+
+    function armNativePlayTimeout() {
+      clearNativePlayTimeout();
+      nativePlayTimer = setTimeout(() => {
+        if (!nativeActive) return;
+        // 15s with no playable data: the stream is dead, not just slow.
+        if (videoNative.readyState < 2) {
+          showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
+          loadVidlinkFallback();
+        }
+      }, 15000);
+    }
+
+    videoNative.addEventListener('error', () => {
+      if (!nativeActive) return;
+      showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
+      loadVidlinkFallback();
+    });
+    videoNative.addEventListener('playing', clearNativePlayTimeout);
+
+    // Sandboxed vidlink fallback for the current item/season/episode.
+    // Also forgets a dead native resolve result for this key so the
+    // download button re-resolves instead of reusing the dead link.
+    function loadVidlinkFallback() {
+      if (!currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      const key = resolveKey(type, currentItem.id, s, e);
+      if (lastResolved && lastResolved.key === key) lastResolved = null;
+      resetPlayer();
+      let streamUrl = '';
+      if (type === 'tv') {
+        streamUrl = `https://vidlink.pro/tv/${currentItem.id}/${selectedSeason}/${selectedEpisode}`;
+      } else {
+        streamUrl = `https://vidlink.pro/movie/${currentItem.id}`;
+      }
+      videoIframe.src = streamUrl;
+      playerContainer.classList.remove('hidden');
     }
 
     function showToast(msg) {
@@ -478,26 +531,40 @@
         lastResolved = { key: resolveKey(type, currentItem.id, s, e), data: resolved };
         videoIframe.src = '';
         videoIframe.classList.add('hidden');
+        nativeActive = true;
         videoNative.src = resolved.stream;
         videoNative.classList.remove('hidden');
         hidePlayerStatus();
+        armNativePlayTimeout();
         videoNative.play().catch(() => {});
         return;
       }
       // No direct source: fall back to vidlink inside the sandboxed iframe
       // (no allow-popups / allow-top-navigation, so its ads cannot open tabs).
-      resetPlayer();
-      let streamUrl = '';
-      if (type === 'tv') {
-        streamUrl = `https://vidlink.pro/tv/${currentItem.id}/${selectedSeason}/${selectedEpisode}`;
-      } else {
-        streamUrl = `https://vidlink.pro/movie/${currentItem.id}`;
-      }
-      videoIframe.src = streamUrl;
-      playerContainer.classList.remove('hidden');
+      loadVidlinkFallback();
     }
 
     // Direct Download & Telegram Bot Request
+    // Cheap liveness probe: a Range fetch for the first byte must answer
+    // 2xx before we trigger the browser download. Without this, a dead
+    // stream produced a fake 16-byte "Dexter.mp4" and Chrome reported the
+    // download as failed.
+    async function isDownloadAlive(url) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: { Range: 'bytes=0-0' },
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        return res.status >= 200 && res.status < 300;
+      } catch (err) {
+        return false;
+      }
+    }
+
     btnDirectDownload.addEventListener('click', async () => {
       if (!currentItem) return;
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
@@ -514,14 +581,19 @@
           if (resolved) lastResolved = { key, data: resolved };
         }
         if (resolved) {
-          const a = document.createElement('a');
-          a.href = resolved.download;
-          a.download = '';
-          a.rel = 'noopener';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          return;
+          if (await isDownloadAlive(resolved.download)) {
+            const a = document.createElement('a');
+            a.href = resolved.download;
+            a.download = '';
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            return;
+          }
+          // Dead link: forget it so the next attempt re-resolves instead
+          // of reusing it, then fall through to the toast + bot request.
+          if (lastResolved && lastResolved.key === key) lastResolved = null;
         }
         showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
         openBotRequest();

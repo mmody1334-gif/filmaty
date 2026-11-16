@@ -1,5 +1,6 @@
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
+import { toLatinDigits } from "./normalize.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import { findProvider, searchAllProviders } from "../providers/index.ts";
 import type { MediaKind, Provider, ResolvedStream } from "../providers/types.ts";
@@ -15,6 +16,85 @@ export function isDirectMediaUrl(url?: string): boolean {
   );
 }
 
+const RESOLVER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// A resolved direct URL is only usable if the host actually serves video:
+// a cheap Range probe (first byte only) must answer 200/206 and must not
+// be an error page (HTML/JSON/plain-text). A dead CDN host answers 526 or
+// throws — both mean "not usable", never a playable link.
+export async function validateDirectUrl(url: string): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { Range: "bytes=0-0", "User-Agent": RESOLVER_UA },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    return false;
+  }
+  try {
+    if (res.status !== 200 && res.status !== 206) return false;
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (
+      ct.includes("text/html") ||
+      ct.includes("application/json") ||
+      ct.includes("text/plain")
+    ) {
+      return false;
+    }
+    return true;
+  } finally {
+    try {
+      await res.body?.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Strict title matching
+// -----------------------------------------------------------------------------
+// Provider search results are loose: Akwam returns "Dexter: Resurrection"
+// for a "Dexter" query, and taking results[0] then resolved the WRONG show
+// (dexter.resurrection.s02e01.mp4 for a Dexter S1E1 request). Normalise both
+// sides (lowercase, strip parenthesised bits, years and punctuation) and
+// only accept an exact match — or the requested title followed by nothing
+// but season/episode metadata ("Dexter Season 2"). A subtitle after the
+// title ("Resurrection", "New Blood") is a different show and is rejected.
+export function normalizeTitleForMatch(raw: string): string {
+  return toLatinDigits(raw)
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/&/g, " and ")
+    .replace(/\b(19|20)\d{2}\b/g, " ")
+    .replace(/\bs\d{1,2}\s*e\d{1,3}\b/gi, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^the\s+/, "");
+}
+
+const SEASON_ONLY_SUFFIX =
+  /^(season|series|part|الموسم|موسم|جزء)\s*\d+$/i;
+
+export function titlesMatch(candidateTitle: string, requestedTitle: string): boolean {
+  const cand = normalizeTitleForMatch(candidateTitle);
+  const req = normalizeTitleForMatch(requestedTitle);
+  if (!cand || !req) return false;
+  if (cand === req) return true;
+  if (cand.startsWith(req + " ")) {
+    const rest = cand.slice(req.length).trim();
+    // Only season/episode metadata may follow the title.
+    return SEASON_ONLY_SUFFIX.test(rest);
+  }
+  return false;
+}
+
 export async function resolveBestDirectStream(
   provider: Provider,
   targetUrl: string,
@@ -23,11 +103,15 @@ export async function resolveBestDirectStream(
   seasonNum?: number,
   episodeNum?: number,
 ): Promise<ResolvedStream> {
-  // 1. Try provider's own resolver
+  // 1. Try provider's own resolver (only a validated direct URL counts).
   if (provider.resolveStream) {
     try {
       const stream = await provider.resolveStream(targetUrl);
-      if (stream && isDirectMediaUrl(stream.directVideoUrl)) {
+      if (
+        stream &&
+        isDirectMediaUrl(stream.directVideoUrl) &&
+        (await validateDirectUrl(stream.directVideoUrl))
+      ) {
         return stream;
       }
     } catch {
@@ -35,41 +119,94 @@ export async function resolveBestDirectStream(
     }
   }
 
-  // 2. Direct lookup on Akwam to obtain real direct .mp4 CDN URL
+  // 2. Direct lookup on Akwam to obtain real direct .mp4 CDN URL.
+  // Only candidates whose title strictly matches the requested title are
+  // considered, and for series the matched show must actually contain the
+  // requested season/episode — no falling back to season/episode [0].
   try {
     const akwam = new AkwamProvider();
     const cleanQ = title.replace(/\([^)]*\)/g, "").trim();
     const results = await akwam.search(cleanQ, kind);
-    if (results.length > 0) {
-      const cand = results[0];
+    const matched = results.filter((c) => titlesMatch(c.title, cleanQ));
+    for (const cand of matched) {
       const details = await akwam.getDetails(cand);
-      if (kind === "movie" && details.sources.length > 0) {
-        return await akwam.resolveStream(details.sources[0].url);
-      }
-      if (kind === "series" && details.seasons.length > 0) {
-        const s =
-          details.seasons.find((sg) => sg.season === (seasonNum || 1)) ||
-          details.seasons[0];
-        const ep =
-          s.episodes.find((e) => e.episode === (episodeNum || 1)) ||
-          s.episodes[0];
-        if (ep) {
-          const epSources = await akwam.getEpisodeSources(ep);
-          if (epSources.length > 0) {
-            return await akwam.resolveStream(epSources[0].url);
+      try {
+        if (kind === "movie" && details.sources.length > 0) {
+          for (const src of details.sources) {
+            const stream = await akwam.resolveStream(src.url);
+            if (
+              stream &&
+              isDirectMediaUrl(stream.directVideoUrl) &&
+              (await validateDirectUrl(stream.directVideoUrl))
+            ) {
+              return stream;
+            }
           }
         }
+        if (kind === "series" && details.seasons.length > 0) {
+          const s = details.seasons.find((sg) => sg.season === (seasonNum || 1));
+          if (!s) continue;
+          const ep = s.episodes.find((e) => e.episode === (episodeNum || 1));
+          if (!ep) continue;
+          const epSources = await akwam.getEpisodeSources(ep);
+          for (const src of epSources) {
+            const stream = await akwam.resolveStream(src.url);
+            if (
+              stream &&
+              isDirectMediaUrl(stream.directVideoUrl) &&
+              (await validateDirectUrl(stream.directVideoUrl))
+            ) {
+              return stream;
+            }
+          }
+        }
+      } catch {
+        /* this candidate failed: try the next matched one */
+        continue;
       }
     }
   } catch {
     /* ignore and continue */
   }
 
-  // 3. Final fallback
+  // 3. Final fallback: one more attempt at the provider's own resolver
+  // (a transient failure on the first try can succeed on retry), or —
+  // when the provider cannot resolve at all (e.g. the embed provider) —
+  // scrape a direct mp4 out of the target page itself. Only a validated
+  // URL is returned; otherwise fail loudly instead of handing callers a
+  // dead link. Callers handle the throw: the bot shows "تعذر استخراج
+  // الرابط المباشر" and /api/resolve tries the next candidate (or returns
+  // { ok: false } so the frontend falls back).
   if (provider.resolveStream) {
-    return await provider.resolveStream(targetUrl);
+    try {
+      const stream = await provider.resolveStream(targetUrl);
+      if (
+        stream &&
+        isDirectMediaUrl(stream.directVideoUrl) &&
+        (await validateDirectUrl(stream.directVideoUrl))
+      ) {
+        return stream;
+      }
+    } catch {
+      /* fall through to the throw */
+    }
+  } else {
+    try {
+      const stream = await new AkwamProvider().resolveStream(targetUrl);
+      if (
+        stream &&
+        isDirectMediaUrl(stream.directVideoUrl) &&
+        (await validateDirectUrl(stream.directVideoUrl))
+      ) {
+        return stream;
+      }
+    } catch {
+      /* fall through to the throw */
+    }
   }
-  return await new AkwamProvider().resolveStream(targetUrl);
+  throw new Error(
+    "تعذر التحقق من رابط الفيديو المباشر — قد يكون المصدر غير متاح حالياً.",
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -193,13 +330,21 @@ async function resolveByTmdbUncached(
   if (!enTitle) return null;
 
   let candidates = await searchAllProviders(enTitle.originalTitle, kind, disabled);
+  // Strict title filter: provider search is loose (isRelevant accepts a
+  // substring), so a spin-off such as "Dexter: Resurrection" can outrank
+  // the real "Dexter" and resolve to the wrong show/episode. Drop every
+  // candidate whose title does not strictly match the requested title.
+  candidates = candidates.filter((c) => titlesMatch(c.title, enTitle.originalTitle));
 
   // Arabic fallback if the English title matched nothing.
   if (candidates.length === 0) {
     const arData = await fetchTmdbDetails(env, type, tmdbId, "ar");
     const arTitle = tmdbTitleOf(arData, type);
     if (arTitle && arTitle.originalTitle !== enTitle.originalTitle) {
-      candidates = await searchAllProviders(arTitle.originalTitle, kind, disabled);
+      const arCandidates = await searchAllProviders(arTitle.originalTitle, kind, disabled);
+      candidates = arCandidates.filter((c) =>
+        titlesMatch(c.title, arTitle.originalTitle),
+      );
     }
   }
 
@@ -244,18 +389,21 @@ async function pickTargetUrl(
   if (type === "movie") {
     return details.sources[0]?.url || fallbackUrl;
   }
-  // Series: find the requested season/episode, then its first source.
-  const seasonGroup =
-    details.seasons.find((sg) => sg.season === (season || 1)) || details.seasons[0];
-  const ep =
-    seasonGroup?.episodes.find((e) => e.episode === (episode || 1)) ||
-    seasonGroup?.episodes[0];
-  if (ep) {
+  // Series: the matched show must actually contain the requested
+  // season/episode — never fall back to season/episode [0], which would
+  // hand the user a different episode. If the provider gave no season
+  // structure at all there is nothing to check, so fall through to its
+  // sources as before.
+  if (details.seasons.length > 0) {
+    const seasonGroup = details.seasons.find((sg) => sg.season === (season || 1));
+    if (!seasonGroup) return null;
+    const ep = seasonGroup.episodes.find((e) => e.episode === (episode || 1));
+    if (!ep) return null;
     try {
       const epSources = await provider.getEpisodeSources(ep);
       if (epSources.length > 0) return epSources[0].url;
     } catch {
-      /* fall through to details sources */
+      /* fall through to the episode page itself */
     }
     return ep.url;
   }

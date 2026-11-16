@@ -66,6 +66,18 @@ function installFetchMock() {
         { status: 200, headers: { "Content-Type": "text/html" } },
       );
     }
+    // The resolver validates a direct URL with a Range probe before
+    // returning it: a healthy CDN answers 206 with a video content-type.
+    if (url.includes("downet.net")) {
+      return new Response("x", {
+        status: 206,
+        headers: {
+          "Content-Type": "video/mp4",
+          "Content-Range": "bytes 0-0/441957985",
+          "Content-Length": "1",
+        },
+      });
+    }
     return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
   };
   return () => {

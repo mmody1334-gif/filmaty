@@ -54,6 +54,22 @@ export async function handleStreamProxy(request: Request, secret: string): Promi
       });
     }
 
+    // Never serve an upstream error as a download: a failed upstream
+    // (e.g. HTTP 526 from a dead CDN host) used to be streamed back with
+    // content-disposition: attachment, so the browser saved a tiny error
+    // body as "Dexter.mp4" and Chrome reported the download as failed.
+    // Error responses are plain text, carry no content-disposition, and
+    // keep the upstream status (or 502 when it is not a valid HTTP error).
+    if (!upstream.ok) {
+      return new Response(`Upstream error: HTTP ${upstream.status}`, {
+        status: upstream.status,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
+
     const responseHeaders = new Headers();
     responseHeaders.set("access-control-allow-origin", "*");
     responseHeaders.set("access-control-allow-headers", "*");
