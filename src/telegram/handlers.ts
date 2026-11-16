@@ -1,7 +1,8 @@
 import type { Env } from "../env.ts";
-import { parseOwnerIds } from "../env.ts";
+import { parseList, parseOwnerIds } from "../env.ts";
 import { AppStore } from "../engine/store.ts";
-import { fetchTmdbDetails, qualityMatches, resolveBestDirectStream, resolveServersByTmdb, tmdbTitleOf } from "../engine/resolve.ts";
+import { fetchTmdbDetails, qualityMatches, resolveBestDirectStream, resolveServersByTmdb, titlesMatch, tmdbTitleOf } from "../engine/resolve.ts";
+import { searchTitles, type SearchResultItem } from "../engine/search.ts";
 import { botCodeKey, isBotCode, type BotCodePayload } from "../engine/botcode.ts";
 import { ALL_PROVIDERS, findProvider, searchAllProviders } from "../providers/index.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, SourceLink } from "../providers/types.ts";
@@ -488,18 +489,85 @@ async function handleBotCode(
   }
 }
 
+// Attach a provider candidate to one unified-engine title (search
+// rebuild, stage 2): the bot's details/send flow needs a real provider
+// candidate (site + url), so each engine title is matched against a
+// provider search for that title — same pattern as the resolver
+// (fetchResolveCandidates): English title first, strict titlesMatch,
+// Arabic fallback. Returns null when no provider has the title; the
+// caller drops such titles (the bot can only serve what providers have).
+// Display fields (title/year/poster) come from the TMDB item so the bot
+// shows the same titles the site shows.
+async function attachProviderCandidate(
+  env: Env,
+  item: SearchResultItem,
+  disabled: string[],
+): Promise<Candidate | null> {
+  const kind: MediaKind = item.media_type === "tv" ? "series" : "movie";
+  const enTitle = item.original_title || item.original_name || item.title || item.name || "";
+  const arTitle = item.title || item.name || "";
+  const tryTitles = enTitle && enTitle !== arTitle ? [enTitle, arTitle] : [enTitle || arTitle];
+  for (const t of tryTitles) {
+    if (!t) continue;
+    const candidates = await searchAllProviders(t, kind, disabled);
+    const match = candidates.find((c) => titlesMatch(c.title, t));
+    if (match) {
+      const year =
+        Number((item.release_date || item.first_air_date || "").slice(0, 4)) || undefined;
+      return {
+        ...match,
+        title: arTitle,
+        year: year || match.year,
+        kind,
+        poster: item.poster_path
+          ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+          : match.poster,
+      };
+    }
+  }
+  return null;
+}
+
 async function executeSearch(
   chatId: number,
   query: string,
   kind: MediaKind | undefined,
   bot: TelegramClient,
   store: AppStore,
-  _env: Env,
+  env: Env,
 ): Promise<void> {
   const statusMsg = await bot.sendMessage(chatId, views.formatSearching(query, kind || "all"));
   const statusId = extractMsgId(statusMsg);
 
-  const results = await searchAllProviders(query, kind);
+  // Unified engine first (search rebuild, stage 2): the same
+  // searchTitles the site uses — brands, famous-titles index, TMDB, one
+  // ranking — so the bot and the site return the same titles in the same
+  // order. The top 8 engine titles are attached to provider candidates
+  // in parallel; the first 6 attached fill the bot's first page. Falls
+  // back to the raw provider search when the engine returns nothing
+  // usable, so the bot never returns less than it did before.
+  let results: Candidate[] = [];
+  try {
+    const engine = await searchTitles(env, query);
+    if (engine.source === "tmdb" && engine.results.length > 0) {
+      const wanted = engine.results
+        .filter(
+          (r) =>
+            !kind || (kind === "movie" ? r.media_type === "movie" : r.media_type === "tv"),
+        )
+        .slice(0, 8);
+      const disabled = parseList(env.PROVIDERS_DISABLED);
+      const attached = await Promise.all(
+        wanted.map((r) => attachProviderCandidate(env, r, disabled)),
+      );
+      results = attached.filter((c): c is Candidate => c !== null).slice(0, 6);
+    }
+  } catch {
+    results = [];
+  }
+  if (results.length === 0) {
+    results = await searchAllProviders(query, kind);
+  }
 
   if (results.length === 0) {
     await bot.safeEdit(chatId, statusId, views.formatNoResults(query), {
