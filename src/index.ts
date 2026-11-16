@@ -1,6 +1,6 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { embedwaveUrl, qualityMatches, resolveServersByTmdb, vidlinkUrl } from "./engine/resolve.ts";
+import { embedwaveUrl, qualityMatches, resolveServersByTmdb } from "./engine/resolve.ts";
 import {
   BOT_CODE_TTL_SECONDS,
   botCodeKey,
@@ -494,14 +494,9 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     episode !== undefined && Number.isInteger(episode) && episode > 0 ? episode : undefined;
 
   const publicBase = env.PUBLIC_BASE || url.origin;
-  const vidlink = vidlinkUrl(type, id, seasonNum, episodeNum);
-  const vidlinkServer = {
-    name: "vidlink",
-    qualities: [{ quality: "HD", stream: vidlink }],
-  };
-  // EmbedWave sits between the native server and vidlink: it plays inside
-  // a sandboxed iframe (popups/redirects blocked), while vidlink is the
-  // last-resort unsandboxed fallback.
+  // EmbedWave is the only embed fallback: it plays inside a sandboxed
+  // iframe (popups/redirects blocked). The old vidlink fallback was
+  // removed — it is unsandboxed and its popups could not be blocked.
   const embedwave = embedwaveUrl(type, id, seasonNum, episodeNum);
   const embedwaveServer = {
     name: "embedwave",
@@ -511,9 +506,9 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
   const resolved = await resolveServersByTmdb(env, type, id, seasonNum, episodeNum);
   if (!resolved) {
     // No validated native stream: top-level ok stays false (existing
-    // behaviour) so the frontend falls back to the embed players, but
-    // both embed servers are still listed.
-    return jsonResponse({ ok: false, servers: [embedwaveServer, vidlinkServer] }, 404);
+    // behaviour) so the frontend falls back to the embed player, and the
+    // embedwave server is still listed.
+    return jsonResponse({ ok: false, servers: [embedwaveServer] }, 404);
   }
 
   // Sign one stream/download token per quality (tokens live 3h).
@@ -544,7 +539,6 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     servers.push({ name: server.name, qualities });
   }
   servers.push(embedwaveServer);
-  servers.push(vidlinkServer);
 
   // Top-level fields stay the default: best quality of the first server.
   const best = servers[0].qualities[0];
