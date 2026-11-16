@@ -11,6 +11,7 @@ import { cleanTitle, normalizeArabicQuery } from "./normalize.ts";
 import { searchAllProviders } from "../providers/index.ts";
 import type { Candidate } from "../providers/types.ts";
 import { titlesMatch } from "./resolve.ts";
+import { POPULAR_TITLES } from "../data/popular-titles.ts";
 
 export const TMDB_BASE = "https://api.themoviedb.org/3";
 // Same public TMDB key already embedded in the frontend (index.html) and
@@ -31,6 +32,7 @@ export interface SearchResultItem {
   release_date?: string;
   first_air_date?: string;
   vote_average?: number;
+  vote_count?: number;
   popularity?: number;
   poster_path?: string | null;
   overview?: string;
@@ -58,6 +60,48 @@ async function tmdbSearch(env: Env, query: string, language: string): Promise<an
   } catch {
     return [];
   }
+}
+
+// Local bilingual index of famous titles (src/data/popular-titles.ts,
+// generated from TMDB trending/popular/top-rated). TMDB's search index
+// matches whole words only, so "WandaVision" never comes back for
+// q=vision and TMDB ar returns 0 hits for "فيجن" — but a substring
+// match here finds it in both scripts ("vision" ⊂ "WandaVision",
+// "فيجن" ⊂ "واندافيجن"). Local, no network: run for every query.
+// Matches sort by vote_count (accumulated fame), not popularity:
+// popularity is a weekly spike — a brand-new show, VisionQuest, sits at
+// 308 vs WandaVision's 35, while votes are 499 vs 13,058 — so sorting by
+// popularity would put the new show first for "vision".
+export function searchPopularIndex(query: string): SearchResultItem[] {
+  const q = normalizeArabicQuery(query);
+  if (q.length < 2) return [];
+  const matches = POPULAR_TITLES.filter(
+    (t) =>
+      normalizeArabicQuery(t.title_en).includes(q) ||
+      normalizeArabicQuery(t.title_ar).includes(q),
+  )
+    .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0))
+    .slice(0, 5);
+  return matches.map((t) => {
+    const title = t.title_ar || t.title_en;
+    const item: SearchResultItem = {
+      id: t.id,
+      media_type: t.media_type,
+      title,
+      original_title: t.title_en,
+      release_date: t.release_date,
+      first_air_date: t.first_air_date,
+      vote_average: t.vote_average,
+      vote_count: t.vote_count,
+      popularity: t.popularity,
+      poster_path: t.poster_path,
+    };
+    if (t.media_type === "tv") {
+      item.name = title;
+      item.original_name = t.title_en;
+    }
+    return item;
+  });
 }
 
 // Merge ar + en results, dedupe by media_type:id, keep the entry with the
@@ -165,20 +209,27 @@ async function providerAugment(env: Env, normalizedQuery: string): Promise<Searc
   return attached;
 }
 
-// Re-rank merged TMDB results by match quality, then popularity.
+// Re-rank merged TMDB results by match quality, then fame.
 // Without this the ar list's order wins outright: q=vision returned
 // "Vision On" first and buried WandaVision, because the ar results keep
 // their positions ahead of the en ones. Match score per item: exact = 3,
 // starts-with = 2, contains = 1, else 0 — best across the title and the
-// original title — plus a popularity bonus capped at +1.9, so a hugely
-// popular contains-match (WandaVision for q=vision) outranks a
-// little-known starts-with match (Vision On), while an exact match
-// still wins overall. A zero-match item always sorts below every real
-// match, however popular it is. Cap at 20.
+// original title — plus a fame bonus from vote_count, capped at +2.5, so
+// a hugely famous contains-match (WandaVision, 13k votes, for q=vision)
+// outranks a little-known starts-with match (Vision On) AND an
+// exact-titled obscurity (the three films literally called "Vision", a
+// few dozen votes each). Any exact match with more than ~500 votes still
+// beats every partial match, so real exact titles are safe. The bonus
+// uses vote_count, not popularity: popularity is a weekly spike
+// (VisionQuest, a brand-new show, sits at 308 vs WandaVision's 35)
+// while vote_count is accumulated fame (499 vs 13,058). A zero-match
+// item always sorts below every real match, however famous it is.
+// Cap at 20.
 function rankScore(queryNorm: string, item: SearchResultItem): number {
   const m = matchScore(queryNorm, item);
-  if (m === 0) return -1 + Math.min((item.popularity || 0) / 1000, 0.5);
-  return m + Math.min((item.popularity || 0) / 50, 1.9);
+  const fame = Math.min((item.vote_count || 0) / 1000, 2.5);
+  if (m === 0) return -1 + Math.min(fame, 0.5);
+  return m + fame;
 }
 function matchScore(queryNorm: string, item: SearchResultItem): number {
   if (!queryNorm) return 0;
@@ -215,7 +266,7 @@ export async function searchTitles(env: Env, query: string): Promise<SearchOutco
     tmdbSearch(env, normalizedQuery, "en-US"),
     singleToken ? providerAugment(env, normalizedQuery) : Promise.resolve([]),
   ]);
-  const merged = mergeTmdbResults([ar, en, augmented]);
+  const merged = mergeTmdbResults([ar, en, augmented, searchPopularIndex(query)]);
   if (merged.length > 0) return { results: rerankResults(merged, normalizedQuery), source: "tmdb" };
   const fallback = await providerFallback(env, query);
   return { results: fallback, source: "providers" };
