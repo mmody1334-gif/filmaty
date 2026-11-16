@@ -418,7 +418,13 @@ export async function fetchResolveCandidateRounds(
     nextRound: async (): Promise<Candidate[] | null> => {
       while (i < queries.length) {
         const q = queries[i++];
-        const found = await searchAllProviders(q, kind, disabled, true);
+        // Direct-file providers only (see searchAllProviders): Akwam +
+        // Laroza + the embed scraper (vidsrc/streamwish pages sometimes
+        // carry a direct mp4) are the only ones that ever yield a
+        // validated direct mp4, and searching all 9 providers per round
+        // exhausts the Worker's subrequest budget before the working
+        // copy is tried.
+        const found = await searchAllProviders(q, kind, disabled, true, ["akwam", "laroza", "embed"]);
         const matched = found.filter((c) => matchesKnownTitles(c.title, knownTitles));
         if (matched.length > 0) return matched;
       }
@@ -500,13 +506,12 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv7: after the lazy-rounds resolve fix — the srv6:
-  // entries cached before it can hold a resolve that stopped at the
-  // first query round with any match (e.g. حب متنكر cached as "no
-  // download" because the English round's Akwam copy was dead and the
-  // Arabic round's working Laroza copy was never tried) and must not
-  // be reused.
-  const cacheKey = `srv7:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv8: after the direct-providers resolve fix — the srv7:
+  // entries cached before it can hold a resolve that ran out of the
+  // Worker's subrequest budget mid-loop (e.g. حب متنكر cached as "no
+  // download" because Laroza's details came back empty and round 3
+  // never ran) and must not be reused.
+  const cacheKey = `srv8:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
