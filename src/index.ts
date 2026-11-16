@@ -1,6 +1,8 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
 import { embedwaveUrl, qualityMatches, resolveServersByTmdb, validateDirectUrl, vidlinkUrl } from "./engine/resolve.ts";
+import { fetchResolveCandidateRounds } from "./engine/resolve.ts";
+import { parseSeasonEpisode } from "./engine/normalize.ts";
 import {
   BOT_CODE_TTL_SECONDS,
   botCodeKey,
@@ -159,6 +161,53 @@ export default {
         );
       } catch (err: any) {
         return new Response(JSON.stringify({ ok: false, site, error: String(err?.message || err) }), {
+          status: 500,
+          headers: corsHeaders(),
+        });
+      }
+    }
+
+    // TEMPORARY diagnostics part 3: shows what the resolver's candidate
+    // rounds actually yield for a TMDB id, inside the Worker — the exact
+    // list the resolve loop iterates, with the season/episode guard's
+    // verdict per candidate. Params: type, id, s, e.
+    if (url.pathname === "/api/debug-rounds" && request.method === "GET") {
+      const type = url.searchParams.get("type") === "movie" ? "movie" : "tv";
+      const tmdbId = Number(url.searchParams.get("id") || "0");
+      const s = Number(url.searchParams.get("s") || "1");
+      const e = Number(url.searchParams.get("e") || "1");
+      if (!tmdbId) {
+        return new Response(JSON.stringify({ ok: false, error: "bad id" }), {
+          status: 400,
+          headers: corsHeaders(),
+        });
+      }
+      try {
+        const found = await fetchResolveCandidateRounds(env, type, tmdbId);
+        if (!found) {
+          return new Response(JSON.stringify({ ok: false, error: "no TMDB title" }), {
+            headers: corsHeaders(),
+          });
+        }
+        const rounds: any[] = [];
+        let round: any;
+        while ((round = await found.nextRound())) {
+          rounds.push(
+            round.map((c: any) => {
+              const declared = parseSeasonEpisode(c.title);
+              const guardSkip =
+                (declared.season !== undefined && declared.season !== s) ||
+                (declared.episode !== undefined && declared.episode !== e);
+              return { site: c.site, title: c.title, url: c.url, guardSkip };
+            }),
+          );
+        }
+        return new Response(
+          JSON.stringify({ ok: true, enTitle: found.enTitle, rounds }),
+          { headers: corsHeaders() },
+        );
+      } catch (err: any) {
+        return new Response(JSON.stringify({ ok: false, error: String(err?.message || err) }), {
           status: 500,
           headers: corsHeaders(),
         });
