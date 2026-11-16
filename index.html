@@ -40,6 +40,7 @@
   <!-- Header -->
   <header class="sticky top-0 z-40 glass border-b border-brand-border px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-2">
+      <button id="menuBtn" aria-label="القائمة" class="w-9 h-9 rounded-xl bg-brand-card border border-brand-border text-white text-lg font-bold flex items-center justify-center hover:border-red-500 transition">☰</button>
       <span class="text-2xl">🎬</span>
       <h1 class="text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300">
         فيلماتي <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-600/30 text-red-400 border border-red-500/40">VIP</span>
@@ -49,6 +50,50 @@
       <span>🤖 البوت في التليجرام</span>
     </a>
   </header>
+
+  <!-- Side drawer (hamburger menu): categories by language, top-rated, collections -->
+  <div id="drawerOverlay" class="fixed inset-0 z-[55] bg-black/70 hidden"></div>
+  <aside id="sideDrawer" class="fixed inset-y-0 right-0 z-[60] w-72 max-w-[85vw] bg-brand-card border-l border-brand-border shadow-2xl overflow-y-auto transition-transform duration-300 translate-x-full" aria-label="قائمة التصنيفات">
+    <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-brand-card border-b border-brand-border">
+      <span class="text-base font-extrabold text-white">☰ القائمة</span>
+      <button id="drawerClose" aria-label="إغلاق القائمة" class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-red-600 transition">✕</button>
+    </div>
+    <nav class="p-3 space-y-1 text-sm font-bold">
+      <div>
+        <button class="drawer-group-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/70 text-white hover:bg-slate-800 transition" data-group="movies">
+          <span>🎬 أفلام</span><span class="drawer-arrow text-slate-400">▾</span>
+        </button>
+        <div id="drawer-movies" class="drawer-sub hidden pr-3 pt-1 space-y-1">
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="ar">عربي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="en">إنجليزي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="hi">هندي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="tr">تركي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="ko">كوري</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="es">إسباني</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="fr">فرنسي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="movie" data-lang="ja">ياباني</button>
+        </div>
+      </div>
+      <div>
+        <button class="drawer-group-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/70 text-white hover:bg-slate-800 transition" data-group="tv">
+          <span>📺 مسلسلات</span><span class="drawer-arrow text-slate-400">▾</span>
+        </button>
+        <div id="drawer-tv" class="drawer-sub hidden pr-3 pt-1 space-y-1">
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="ar">عربي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="en">إنجليزي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="hi">هندي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="tr">تركي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="ko">كوري</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="es">إسباني</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="fr">فرنسي</button>
+          <button class="drawer-lang w-full text-right px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition" data-type="tv" data-lang="ja">ياباني</button>
+        </div>
+      </div>
+      <button id="drawerTopRated" class="w-full text-right px-3 py-2.5 rounded-xl text-white hover:bg-slate-800 transition">⭐ الأعلى تقييمًا</button>
+      <button id="drawerMarvel" class="w-full text-right px-3 py-2.5 rounded-xl text-white hover:bg-slate-800 transition">🦸‍♂️ مارفل</button>
+      <button id="drawerNetflix" class="w-full text-right px-3 py-2.5 rounded-xl text-white hover:bg-slate-800 transition">🔴 نتفليكس</button>
+    </nav>
+  </aside>
 
   <!-- Hero / Search Section -->
   <section class="p-4 max-w-4xl mx-auto w-full">
@@ -391,7 +436,119 @@
       }
     }
 
-    // Category filter click handler
+    // Side drawer (hamburger menu). Slides in from the right (RTL start
+    // side); the overlay or the ✕ button closes it. Full-height and
+    // scrollable so it works on a 390px phone.
+    const menuBtn = document.getElementById('menuBtn');
+    const sideDrawer = document.getElementById('sideDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    const drawerClose = document.getElementById('drawerClose');
+
+    function openDrawer() {
+      sideDrawer.classList.remove('translate-x-full');
+      drawerOverlay.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function closeDrawer() {
+      sideDrawer.classList.add('translate-x-full');
+      drawerOverlay.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    menuBtn.addEventListener('click', openDrawer);
+    drawerClose.addEventListener('click', closeDrawer);
+    drawerOverlay.addEventListener('click', closeDrawer);
+
+    // Expandable drawer groups (movies / series language lists).
+    document.querySelectorAll('.drawer-group-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sub = document.getElementById(`drawer-${btn.dataset.group}`);
+        const arrow = btn.querySelector('.drawer-arrow');
+        const opening = sub.classList.contains('hidden');
+        sub.classList.toggle('hidden');
+        if (arrow) arrow.textContent = opening ? '▴' : '▾';
+      });
+    });
+
+    // Language names for browse titles: «🎬 أفلام عربية», «📺 مسلسلات هندية».
+    const LANG_LABELS = {
+      ar: 'عربية', en: 'إنجليزية', hi: 'هندية', tr: 'تركية',
+      ko: 'كورية', es: 'إسبانية', fr: 'فرنسية', ja: 'يابانية',
+    };
+
+    // Browse via the Worker (/api/browse) — all browsing goes through the
+    // backend now; the old direct-browser TMDB discover calls are gone.
+    async function loadBrowse(params, title) {
+      renderLoading();
+      try {
+        const qs = new URLSearchParams(params);
+        const res = await fetch(`${API_BASE}/api/browse?${qs.toString()}`);
+        const data = await res.json();
+        renderCards(data.results || [], title);
+      } catch (e) {
+        showError('تعذر جلب البيانات.');
+      }
+    }
+
+    function loadBrowseLanguage(type, lang) {
+      const kind = type === 'tv' ? '📺 مسلسلات' : '🎬 أفلام';
+      loadBrowse(
+        { type, lang, sort: 'popular', page: '1' },
+        `${kind} ${LANG_LABELS[lang] || lang}`,
+      );
+    }
+
+    // Top-rated: top-rated movies + top-rated series, one grid merged by
+    // vote_average desc.
+    async function loadTopRated() {
+      renderLoading();
+      try {
+        const [movies, tv] = await Promise.all([
+          fetch(`${API_BASE}/api/browse?type=movie&sort=top_rated&page=1`).then((r) => r.json()),
+          fetch(`${API_BASE}/api/browse?type=tv&sort=top_rated&page=1`).then((r) => r.json()),
+        ]);
+        const merged = [...(movies.results || []), ...(tv.results || [])]
+          .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+        renderCards(merged, '⭐ الأعلى تقييمًا');
+      } catch (e) {
+        showError('تعذر جلب البيانات.');
+      }
+    }
+
+    function clearActiveFilters() {
+      filterBtns.forEach((b) => {
+        b.classList.remove('bg-red-600', 'text-white');
+        b.classList.add('bg-brand-card', 'text-slate-300');
+      });
+    }
+
+    // Drawer language items.
+    document.querySelectorAll('.drawer-lang').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        clearActiveFilters();
+        closeDrawer();
+        loadBrowseLanguage(btn.dataset.type, btn.dataset.lang);
+      });
+    });
+
+    document.getElementById('drawerTopRated').addEventListener('click', () => {
+      clearActiveFilters();
+      closeDrawer();
+      loadTopRated();
+    });
+    document.getElementById('drawerMarvel').addEventListener('click', () => {
+      clearActiveFilters();
+      closeDrawer();
+      loadBrowse({ type: 'movie', collection: 'marvel', sort: 'popular', page: '1' }, '🦸‍♂️ مارفل');
+    });
+    document.getElementById('drawerNetflix').addEventListener('click', () => {
+      clearActiveFilters();
+      closeDrawer();
+      loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
+    });
+
+    // Category filter click handler: each tab has its own home.
     filterBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         filterBtns.forEach(b => {
@@ -406,24 +563,12 @@
         clearSearch.classList.add('hidden');
 
         if (filter === 'trending') loadHome();
-        else if (filter === 'movie') loadDiscover('movie', '🎬 أحدث الأفلام');
-        else if (filter === 'tv') loadDiscover('tv', '📺 أحدث المسلسلات');
-        else if (filter === 'marvel') executeSearch('marvel');
-        else if (filter === 'netflix') executeSearch('netflix');
+        else if (filter === 'movie') loadBrowse({ type: 'movie', sort: 'popular', page: '1' }, '🎬 أحدث الأفلام');
+        else if (filter === 'tv') loadBrowse({ type: 'tv', sort: 'popular', page: '1' }, '📺 أحدث المسلسلات');
+        else if (filter === 'marvel') loadBrowse({ type: 'movie', collection: 'marvel', sort: 'popular', page: '1' }, '🦸‍♂️ مارفل');
+        else if (filter === 'netflix') loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
       });
     });
-
-    async function loadDiscover(type, title) {
-      renderLoading();
-      try {
-        const res = await fetch(`${TMDB_BASE}/discover/${type}?api_key=${TMDB_KEY}&language=ar&sort_by=popularity.desc`);
-        const data = await res.json();
-        const mapped = (data.results || []).map(r => ({ ...r, media_type: type }));
-        renderCards(mapped, title);
-      } catch (e) {
-        showError('تعذر جلب البيانات.');
-      }
-    }
 
     function renderLoading() {
       showGridView();

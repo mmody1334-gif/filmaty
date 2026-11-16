@@ -20,6 +20,18 @@ export function normalizeArabic(text: string): string {
     .toLowerCase();
 }
 
+// Query normalization for search: normalizeArabic plus the variant
+// letters users actually type (Egyptian/Levantine/Gulf keyboards and
+// transliterated spellings). "ڤيجن" becomes "فيجن" so TMDB finds
+// "واندافيجن"; "مُحَمَّد" becomes "محمد".
+export function normalizeArabicQuery(q: string): string {
+  return normalizeArabic(q)
+    .replace(/[ڤ]/g, "ف")
+    .replace(/[پ]/g, "ب")
+    .replace(/[چ]/g, "ج")
+    .replace(/[گ]/g, "ك");
+}
+
 const NOISE_WORDS = new Set([
   "فيلم",
   "مسلسل",

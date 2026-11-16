@@ -5,7 +5,7 @@
 
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
-import { cleanTitle } from "./normalize.ts";
+import { cleanTitle, normalizeArabicQuery } from "./normalize.ts";
 import { searchAllProviders } from "../providers/index.ts";
 import { titlesMatch } from "./resolve.ts";
 
@@ -124,13 +124,53 @@ async function providerFallback(env: Env, query: string): Promise<SearchResultIt
   return items;
 }
 
+// Re-rank merged TMDB results by match quality, then popularity.
+// Without this the ar list's order wins outright: q=vision returned
+// "Vision On" first and buried WandaVision, because the ar results keep
+// their positions ahead of the en ones. Match score per item: exact = 3,
+// starts-with = 2, contains = 1, else 0 — best across the title and the
+// original title — plus a popularity bonus capped at +1.9, so a hugely
+// popular contains-match (WandaVision for q=vision) outranks a
+// little-known starts-with match (Vision On), while an exact match
+// still wins overall. A zero-match item always sorts below every real
+// match, however popular it is. Cap at 20.
+function rankScore(queryNorm: string, item: SearchResultItem): number {
+  const m = matchScore(queryNorm, item);
+  if (m === 0) return -1 + Math.min((item.popularity || 0) / 1000, 0.5);
+  return m + Math.min((item.popularity || 0) / 50, 1.9);
+}
+function matchScore(queryNorm: string, item: SearchResultItem): number {
+  if (!queryNorm) return 0;
+  let best = 0;
+  for (const raw of [
+    item.title || item.name || "",
+    item.original_title || item.original_name || "",
+  ]) {
+    const t = normalizeArabicQuery(raw);
+    if (!t) continue;
+    if (t === queryNorm) best = Math.max(best, 3);
+    else if (t.startsWith(queryNorm)) best = Math.max(best, 2);
+    else if (t.includes(queryNorm)) best = Math.max(best, 1);
+  }
+  return best;
+}
+
+function rerankResults(items: SearchResultItem[], queryNorm: string): SearchResultItem[] {
+  return [...items]
+    .sort((a, b) => rankScore(queryNorm, b) - rankScore(queryNorm, a))
+    .slice(0, 20);
+}
+
 export async function searchTitles(env: Env, query: string): Promise<SearchOutcome> {
+  // Search TMDB with the normalized query in both languages: "ڤيجن"
+  // becomes "فيجن", so TMDB can match "واندافيجن".
+  const normalizedQuery = normalizeArabicQuery(query);
   const [ar, en] = await Promise.all([
-    tmdbSearch(env, query, "ar"),
-    tmdbSearch(env, query, "en-US"),
+    tmdbSearch(env, normalizedQuery, "ar"),
+    tmdbSearch(env, normalizedQuery, "en-US"),
   ]);
   const merged = mergeTmdbResults([ar, en]);
-  if (merged.length > 0) return { results: merged, source: "tmdb" };
+  if (merged.length > 0) return { results: rerankResults(merged, normalizedQuery), source: "tmdb" };
   const fallback = await providerFallback(env, query);
   return { results: fallback, source: "providers" };
 }

@@ -8,6 +8,7 @@ import {
   type BotCodePayload,
 } from "./engine/botcode.ts";
 import { searchTitles } from "./engine/search.ts";
+import { BROWSE_COLLECTIONS, BROWSE_LANGS, browseTitles } from "./engine/browse.ts";
 import { getHome, recordView } from "./engine/home.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
 import { renderPlayerHtml } from "./player/html.ts";
@@ -61,6 +62,10 @@ export default {
 
     if (url.pathname === "/api/search" && request.method === "GET") {
       return handleApiSearch(request, env, url);
+    }
+
+    if (url.pathname === "/api/browse" && request.method === "GET") {
+      return handleApiBrowse(request, env, url);
     }
 
     if (url.pathname === "/api/view" && request.method === "POST") {
@@ -186,6 +191,44 @@ async function handleApiHome(request: Request, env: Env): Promise<Response> {
   }
   const { mostWatched, topRated } = await getHome(env);
   return jsonResponse({ ok: true, mostWatched, topRated }, 200);
+}
+
+// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&sort=popular|top_rated&page=1..5&collection=marvel|netflix
+// TMDB discover behind the Worker (cached 10 min). { ok, results, total_pages }.
+async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Response> {
+  const type = url.searchParams.get("type");
+  if (type !== "movie" && type !== "tv") {
+    return jsonResponse({ ok: false, error: "invalid type" }, 400);
+  }
+  const lang = url.searchParams.get("lang") || "ar";
+  if (!(BROWSE_LANGS as readonly string[]).includes(lang)) {
+    return jsonResponse({ ok: false, error: "invalid lang" }, 400);
+  }
+  const sort = url.searchParams.get("sort") || "popular";
+  if (sort !== "popular" && sort !== "top_rated") {
+    return jsonResponse({ ok: false, error: "invalid sort" }, 400);
+  }
+  const pageRaw = url.searchParams.get("page") || "1";
+  const page = Number(pageRaw);
+  if (!Number.isInteger(page) || page < 1 || page > 5) {
+    return jsonResponse({ ok: false, error: "invalid page" }, 400);
+  }
+  const collection = url.searchParams.get("collection");
+  if (collection !== null && !(BROWSE_COLLECTIONS as readonly string[]).includes(collection)) {
+    return jsonResponse({ ok: false, error: "invalid collection" }, 400);
+  }
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "browse"))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+  const { results, total_pages } = await browseTitles(env, {
+    type,
+    lang: lang as (typeof BROWSE_LANGS)[number],
+    sort,
+    page,
+    collection: (collection as (typeof BROWSE_COLLECTIONS)[number]) || undefined,
+  });
+  return jsonResponse({ ok: true, results, total_pages }, 200);
 }
 
 // GET /api/search?q= — TMDB in ar + en-US merged/deduped, provider

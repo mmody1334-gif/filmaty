@@ -237,6 +237,47 @@ test("built webapp has the home sections, year chips and view counting", () => {
   assert.ok(!FILMATY_WEBAPP_HTML.includes("loadTrending()"));
 });
 
+// The hamburger drawer + browse categories live in inline frontend JS
+// (not importable), so they are covered by asserting the built webapp
+// carries the drawer, the language items, the /api/browse calls — and no
+// direct-browser TMDB discover call anymore.
+test("built webapp has the hamburger drawer, browse categories and no direct discover", () => {
+  for (const s of [
+    "menuBtn",
+    "sideDrawer",
+    "drawerOverlay",
+    "drawerClose",
+    "drawer-group-btn",
+    "drawer-lang",
+    'data-lang="ar"',
+    'data-lang="en"',
+    'data-lang="hi"',
+    'data-lang="tr"',
+    'data-lang="ko"',
+    'data-lang="es"',
+    'data-lang="fr"',
+    'data-lang="ja"',
+    "الأعلى تقييمًا",
+    "🦸‍♂️ مارفل",
+    "🔴 نتفليكس",
+    "/api/browse",
+    "loadBrowse",
+    "loadBrowseLanguage",
+    "loadTopRated",
+    "LANG_LABELS",
+    "عربية",
+    "هندية",
+    "openDrawer",
+    "closeDrawer",
+  ]) {
+    assert.ok(FILMATY_WEBAPP_HTML.includes(s), `built webapp must contain: ${s}`);
+  }
+  // All browsing goes through /api/browse now: no direct TMDB discover
+  // call may remain in the frontend.
+  assert.ok(!FILMATY_WEBAPP_HTML.includes("/discover/"), "no direct TMDB discover call left");
+  assert.ok(!FILMATY_WEBAPP_HTML.includes("loadDiscover"), "loadDiscover must be gone");
+});
+
 // The native player must tolerate a slow cold start (verified live:
 // Interstellar 1080p needed well over 15s before readyState 2, then
 // played fine). The vidlink iframe tag itself carries no sandbox

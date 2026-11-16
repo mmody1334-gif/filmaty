@@ -5,6 +5,7 @@ import {
   computeSimilarity,
   isRelevant,
   normalizeArabic,
+  normalizeArabicQuery,
   parseQuality,
   parseSeasonEpisode,
   parseYear,
@@ -18,6 +19,18 @@ test("converts Eastern Arabic-Indic numerals to Latin", () => {
 test("normalizes Arabic letters and diacritics", () => {
   assert.equal(normalizeArabic("إِعْلَانٌ رَسْمِيّ"), "اعلان رسمي");
   assert.equal(normalizeArabic("القاهرة ة ي ى"), "القاهره ه ي ي");
+});
+
+test("normalizeArabicQuery maps variant letters so TMDB can match", () => {
+  // ڤ is not ف in TMDB's index: q=ڤيجن missed واندافيجن entirely.
+  assert.equal(normalizeArabicQuery("ڤيجن"), "فيجن");
+  assert.equal(normalizeArabicQuery("مُحَمَّد"), "محمد");
+  assert.equal(normalizeArabicQuery("أحمد"), "احمد");
+  assert.equal(normalizeArabicQuery("مدرسة"), "مدرسه");
+  assert.equal(normalizeArabicQuery("پاريس"), "باريس");
+  assert.equal(normalizeArabicQuery("چگال"), "جكال");
+  assert.equal(normalizeArabicQuery("سيف الدين"), "سيف الدين");
+  assert.equal(normalizeArabicQuery("Vision"), "vision");
 });
 
 test("strips noise and filler words from titles", () => {

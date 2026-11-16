@@ -77,6 +77,113 @@ const personHit = {
   popularity: 40,
 };
 
+// Re-rank fixtures: "vision" — the ar list holds an unrelated popular
+// item that the old no-rank merge put first; the en list holds
+// WandaVision (contains-match) and "The Vision" (contains-match, less
+// popular). "dark" — exact / starts-with / contains chain.
+const randomShow = {
+  id: 9001,
+  media_type: "tv",
+  title: "Random Show",
+  original_title: "Random Show",
+  vote_average: 5.0,
+  popularity: 200,
+  poster_path: "/random.jpg",
+  overview: "",
+};
+
+const wandaVisionEn = {
+  id: 85271,
+  media_type: "tv",
+  title: "WandaVision",
+  original_title: "WandaVision",
+  first_air_date: "2021-01-15",
+  vote_average: 8.3,
+  popularity: 95,
+  poster_path: "/wandavision.jpg",
+  overview: "",
+};
+
+const visionOn = {
+  id: 9007,
+  media_type: "tv",
+  title: "Vision On",
+  original_title: "Vision On",
+  vote_average: 7.0,
+  popularity: 3,
+  poster_path: "/visionon.jpg",
+  overview: "",
+};
+
+const theVision = {
+  id: 9002,
+  media_type: "tv",
+  title: "The Vision",
+  original_title: "The Vision",
+  vote_average: 6.0,
+  popularity: 12,
+  poster_path: "/vision.jpg",
+  overview: "",
+};
+
+const darkExact = {
+  id: 9003,
+  media_type: "tv",
+  title: "Dark",
+  original_title: "Dark",
+  vote_average: 8.0,
+  popularity: 5,
+  poster_path: "/dark.jpg",
+  overview: "",
+};
+
+const darkness = {
+  id: 9004,
+  media_type: "movie",
+  title: "Darkness",
+  original_title: "Darkness",
+  vote_average: 6.5,
+  popularity: 50,
+  poster_path: "/darkness.jpg",
+  overview: "",
+};
+
+const darkKnight = {
+  id: 9005,
+  media_type: "movie",
+  title: "The Dark Knight",
+  original_title: "The Dark Knight",
+  vote_average: 9.0,
+  popularity: 90,
+  poster_path: "/tdk.jpg",
+  overview: "",
+};
+
+// "فيجن" (normalized form of "ڤيجن"): TMDB ar returns واندافيجن and
+// "رحلة ڤيجن" — both contains-matches, so popularity must break the tie.
+const wandaVisionAr = {
+  id: 85271,
+  media_type: "tv",
+  title: "واندافيجن",
+  original_title: "WandaVision",
+  first_air_date: "2021-01-15",
+  vote_average: 8.3,
+  popularity: 95,
+  poster_path: "/wandavision.jpg",
+  overview: "",
+};
+
+const rahlaVision = {
+  id: 9006,
+  media_type: "movie",
+  title: "رحلة ڤيجن",
+  original_title: "رحلة ڤيجن",
+  vote_average: 4.0,
+  popularity: 3,
+  poster_path: "/rahla.jpg",
+  overview: "",
+};
+
 // TMDB search results keyed by (query, language). The "Interstellar" key
 // serves the provider-fallback attach search for "Interstellar فيلم".
 function tmdbSearchResult(query: string, lang: string): any[] {
@@ -91,6 +198,15 @@ function tmdbSearchResult(query: string, lang: string): any[] {
   }
   if (query === "Interstellar") {
     return [interstellarHit];
+  }
+  if (query === "vision") {
+    return lang === "ar" ? [visionOn, randomShow] : [wandaVisionEn, theVision];
+  }
+  if (query === "dark") {
+    return lang === "en-US" ? [darkExact, darkness, darkKnight] : [];
+  }
+  if (query === "فيجن") {
+    return lang === "ar" ? [wandaVisionAr, rahlaVision] : [];
   }
   return [];
 }
@@ -155,6 +271,58 @@ test("non-movie/tv media types are filtered out", async () => {
     assert.equal(results.length, 1);
     assert.equal(results[0].id, 157336);
     assert.equal(results[0].media_type, "movie");
+  } finally {
+    restore();
+  }
+});
+
+test("re-rank puts the best match first: 'vision' ranks WandaVision first", async () => {
+  const restore = installMock();
+  const { env } = mockEnv();
+  try {
+    // Live bug: q=vision returned an unrelated ar hit first and buried
+    // WandaVision (no re-ranking — ar order won). The re-rank scores
+    // WandaVision and "The Vision" as contains-matches (1) and the
+    // unrelated ar hit as 0, so popularity breaks the 1-1 tie — and the
+    // popularity bonus lets hugely popular WandaVision outrank the
+    // little-known starts-with match "Vision On" (live: Vision On was
+    // first, WandaVision buried).
+    const { results, source } = await searchTitles(env, "vision");
+    assert.equal(source, "tmdb");
+    assert.deepEqual(
+      results.map((r) => r.title),
+      ["WandaVision", "Vision On", "The Vision", "Random Show"],
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("re-rank orders exact > starts-with > contains", async () => {
+  const restore = installMock();
+  const { env } = mockEnv();
+  try {
+    const { results } = await searchTitles(env, "dark");
+    assert.deepEqual(
+      results.map((r) => r.title),
+      ["Dark", "Darkness", "The Dark Knight"],
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("normalized Arabic query 'ڤيجن' finds واندافيجن first", async () => {
+  const restore = installMock();
+  const { env } = mockEnv();
+  try {
+    // Live bug: q=ڤيجن returned only "رحلة ڤيجن" (ڤ ≠ ف in TMDB's
+    // index). The normalized query "فيجن" matches واندافيجن; both hits
+    // are contains-matches, so the more popular one wins.
+    const { results, source } = await searchTitles(env, "ڤيجن");
+    assert.equal(source, "tmdb");
+    assert.equal(results[0].title, "واندافيجن");
+    assert.ok(results.some((r) => r.title === "رحلة ڤيجن"));
   } finally {
     restore();
   }
