@@ -384,7 +384,9 @@ export interface ResolvedMulti {
   servers: ResolvedServer[];
 }
 
-// The sandboxed embed fallback for a title (no direct download from it).
+// The vidlink embed fallback for a title (no direct download from it).
+// Unsandboxed: vidlink refuses sandboxed embeds ("Please Disable
+// Sandbox"), so its own ads/popups are not blocked there.
 export function vidlinkUrl(
   type: "movie" | "tv",
   tmdbId: number,
@@ -395,6 +397,21 @@ export function vidlinkUrl(
     return `https://vidlink.pro/tv/${tmdbId}/${season || 1}/${episode || 1}`;
   }
   return `https://vidlink.pro/movie/${tmdbId}`;
+}
+
+// The vidsrc embed fallback. Unlike vidlink, vidsrc plays inside a
+// sandboxed iframe, so its popups/redirects stay blocked (no
+// allow-popups / allow-top-navigation).
+export function vidsrcUrl(
+  type: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): string {
+  if (type === "tv") {
+    return `https://vidsrc.to/embed/tv/${tmdbId}/${season || 1}/${episode || 1}`;
+  }
+  return `https://vidsrc.to/embed/movie/${tmdbId}`;
 }
 
 // Do two quality labels name the same resolution? ("720p HD" vs "720p")

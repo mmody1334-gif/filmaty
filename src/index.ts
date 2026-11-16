@@ -1,6 +1,6 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { qualityMatches, resolveServersByTmdb, vidlinkUrl } from "./engine/resolve.ts";
+import { qualityMatches, resolveServersByTmdb, vidlinkUrl, vidsrcUrl } from "./engine/resolve.ts";
 import {
   BOT_CODE_TTL_SECONDS,
   botCodeKey,
@@ -329,13 +329,21 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     name: "vidlink",
     qualities: [{ quality: "HD", stream: vidlink }],
   };
+  // vidsrc sits between the native server and vidlink: it plays inside a
+  // sandboxed iframe (popups/redirects blocked), while vidlink is the
+  // last-resort unsandboxed fallback.
+  const vidsrc = vidsrcUrl(type, id, seasonNum, episodeNum);
+  const vidsrcServer = {
+    name: "vidsrc",
+    qualities: [{ quality: "HD", stream: vidsrc }],
+  };
 
   const resolved = await resolveServersByTmdb(env, type, id, seasonNum, episodeNum);
   if (!resolved) {
     // No validated native stream: top-level ok stays false (existing
-    // behaviour) so the frontend falls back to the sandboxed vidlink
-    // player, but the vidlink server is still listed.
-    return jsonResponse({ ok: false, servers: [vidlinkServer] }, 404);
+    // behaviour) so the frontend falls back to the embed players, but
+    // both embed servers are still listed.
+    return jsonResponse({ ok: false, servers: [vidsrcServer, vidlinkServer] }, 404);
   }
 
   // Sign one stream/download token per quality (tokens live 3h).
@@ -365,6 +373,7 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     }
     servers.push({ name: server.name, qualities });
   }
+  servers.push(vidsrcServer);
   servers.push(vidlinkServer);
 
   // Top-level fields stay the default: best quality of the first server.

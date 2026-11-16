@@ -660,6 +660,21 @@
       return server && server.name === 'vidlink';
     }
 
+    function isVidsrcServer(server) {
+      return server && server.name === 'vidsrc';
+    }
+
+    // Either iframe embed server (vidsrc or vidlink), as opposed to a
+    // native direct-stream server.
+    function isEmbedServer(server) {
+      return isVidlinkServer(server) || isVidsrcServer(server);
+    }
+
+    // Sandbox flags for the vidsrc iframe: scripts + same-origin so the
+    // player can run, but NO allow-popups / allow-top-navigation, so its
+    // ads cannot open tabs or hijack the page.
+    const VIDSRC_SANDBOX = 'allow-same-origin allow-scripts allow-presentation allow-forms';
+
     function renderServerControls() {
       const wrap = document.getElementById('serverControls');
       const serversRow = document.getElementById('serversRow');
@@ -711,10 +726,17 @@
     function playSelected() {
       const server = selectedServer();
       const quality = selectedQuality();
-      if (!server || !quality) { loadVidlinkFallback(); return; }
+      if (!server || !quality) { loadEmbedFallback(); return; }
       playerContainer.classList.remove('hidden');
-      if (isVidlinkServer(server)) {
+      if (isEmbedServer(server)) {
         resetPlayer();
+        // vidsrc plays sandboxed (ads blocked); vidlink refuses any
+        // sandbox, so its attribute is removed for that server.
+        if (isVidsrcServer(server)) {
+          videoIframe.setAttribute('sandbox', VIDSRC_SANDBOX);
+        } else {
+          videoIframe.removeAttribute('sandbox');
+        }
         videoIframe.src = quality.stream;
         playerContainer.classList.remove('hidden');
         return;
@@ -730,14 +752,31 @@
     }
 
     // Native player failure: try the next quality of the same server
-    // first; only when no quality is left, fall back to vidlink.
+    // first; only when no quality is left, fall back to the embed
+    // servers (vidsrc first, then vidlink).
     function tryNextQualityOrFallback() {
       const server = selectedServer();
-      if (server && !isVidlinkServer(server) && selectedQualityIdx < server.qualities.length - 1) {
+      if (server && !isEmbedServer(server) && selectedQualityIdx < server.qualities.length - 1) {
         selectedQualityIdx++;
         renderServerControls();
         playSelected();
         showToast('الجودة السابقة مش شغالة — جارٍ تجربة جودة أخرى…');
+        return;
+      }
+      loadEmbedFallback();
+    }
+
+    // Embed fallback: pick the vidsrc server if it exists and is not
+    // already selected (sandboxed, ads blocked); otherwise the vidlink
+    // server (unsandboxed last resort).
+    function loadEmbedFallback() {
+      if (!currentServers) { loadVidlinkFallback(); return; }
+      const vidsrcIdx = currentServers.findIndex((s) => s.name === 'vidsrc');
+      if (vidsrcIdx >= 0 && vidsrcIdx !== selectedServerIdx) {
+        selectedServerIdx = vidsrcIdx;
+        selectedQualityIdx = 0;
+        renderServerControls();
+        playSelected();
         return;
       }
       loadVidlinkFallback();
@@ -762,6 +801,9 @@
         if (vidIdx >= 0) { selectedServerIdx = vidIdx; selectedQualityIdx = 0; renderServerControls(); }
       }
       resetPlayer();
+      // Vidlink refuses any sandbox, so drop the attribute (the vidsrc
+      // server may have left it on) before loading it.
+      videoIframe.removeAttribute('sandbox');
       let streamUrl = '';
       if (type === 'tv') {
         streamUrl = `https://vidlink.pro/tv/${currentItem.id}/${selectedSeason}/${selectedEpisode}`;
@@ -800,7 +842,8 @@
       }).catch(() => {});
     }
 
-    // In-App Instant Player: ad-free native <video> first, vidlink fallback
+    // In-App Instant Player: ad-free native <video> first, then the
+    // sandboxed vidsrc embed, then the vidlink fallback
     btnPlayInApp.addEventListener('click', playActiveStream);
 
     async function playActiveStream() {
@@ -823,9 +866,9 @@
         playSelected();
         return;
       }
-      // No direct source: fall back to vidlink in an unsandboxed iframe
-      // (vidlink refuses sandboxed embeds).
-      loadVidlinkFallback();
+      // No direct source: fall back to the embed servers (vidsrc
+      // sandboxed first, then vidlink unsandboxed).
+      loadEmbedFallback();
     }
 
     // Direct Download & Telegram Bot Request

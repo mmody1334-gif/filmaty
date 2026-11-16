@@ -239,15 +239,25 @@ test("built webapp has the home sections, year chips and view counting", () => {
 
 // The native player must tolerate a slow cold start (verified live:
 // Interstellar 1080p needed well over 15s before readyState 2, then
-// played fine) and vidlink must not be sandboxed (it refuses sandboxed
-// embeds with "Please Disable Sandbox").
-test("built webapp gives slow streams 45s and leaves the vidlink iframe unsandboxed", () => {
+// played fine). The vidlink iframe tag itself carries no sandbox
+// attribute (vidlink refuses sandboxed embeds), while the vidsrc
+// server is sandboxed from JS so its popups stay blocked.
+test("built webapp gives slow streams 45s and toggles the embed sandbox per server", () => {
   assert.ok(
     FILMATY_WEBAPP_HTML.includes("}, 45000);"),
     "built webapp must arm the no-data timeout at 45s",
   );
-  assert.ok(
-    !FILMATY_WEBAPP_HTML.includes("sandbox="),
-    "built webapp must not sandbox the vidlink iframe",
-  );
+  const iframeTag = FILMATY_WEBAPP_HTML.match(/<iframe id="videoIframe"[^>]*>/)?.[0] ?? "";
+  assert.ok(iframeTag.length > 0, "built webapp must contain the videoIframe tag");
+  assert.ok(!iframeTag.includes("sandbox"), "the videoIframe tag must not carry a sandbox attribute");
+  for (const s of [
+    "setAttribute('sandbox', VIDSRC_SANDBOX)",
+    "removeAttribute('sandbox')",
+    "loadEmbedFallback",
+    // The vidsrc server name (its embed URL is built server-side).
+    "'vidsrc'",
+    "allow-popups",
+  ]) {
+    assert.ok(FILMATY_WEBAPP_HTML.includes(s), `built webapp must contain: ${s}`);
+  }
 });

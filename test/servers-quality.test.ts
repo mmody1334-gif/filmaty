@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.ts";
-import { resolveServersByTmdb } from "../src/engine/resolve.ts";
+import { resolveServersByTmdb, vidsrcUrl } from "../src/engine/resolve.ts";
 import { AkwamProvider } from "../src/providers/akwam.ts";
 import { verifyToken } from "../src/engine/token.ts";
 
@@ -168,23 +168,33 @@ test("GET /api/resolve returns servers (native multi-quality + vidlink) and best
     assert.ok(payload);
     assert.ok(payload!.u.includes("1080p"));
 
-    assert.equal(body.servers.length, 2);
+    assert.equal(body.servers.length, 3);
     assert.equal(body.servers[0].qualities.length, 3);
     for (const q of body.servers[0].qualities) {
       assert.ok(q.stream.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.endsWith("&dl=1"));
     }
-    assert.equal(body.servers[1].name, "vidlink");
+    // vidsrc sits between the native server and vidlink, sandboxed.
+    assert.equal(body.servers[1].name, "vidsrc");
     assert.equal(body.servers[1].qualities.length, 1);
-    assert.equal(body.servers[1].qualities[0].stream, "https://vidlink.pro/movie/157336");
+    assert.equal(body.servers[1].qualities[0].stream, "https://vidsrc.to/embed/movie/157336");
     assert.equal(body.servers[1].qualities[0].download, undefined);
+    assert.equal(body.servers[2].name, "vidlink");
+    assert.equal(body.servers[2].qualities.length, 1);
+    assert.equal(body.servers[2].qualities[0].stream, "https://vidlink.pro/movie/157336");
+    assert.equal(body.servers[2].qualities[0].download, undefined);
   } finally {
     restore();
   }
 });
 
-test("no validated native stream: ok:false with only the vidlink server", async () => {
+test("vidsrcUrl builds the TMDB-id embed URLs for movies and episodes", () => {
+  assert.equal(vidsrcUrl("movie", 157336), "https://vidsrc.to/embed/movie/157336");
+  assert.equal(vidsrcUrl("tv", 48866, 7, 1), "https://vidsrc.to/embed/tv/48866/7/1");
+});
+
+test("no validated native stream: ok:false with the vidsrc + vidlink servers", async () => {
   const restore = installQualityMock({ allDead: true });
   const { env } = mockEnv();
   try {
@@ -196,9 +206,11 @@ test("no validated native stream: ok:false with only the vidlink server", async 
     assert.equal(res.status, 404);
     const body = (await res.json()) as any;
     assert.equal(body.ok, false);
-    assert.equal(body.servers.length, 1);
-    assert.equal(body.servers[0].name, "vidlink");
-    assert.equal(body.servers[0].qualities[0].stream, "https://vidlink.pro/movie/157336");
+    assert.equal(body.servers.length, 2);
+    assert.equal(body.servers[0].name, "vidsrc");
+    assert.equal(body.servers[0].qualities[0].stream, "https://vidsrc.to/embed/movie/157336");
+    assert.equal(body.servers[1].name, "vidlink");
+    assert.equal(body.servers[1].qualities[0].stream, "https://vidlink.pro/movie/157336");
   } finally {
     restore();
   }
