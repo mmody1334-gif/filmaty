@@ -8,6 +8,7 @@ import {
   type BotCodePayload,
 } from "./engine/botcode.ts";
 import { searchTitles } from "./engine/search.ts";
+import { findProvider } from "./providers/index.ts";
 import { BROWSE_COLLECTIONS, BROWSE_LANGS, browseTitles } from "./engine/browse.ts";
 import { getHome, recordView } from "./engine/home.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
@@ -62,6 +63,42 @@ export default {
 
     if (url.pathname === "/api/search" && request.method === "GET") {
       return handleApiSearch(request, env, url);
+    }
+
+    // TEMPORARY diagnostics (added 2026-11-16 while tracing why حب متنكر
+    // resolves from a VM but not from the Worker): runs ONE provider's
+    // search and returns its candidate titles. Read-only, no secrets.
+    // Remove once the diagnosis is done.
+    if (url.pathname === "/api/debug-search" && request.method === "GET") {
+      const site = url.searchParams.get("site") || "";
+      const q = url.searchParams.get("q") || "";
+      const kind = url.searchParams.get("kind") === "movie" ? "movie" : "series";
+      const provider = findProvider(site);
+      if (!provider || !q) {
+        return new Response(JSON.stringify({ ok: false, error: "bad site or q" }), {
+          status: 400,
+          headers: corsHeaders(),
+        });
+      }
+      try {
+        const candidates = await provider.search(q, kind as "movie" | "series");
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            site,
+            query: q,
+            kind,
+            count: candidates.length,
+            candidates: candidates.slice(0, 5).map((c) => ({ title: c.title, url: c.url })),
+          }),
+          { headers: corsHeaders() },
+        );
+      } catch (err: any) {
+        return new Response(JSON.stringify({ ok: false, site, query: q, error: String(err?.message || err) }), {
+          status: 500,
+          headers: corsHeaders(),
+        });
+      }
     }
 
     if (url.pathname === "/api/browse" && request.method === "GET") {
