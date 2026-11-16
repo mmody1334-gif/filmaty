@@ -95,7 +95,7 @@ export function formatEpisodeDetails(seriesTitle: string, epTitle: string): stri
 }
 
 /**
- * Exact card requested by user in Image 3
+ * Stream ready card with clear two-choice download/watch actions
  */
 export function formatStreamReadyCard(
   title: string,
@@ -106,12 +106,14 @@ export function formatStreamReadyCard(
   const icon = isSeries ? "📺" : "🎬";
   const sizeText = size ? size : "N/A";
 
-  return `✅ <b>Ready to stream and download!</b>
+  return `✅ <b>Ready to stream and download! | جاهز للتشغيل والتحميل!</b>
 ${icon} <b>${escapeHtml(title)}</b>
-🎯 <b>Quality:</b> ${quality}
-📦 <b>Size:</b> ${sizeText}
+🎯 <b>الجودة (Quality):</b> ${quality}
+📦 <b>الحجم (Size):</b> ${sizeText}
 
-👇 <b>Use the direct links below:</b>`;
+👇 <b>اختر الإجراء المناسب لك:</b>
+• اضغط <b>تحميل مباشر</b> لتنزيل ملف الفيديو فوراً (.mp4).
+• اضغط <b>إرسال في التليجرام</b> ليصلك الفيديو كملف تشغيلي داخل المحادثة.`;
 }
 
 export function formatArchive(items: ArchiveEntry[]): string {

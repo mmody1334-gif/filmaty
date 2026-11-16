@@ -64,12 +64,14 @@ export async function searchAllProviders(
     }
   }
 
-  // Sort by highest similarity, prioritizing Akwam direct CDN if similarity is close
+  // Sort by highest similarity, prioritizing direct MP4 CDN providers (akwam first, then laroza)
   return merged.sort((a, b) => {
     const simDiff = (b.similarity || 0) - (a.similarity || 0);
-    if (Math.abs(simDiff) > 0.15) return simDiff;
+    if (Math.abs(simDiff) > 0.25) return simDiff;
     if (a.site === "akwam" && b.site !== "akwam") return -1;
     if (b.site === "akwam" && a.site !== "akwam") return 1;
+    if (a.site === "laroza" && b.site !== "laroza") return -1;
+    if (b.site === "laroza" && a.site !== "laroza") return 1;
     return simDiff;
   });
 }

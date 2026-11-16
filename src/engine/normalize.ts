@@ -269,12 +269,118 @@ export function hostOf(urlStr: string): string {
   }
 }
 
+export const GLOBAL_POPULAR_ALIASES: Record<string, string> = {
+  "دكستر": "dexter",
+  "ديكستر": "dexter",
+  "dexter": "دكستر",
+  "صراع العروش": "game of thrones",
+  "قيم اوف ثرونز": "game of thrones",
+  "game of thrones": "صراع العروش",
+  "لعبة الحبار": "squid game",
+  "سكويد جيم": "squid game",
+  "squid game": "لعبة الحبار",
+  "البروفيسور": "money heist",
+  "لا كاسا دي بابيل": "money heist",
+  "money heist": "البروفيسور",
+  "وينزداي": "wednesday",
+  "wednesday": "وينزداي",
+  "دارك": "dark",
+  "dark": "دارك",
+  "سترينجر ثينقز": "stranger things",
+  "سترينجر ثينغز": "stranger things",
+  "اشياء غريبة": "stranger things",
+  "أشياء غريبة": "stranger things",
+  "stranger things": "سترينجر ثينقز",
+  "بريكنج باد": "breaking bad",
+  "breaking bad": "بريكنج باد",
+  "بيكي بلاندرز": "peaky blinders",
+  "peaky blinders": "بيكي بلاندرز",
+  "فايكنج": "vikings",
+  "فايكنجز": "vikings",
+  "vikings": "فايكنج",
+  "بريزون بريك": "prison break",
+  "prison break": "بريزون بريك",
+  "ذا بويز": "the boys",
+  "the boys": "ذا بويز",
+  "ذا بينجوين": "the penguin",
+  "البطريق": "the penguin",
+  "the penguin": "البطريق",
+  "سيلو": "silo",
+  "silo": "سيلو",
+  "سيفيرانس": "severance",
+  "severance": "سيفيرانس",
+  "بيتر كول سول": "better call saul",
+  "better call saul": "بيتر كول سول",
+  "دكتور هاوس": "house",
+  "house md": "دكتور هاوس",
+  "فريندز": "friends",
+  "friends": "فريندز",
+  "ذا لاست اوف اس": "the last of us",
+  "the last of us": "ذا لاست اوف اس",
+  "هاوس اوف ذا دراجون": "house of the dragon",
+  "house of the dragon": "هاوس اوف ذا دراجون",
+  "فول اوت": "fallout",
+  "fallout": "فول اوت",
+  "شوجون": "shogun",
+  "shogun": "شوجون",
+  "تشرنوبل": "chernobyl",
+  "chernobyl": "تشرنوبل",
+  "لوست": "lost",
+  "lost": "لوست",
+  "سوبرناتشورال": "supernatural",
+  "supernatural": "سوبرناتشورال",
+  "بلاك ميرور": "black mirror",
+  "black mirror": "بلاك ميرور",
+  "لوكي": "loki",
+  "loki": "لوكي",
+  "ماندالوريان": "the mandalorian",
+  "the mandalorian": "ماندالوريان",
+  "داردفيل": "daredevil",
+  "daredevil": "داردفيل",
+  "افنجرز": "avengers",
+  "avengers": "افنجرز",
+  "اندجيم": "endgame",
+  "endgame": "اندجيم",
+  "انفنتي وور": "infinity war",
+  "infinity war": "انفنتي وور",
+  "سبايدر مان": "spider-man",
+  "سبايدرمان": "spider-man",
+  "spider-man": "سبايدر مان",
+  "باتمان": "batman",
+  "batman": "باتمان",
+  "سوبرمان": "superman",
+  "superman": "سوبرمان",
+  "ديدبول": "deadpool",
+  "deadpool": "ديدبول",
+  "ولفرين": "wolverine",
+  "جون ويك": "john wick",
+  "john wick": "جون ويك",
+  "هاري بوتر": "harry potter",
+  "harry potter": "هاري بوتر",
+  "سيد الخواتم": "lord of the rings",
+  "lord of the rings": "سيد الخواتم",
+};
+
 export function isRelevant(title: string, query: string): boolean {
   const tNorm = normalizeArabic(cleanTitle(title));
   const qNorm = normalizeArabic(cleanTitle(query));
 
   if (!tNorm || !qNorm) return false;
   if (tNorm.includes(qNorm) || qNorm.includes(tNorm)) return true;
+
+  // Check cross-language popular aliases
+  const qAlias = GLOBAL_POPULAR_ALIASES[qNorm];
+  if (qAlias && (tNorm.includes(qAlias) || qAlias.includes(tNorm))) {
+    return true;
+  }
+  const tAlias = GLOBAL_POPULAR_ALIASES[tNorm];
+  if (tAlias && (qNorm.includes(tAlias) || tAlias.includes(qNorm))) {
+    return true;
+  }
+  for (const [key, val] of Object.entries(GLOBAL_POPULAR_ALIASES)) {
+    if (qNorm.includes(key) && tNorm.includes(val)) return true;
+    if (qNorm.includes(val) && tNorm.includes(key)) return true;
+  }
 
   const qTokens = qNorm.split(/[\s:\-_]+/).filter((w) => w.length >= 2);
   if (qTokens.length === 0) return true;

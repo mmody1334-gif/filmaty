@@ -8,6 +8,11 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    // Root redirect to GitHub Pages WebApp
+    if (url.pathname === "/" || url.pathname === "") {
+      return Response.redirect("https://mmody1334-gif.github.io/filmaty/", 302);
+    }
+
     // Health check endpoint
     if (url.pathname === "/health") {
       return new Response(

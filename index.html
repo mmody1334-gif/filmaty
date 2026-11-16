@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>فيلماتي | سينما وأفلام ومسلسلات بجودة فائقة</title>
+  <!-- Telegram WebApp JS -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              red: '#e50914',
+              gold: '#f59e0b',
+              dark: '#0b0f19',
+              card: '#161e2e',
+              border: '#26334d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+    * { font-family: 'Cairo', system-ui, -apple-system, sans-serif; }
+    body { background-color: #0b0f19; color: #f8fafc; }
+    .glass { background: rgba(22, 30, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-12">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 glass border-b border-brand-border px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">🎬</span>
+      <h1 class="text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300">
+        فيلماتي <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-600/30 text-red-400 border border-red-500/40">VIP</span>
+      </h1>
+    </div>
+    <a href="https://t.me/filmatibot" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 text-xs font-bold hover:bg-blue-600 hover:text-white transition">
+      <span>🤖 البوت في التليجرام</span>
+    </a>
+  </header>
+
+  <!-- Hero / Search Section -->
+  <section class="p-4 max-w-4xl mx-auto w-full">
+    <div class="relative">
+      <input
+        id="searchInput"
+        type="text"
+        placeholder="ابحث عن فيلم، مسلسل، Marvel، Netflix..."
+        class="w-full bg-brand-card/90 text-white placeholder-slate-400 rounded-2xl py-3.5 pr-12 pl-10 border border-brand-border focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 transition text-sm"
+      />
+      <span class="absolute right-4 top-3.5 text-slate-400 text-lg">🔍</span>
+      <button id="clearSearch" class="hidden absolute left-3 top-3 text-slate-400 hover:text-white text-sm bg-slate-800 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
+    </div>
+
+    <!-- Quick Filters -->
+    <div class="flex gap-2 overflow-x-auto scrollbar-hide py-3 mt-1 text-xs font-bold">
+      <button class="filter-btn active whitespace-nowrap px-4 py-2 rounded-xl bg-red-600 text-white transition" data-filter="trending">🔥 الأكثر رواجاً</button>
+      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="movie">🎬 أفلام</button>
+      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="tv">📺 مسلسلات</button>
+      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="marvel">🦸‍♂️ مارفل</button>
+      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="netflix">🔴 نتفليكس</button>
+    </div>
+  </section>
+
+  <!-- Main Content Grid -->
+  <main class="flex-1 max-w-5xl mx-auto w-full px-4">
+    <!-- Section Title -->
+    <div class="flex items-center justify-between mb-3">
+      <h2 id="sectionTitle" class="text-base font-extrabold text-white flex items-center gap-2">
+        <span>🔥</span> <span>الأعمال الأكثر رواجاً اليوم</span>
+      </h2>
+      <span id="itemsCount" class="text-xs text-slate-400 font-semibold"></span>
+    </div>
+
+    <!-- Media Cards Grid -->
+    <div id="mediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+      <!-- Loading placeholders -->
+      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+    </div>
+  </main>
+
+  <!-- Media Details & Player Modal -->
+  <div id="mediaModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+    <div class="bg-brand-card border border-brand-border rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative">
+      <!-- Close button -->
+      <button id="closeModal" class="absolute top-3 left-3 z-20 w-8 h-8 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-red-600 transition">✕</button>
+
+      <!-- Video Player Frame Area -->
+      <div id="playerContainer" class="hidden relative aspect-video w-full bg-black">
+        <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0"></iframe>
+      </div>
+
+      <!-- Modal Content Body -->
+      <div class="p-5 overflow-y-auto space-y-4">
+        <div class="flex gap-4">
+          <img id="modalPoster" src="" alt="Poster" class="w-24 h-36 object-cover rounded-xl shadow-md border border-brand-border flex-shrink-0 bg-slate-900" />
+          <div class="flex-1 min-w-0">
+            <h3 id="modalTitle" class="text-lg font-black text-white leading-tight"></h3>
+            <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
+              <span id="modalRating" class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">⭐ 8.5</span>
+              <span id="modalYear" class="text-slate-400 font-semibold">2026</span>
+              <span id="modalKind" class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold">فيلم</span>
+            </div>
+            <p id="modalStory" class="text-slate-300 text-xs mt-2.5 line-clamp-2 leading-relaxed"></p>
+          </div>
+        </div>
+
+        <!-- Series Seasons & Episodes Picker (Visible if TV show) -->
+        <div id="seriesControls" class="hidden space-y-3 pt-2 border-t border-brand-border">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-300">الموسم:</label>
+            <select id="seasonSelect" class="bg-slate-800 text-white text-xs rounded-xl px-3 py-1.5 border border-brand-border focus:outline-none"></select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-300 block mb-2">اختر الحلقة:</label>
+            <div id="episodesGrid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-3 border-t border-brand-border space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnPlayInApp" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg shadow-red-900/30">
+              <span>▶️</span> <span>مشاهدة فورية</span>
+            </button>
+            <button id="btnDirectDownload" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg shadow-emerald-900/30">
+              <span>⬇️</span> <span>تحميل مباشر (.mp4)</span>
+            </button>
+          </div>
+          <button id="btnOpenInBot" class="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition">
+            <span>🚀</span> <span>طلب إرسال الفيديو عبر بوت التليجرام</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+    const TMDB_BASE = 'https://api.themoviedb.org/3';
+    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+
+    let currentItem = null;
+    let selectedSeason = 1;
+    let selectedEpisode = 1;
+    let debounceTimer = null;
+
+    // Telegram Mini App initialization
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    // Elements
+    const searchInput = document.getElementById('searchInput');
+    const clearSearch = document.getElementById('clearSearch');
+    const mediaGrid = document.getElementById('mediaGrid');
+    const sectionTitle = document.getElementById('sectionTitle');
+    const itemsCount = document.getElementById('itemsCount');
+    const mediaModal = document.getElementById('mediaModal');
+    const closeModal = document.getElementById('closeModal');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+
+    // Modal elements
+    const modalPoster = document.getElementById('modalPoster');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalRating = document.getElementById('modalRating');
+    const modalYear = document.getElementById('modalYear');
+    const modalKind = document.getElementById('modalKind');
+    const modalStory = document.getElementById('modalStory');
+    const seriesControls = document.getElementById('seriesControls');
+    const seasonSelect = document.getElementById('seasonSelect');
+    const episodesGrid = document.getElementById('episodesGrid');
+    const playerContainer = document.getElementById('playerContainer');
+    const videoIframe = document.getElementById('videoIframe');
+    const btnPlayInApp = document.getElementById('btnPlayInApp');
+    const btnDirectDownload = document.getElementById('btnDirectDownload');
+    const btnOpenInBot = document.getElementById('btnOpenInBot');
+
+    // Fetch and render initial trending content
+    async function loadTrending() {
+      renderLoading();
+      try {
+        const res = await fetch(`${TMDB_BASE}/trending/all/day?api_key=${TMDB_KEY}&language=ar`);
+        const data = await res.json();
+        renderCards(data.results || [], '🔥 الأعمال الأكثر رواجاً اليوم');
+      } catch (e) {
+        showError('تعذر جلب البيانات. يرجى التحقق من اتصالك.');
+      }
+    }
+
+    // Search function with Debounce
+    searchInput.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      clearSearch.classList.toggle('hidden', !q);
+      clearTimeout(debounceTimer);
+      if (!q) {
+        loadTrending();
+        return;
+      }
+      debounceTimer = setTimeout(() => executeSearch(q), 350);
+    });
+
+    clearSearch.addEventListener('click', () => {
+      searchInput.value = '';
+      clearSearch.classList.add('hidden');
+      loadTrending();
+    });
+
+    async function executeSearch(query) {
+      renderLoading();
+      try {
+        const res = await fetch(`${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}&language=ar&include_adult=false`);
+        const data = await res.json();
+        const valid = (data.results || []).filter(i => i.media_type === 'movie' || i.media_type === 'tv');
+        renderCards(valid, `🔍 نتائج البحث عن: "${query}"`);
+      } catch (e) {
+        showError('تعذر إتمام البحث. حاول مرة أخرى.');
+      }
+    }
+
+    // Category filter click handler
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => {
+          b.classList.remove('bg-red-600', 'text-white');
+          b.classList.add('bg-brand-card', 'text-slate-300');
+        });
+        btn.classList.remove('bg-brand-card', 'text-slate-300');
+        btn.classList.add('bg-red-600', 'text-white');
+
+        const filter = btn.dataset.filter;
+        searchInput.value = '';
+        clearSearch.classList.add('hidden');
+
+        if (filter === 'trending') loadTrending();
+        else if (filter === 'movie') loadDiscover('movie', '🎬 أحدث الأفلام');
+        else if (filter === 'tv') loadDiscover('tv', '📺 أحدث المسلسلات');
+        else if (filter === 'marvel') executeSearch('marvel');
+        else if (filter === 'netflix') executeSearch('netflix');
+      });
+    });
+
+    async function loadDiscover(type, title) {
+      renderLoading();
+      try {
+        const res = await fetch(`${TMDB_BASE}/discover/${type}?api_key=${TMDB_KEY}&language=ar&sort_by=popularity.desc`);
+        const data = await res.json();
+        const mapped = (data.results || []).map(r => ({ ...r, media_type: type }));
+        renderCards(mapped, title);
+      } catch (e) {
+        showError('تعذر جلب البيانات.');
+      }
+    }
+
+    function renderLoading() {
+      mediaGrid.innerHTML = Array(10).fill(0).map(() => `
+        <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      `).join('');
+    }
+
+    function showError(msg) {
+      mediaGrid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-sm font-semibold">${msg}</div>`;
+    }
+
+    function renderCards(items, title) {
+      sectionTitle.innerHTML = title;
+      itemsCount.innerText = `${items.length} عمل`;
+
+      if (!items.length) {
+        mediaGrid.innerHTML = `
+          <div class="col-span-full text-center py-16 text-slate-400">
+            <p class="text-3xl mb-2">🍿</p>
+            <p class="text-sm font-bold">لم يتم العثور على نتائج مطابقة.</p>
+          </div>`;
+        return;
+      }
+
+      mediaGrid.innerHTML = items.map(item => {
+        const title = item.title || item.name || 'بدون عنوان';
+        const date = item.release_date || item.first_air_date || '';
+        const year = date ? date.slice(0, 4) : '';
+        const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
+        const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+        const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+
+        return `
+          <div class="group cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 hover:-translate-y-1 shadow-lg" onclick="openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')">
+            <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+              <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+              <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-amber-400 text-[11px] font-extrabold border border-amber-500/20">⭐ ${rating}</span>
+              <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-slate-300 text-[10px] font-bold border border-white/10">${kind}</span>
+            </div>
+            <div class="p-2.5">
+              <h4 class="text-xs font-bold text-white truncate">${title}</h4>
+              <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+                <span>${year}</span>
+                <span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Modal Details Logic
+    async function openDetails(id, mediaType) {
+      try {
+        const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}?api_key=${TMDB_KEY}&language=ar`);
+        currentItem = await res.json();
+        currentItem.media_type = mediaType;
+
+        const title = currentItem.title || currentItem.name;
+        const date = currentItem.release_date || currentItem.first_air_date || '';
+        const year = date ? date.slice(0, 4) : '';
+        const rating = currentItem.vote_average ? currentItem.vote_average.toFixed(1) : '8.0';
+        const poster = currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=Poster';
+
+        modalTitle.innerText = title;
+        modalPoster.src = poster;
+        modalRating.innerText = `⭐ ${rating}`;
+        modalYear.innerText = year;
+        modalKind.innerText = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+        modalStory.innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
+
+        // Player reset
+        playerContainer.classList.add('hidden');
+        videoIframe.src = '';
+
+        if (mediaType === 'tv') {
+          seriesControls.classList.remove('hidden');
+          setupSeriesSeasons(currentItem);
+        } else {
+          seriesControls.classList.add('hidden');
+          selectedSeason = 1;
+          selectedEpisode = 1;
+        }
+
+        mediaModal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+      } catch (err) {
+        alert('تعذر فتح تفاصيل العمل.');
+      }
+    }
+
+    function setupSeriesSeasons(tv) {
+      const seasons = (tv.seasons || []).filter(s => s.season_number > 0);
+      seasonSelect.innerHTML = seasons.map(s => `
+        <option value="${s.season_number}">الموسم ${s.season_number} (${s.episode_count} حلقة)</option>
+      `).join('');
+
+      selectedSeason = seasons[0]?.season_number || 1;
+      renderEpisodes(seasons[0]?.episode_count || 10);
+
+      seasonSelect.onchange = (e) => {
+        selectedSeason = Number(e.target.value);
+        const s = seasons.find(x => x.season_number === selectedSeason);
+        renderEpisodes(s?.episode_count || 10);
+      };
+    }
+
+    function renderEpisodes(count) {
+      selectedEpisode = 1;
+      episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => `
+        <button class="ep-btn ${epNum === 1 ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl py-1.5 text-xs font-bold border border-brand-border hover:bg-red-600 hover:text-white transition" onclick="selectEpisode(${epNum}, this)">
+          حلقة ${epNum}
+        </button>
+      `).join('');
+    }
+
+    function selectEpisode(epNum, btn) {
+      selectedEpisode = epNum;
+      document.querySelectorAll('.ep-btn').forEach(b => {
+        b.classList.remove('bg-red-600', 'text-white');
+        b.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      btn.classList.remove('bg-slate-800', 'text-slate-300');
+      btn.classList.add('bg-red-600', 'text-white');
+
+      // Update active stream player if already open
+      if (!playerContainer.classList.contains('hidden')) {
+        playActiveStream();
+      }
+    }
+
+    // In-App Instant Player
+    btnPlayInApp.addEventListener('click', playActiveStream);
+
+    function playActiveStream() {
+      if (!currentItem) return;
+      let streamUrl = '';
+      if (currentItem.media_type === 'tv') {
+        streamUrl = `https://vidlink.pro/tv/${currentItem.id}/${selectedSeason}/${selectedEpisode}`;
+      } else {
+        streamUrl = `https://vidlink.pro/movie/${currentItem.id}`;
+      }
+      videoIframe.src = streamUrl;
+      playerContainer.classList.remove('hidden');
+    }
+
+    // Direct Download & Telegram Bot Request
+    btnDirectDownload.addEventListener('click', () => {
+      if (!currentItem) return;
+      const title = currentItem.title || currentItem.name;
+      // Direct fast link bridge: opens the Telegram bot with the exact title for instant .mp4 delivery
+      const tgUrl = `https://t.me/filmatibot?start=${encodeURIComponent(title)}`;
+      window.open(tgUrl, '_blank');
+    });
+
+    btnOpenInBot.addEventListener('click', () => {
+      if (!currentItem) return;
+      const title = currentItem.title || currentItem.name;
+      const targetQuery = currentItem.media_type === 'tv'
+        ? `/series ${title}`
+        : `/film ${title}`;
+      const tgUrl = `https://t.me/filmatibot?start=${encodeURIComponent(title)}`;
+
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.sendData) {
+        window.Telegram.WebApp.sendData(targetQuery);
+      } else {
+        window.open(tgUrl, '_blank');
+      }
+    });
+
+    closeModal.addEventListener('click', () => {
+      mediaModal.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+      videoIframe.src = '';
+      playerContainer.classList.add('hidden');
+    });
+
+    // Start
+    loadTrending();
+  </script>
+</body>
+</html>

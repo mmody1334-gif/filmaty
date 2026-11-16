@@ -85,6 +85,8 @@ export const POPULAR_ALIASES: Record<string, string> = {
   "شوجون": "Shogun",
   "تشرنوبل": "Chernobyl",
   "ديكستر": "Dexter",
+  "دكستر": "Dexter",
+  "dexter": "Dexter",
   "لوست": "Lost",
   "سوبرناتشورال": "Supernatural",
   "بلاك ميرور": "Black Mirror",

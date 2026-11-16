@@ -9,6 +9,12 @@ export function buildMainMenuKeyboard(): InlineKeyboardMarkup {
         { text: "📺 بحث عن مسلسل (/series)", callback_data: "cmd:series" },
       ],
       [
+        {
+          text: "🌐 تصفح المكتبة بالويب (Web App)",
+          web_app: { url: "https://mmody1334-gif.github.io/filmaty/" },
+        },
+      ],
+      [
         { text: "📁 أرشيفي وسجل المشاهدة", callback_data: "cmd:archive" },
         { text: "⚡️ حالة السيرفرات والمصادر", callback_data: "cmd:status" },
       ],
@@ -31,11 +37,10 @@ export function buildSearchResultsKeyboard(
     const idx = start + i;
     const kindBadge = cand.kind === "series" ? "📺" : "🎬";
     const yearBadge = cand.year ? ` (${cand.year})` : "";
-    const siteBadge = cand.siteLabel ? ` [${cand.siteLabel}]` : "";
 
     keyboard.push([
       {
-        text: `${kindBadge} ${cand.title}${yearBadge}${siteBadge}`,
+        text: `${kindBadge} ${cand.title}${yearBadge}`,
         callback_data: `mov|s|${searchKey}|${idx}`,
       },
     ]);
@@ -200,26 +205,37 @@ export function buildEpisodeQualitiesKeyboard(
 }
 
 /**
- * Exact layout from user Image 3:
- * ⬇️ Fast Direct Download
- * ▶️ Direct Stream
- * 🔙 Other Quality | 🔍 Back to Search
+ * Two-choice Action Card:
+ * ⬇️ تحميل مباشر (.mp4)
+ * 🚀 إرسال الفيديو في التليجرام
+ * ▶️ مشاهدة مباشرة أونلاين
+ * 🔙 اختيار جودة أخرى | 🔍 بحث جديد
  */
 export function buildStreamReadyKeyboard(
   directVideoUrl: string,
+  streamKey: string,
   backQualityCallback: string,
   searchKey: string,
+  streamPlayerUrl?: string,
 ): InlineKeyboardMarkup {
-  return {
-    inline_keyboard: [
-      [{ text: "⬇️ Fast Direct Download", url: directVideoUrl }],
-      [{ text: "▶️ Direct Stream", url: directVideoUrl }],
-      [
-        { text: "🔙 Other Quality", callback_data: backQualityCallback },
-        { text: "🔍 Back to Search", callback_data: `mov|b|${searchKey}` },
-      ],
-    ],
-  };
+  const keyboard: InlineKeyboardButton[][] = [];
+
+  // Row 1: Direct MP4 Download (Downloads file immediately in browser/IDM)
+  keyboard.push([{ text: "⬇️ تحميل مباشر (.mp4)", url: directVideoUrl }]);
+
+  // Row 2: Send Video directly into Telegram chat
+  keyboard.push([{ text: "🚀 إرسال الفيديو في التليجرام", callback_data: `mov|send|${streamKey}` }]);
+
+  // Row 3: Online stream player
+  keyboard.push([{ text: "▶️ مشاهدة مباشرة أونلاين", url: streamPlayerUrl || directVideoUrl }]);
+
+  // Row 4: Navigation
+  keyboard.push([
+    { text: "🔙 اختيار جودة أخرى", callback_data: backQualityCallback },
+    { text: "🔍 بحث جديد", callback_data: `mov|b|${searchKey}` },
+  ]);
+
+  return { inline_keyboard: keyboard };
 }
 
 export function buildTikTokKeyboard(

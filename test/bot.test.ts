@@ -28,9 +28,10 @@ import type { Candidate, Episode, MediaDetails, SourceLink } from "../src/provid
 
 test("builds main menu keyboard", () => {
   const kb = buildMainMenuKeyboard();
-  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard.length, 3);
   assert.equal(kb.inline_keyboard[0][0].text.includes("/film"), true);
   assert.equal(kb.inline_keyboard[0][1].text.includes("/series"), true);
+  assert.equal(kb.inline_keyboard[1][0].text.includes("Web App"), true);
 });
 
 test("builds search results keyboard with pagination", () => {
@@ -81,26 +82,26 @@ test("builds series episodes keyboard (grid of 4)", () => {
   assert.equal(kb.inline_keyboard[2].length, 1);
 });
 
-test("builds stream ready keyboard matching user Image 3 and Image 4", () => {
+test("builds stream ready keyboard with direct download and send to telegram actions", () => {
   const directUrl = "https://s204d1.downet.net/download/123/456/Avengers.Endgame.720p.mp4";
-  const kb = buildStreamReadyKeyboard(directUrl, "mov|d|item1", "search1");
+  const kb = buildStreamReadyKeyboard(directUrl, "streamKey123", "mov|d|item1", "search1");
 
-  assert.equal(kb.inline_keyboard.length, 3);
-  assert.equal(kb.inline_keyboard[0][0].text, "⬇️ Fast Direct Download");
+  assert.equal(kb.inline_keyboard.length, 4);
+  assert.equal(kb.inline_keyboard[0][0].text, "⬇️ تحميل مباشر (.mp4)");
   assert.equal(kb.inline_keyboard[0][0].url, directUrl);
-  assert.equal(kb.inline_keyboard[1][0].text, "▶️ Direct Stream");
-  assert.equal(kb.inline_keyboard[1][0].url, directUrl);
-  assert.equal(kb.inline_keyboard[2][0].text, "🔙 Other Quality");
-  assert.equal(kb.inline_keyboard[2][1].text, "🔍 Back to Search");
+  assert.equal(kb.inline_keyboard[1][0].text, "🚀 إرسال الفيديو في التليجرام");
+  assert.equal(kb.inline_keyboard[1][0].callback_data, "mov|send|streamKey123");
+  assert.equal(kb.inline_keyboard[2][0].text, "▶️ مشاهدة مباشرة أونلاين");
+  assert.equal(kb.inline_keyboard[3][0].text, "🔙 اختيار جودة أخرى");
+  assert.equal(kb.inline_keyboard[3][1].text, "🔍 بحث جديد");
 });
 
 test("formats exact stream ready card", () => {
   const card = formatStreamReadyCard("Avengers Endgame: Encore", "720p HD", "776.2 MB", false);
   assert.ok(card.includes("Ready to stream and download!"));
   assert.ok(card.includes("Avengers Endgame: Encore"));
-  assert.ok(card.includes("Quality:</b> 720p HD"));
-  assert.ok(card.includes("Size:</b> 776.2 MB"));
-  assert.ok(card.includes("Use the direct links below:"));
+  assert.ok(card.includes("720p HD"));
+  assert.ok(card.includes("776.2 MB"));
 });
 
 test("expands smart aliases for search queries", () => {

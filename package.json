@@ -8,6 +8,8 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
+    "bot": "node src/bot-runner.ts",
+    "runner": "node src/bot-runner.ts",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },

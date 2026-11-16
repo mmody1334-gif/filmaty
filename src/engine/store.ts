@@ -28,6 +28,7 @@ export interface UserSession {
 
 export class AppStore {
   private env: Env;
+  private static memStore = new Map<string, { value: string; expiresAt: number }>();
 
   constructor(env: Env) {
     this.env = env;
@@ -43,47 +44,65 @@ export class AppStore {
       timestamp: Date.now(),
     };
     const updated = { ...existing, ...session, timestamp: Date.now() };
-    await this.env.CACHE.put(key, JSON.stringify(updated), { expirationTtl: 3600 }); // 1 hour session
+    await this.put(key, JSON.stringify(updated), 3600);
   }
 
   async getSession(chatId: number): Promise<UserSession | null> {
     const key = `session:${chatId}`;
+    const raw = await this.get(key);
+    if (!raw) return null;
     try {
-      return await this.env.CACHE.get<UserSession>(key, "json");
+      return JSON.parse(raw) as UserSession;
     } catch {
       return null;
     }
   }
 
   async clearSession(chatId: number): Promise<void> {
-    await this.env.CACHE.delete(`session:${chatId}`);
+    const key = `session:${chatId}`;
+    if (this.env?.CACHE) {
+      await this.env.CACHE.delete(key).catch(() => undefined);
+    }
+    AppStore.memStore.delete(key);
   }
 
   async put(key: string, value: string, ttlSeconds = 3600): Promise<void> {
-    try {
-      await this.env.CACHE.put(key, value, { expirationTtl: ttlSeconds });
-    } catch (err) {
-      console.error(`KV put error for key ${key}:`, err);
+    if (this.env?.CACHE) {
+      try {
+        await this.env.CACHE.put(key, value, { expirationTtl: ttlSeconds });
+        return;
+      } catch (err) {
+        // Fallback to in-memory store
+      }
     }
+    AppStore.memStore.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
   }
 
   async get(key: string): Promise<string | null> {
-    try {
-      return await this.env.CACHE.get(key);
-    } catch {
+    if (this.env?.CACHE) {
+      try {
+        const val = await this.env.CACHE.get(key);
+        if (val !== null) return val;
+      } catch {}
+    }
+    const item = AppStore.memStore.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiresAt) {
+      AppStore.memStore.delete(key);
       return null;
     }
+    return item.value;
   }
 
   async setCache<T>(key: string, value: T, ttlSeconds = 1800): Promise<void> {
-    try {
-      await this.env.CACHE.put(key, JSON.stringify(value), { expirationTtl: ttlSeconds });
-    } catch {}
+    await this.put(key, JSON.stringify(value), ttlSeconds);
   }
 
   async getCache<T>(key: string): Promise<T | null> {
+    const raw = await this.get(key);
+    if (!raw) return null;
     try {
-      return await this.env.CACHE.get<T>(key, "json");
+      return JSON.parse(raw) as T;
     } catch {
       return null;
     }

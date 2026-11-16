@@ -2,7 +2,7 @@ import type { Env } from "../env.ts";
 import { parseOwnerIds } from "../env.ts";
 import { AppStore } from "../engine/store.ts";
 import { ALL_PROVIDERS, findProvider, searchAllProviders } from "../providers/index.ts";
-import type { Candidate, Episode, MediaDetails, MediaKind, SourceLink } from "../providers/types.ts";
+import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SourceLink } from "../providers/types.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import {
   detectSocialPlatform,
@@ -32,6 +32,72 @@ function extractMsgId(msg: any): number | undefined {
   if (typeof msg.message_id === "number") return msg.message_id;
   if (msg.result && typeof msg.result.message_id === "number") return msg.result.message_id;
   return undefined;
+}
+
+function isDirectMediaUrl(url?: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes("downet.net") ||
+    url.includes("okprimeone.site") ||
+    /\.(mp4|mkv|webm|avi)(\?|$)/i.test(url)
+  );
+}
+
+async function resolveBestDirectStream(
+  provider: Provider,
+  targetUrl: string,
+  title: string,
+  kind: MediaKind,
+  seasonNum?: number,
+  episodeNum?: number,
+): Promise<ResolvedStream> {
+  // 1. Try provider's own resolver
+  if (provider.resolveStream) {
+    try {
+      const stream = await provider.resolveStream(targetUrl);
+      if (stream && isDirectMediaUrl(stream.directVideoUrl)) {
+        return stream;
+      }
+    } catch {
+      /* continue to lookup */
+    }
+  }
+
+  // 2. Direct lookup on Akwam to obtain real direct .mp4 CDN URL
+  try {
+    const akwam = new AkwamProvider();
+    const cleanQ = title.replace(/\([^)]*\)/g, "").trim();
+    const results = await akwam.search(cleanQ, kind);
+    if (results.length > 0) {
+      const cand = results[0];
+      const details = await akwam.getDetails(cand);
+      if (kind === "movie" && details.sources.length > 0) {
+        return await akwam.resolveStream(details.sources[0].url);
+      }
+      if (kind === "series" && details.seasons.length > 0) {
+        const s =
+          details.seasons.find((sg) => sg.season === (seasonNum || 1)) ||
+          details.seasons[0];
+        const ep =
+          s.episodes.find((e) => e.episode === (episodeNum || 1)) ||
+          s.episodes[0];
+        if (ep) {
+          const epSources = await akwam.getEpisodeSources(ep);
+          if (epSources.length > 0) {
+            return await akwam.resolveStream(epSources[0].url);
+          }
+        }
+      }
+    }
+  } catch {
+    /* ignore and continue */
+  }
+
+  // 3. Final fallback
+  if (provider.resolveStream) {
+    return await provider.resolveStream(targetUrl);
+  }
+  return await new AkwamProvider().resolveStream(targetUrl);
 }
 
 export async function handleTelegramUpdate(update: any, env: Env): Promise<Response> {
@@ -676,17 +742,34 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     try {
       const provider = findProvider(details.candidate.site) || new AkwamProvider();
       const targetUrl = chosenSource?.url || details.candidate.url;
-      const stream = provider.resolveStream
-        ? await provider.resolveStream(targetUrl)
-        : await new AkwamProvider().resolveStream(targetUrl);
+      const stream = await resolveBestDirectStream(
+        provider,
+        targetUrl,
+        details.title,
+        "movie",
+      );
 
       const title = details.title;
       const quality = chosenSource?.quality || stream.quality || "720p HD";
       const size = chosenSource?.fileSize || stream.size;
 
+      const streamKey = shortKey();
+      await store.put(
+        `mov_str:${streamKey}`,
+        JSON.stringify({
+          directVideoUrl: stream.directVideoUrl,
+          title,
+          quality,
+          size,
+          poster: details.poster,
+        }),
+        3600,
+      );
+
       const text = views.formatStreamReadyCard(title, quality, size, false);
       const keyboard = kb.buildStreamReadyKeyboard(
         stream.directVideoUrl,
+        streamKey,
         `mov|d|${itemKey}`,
         stored.searchKey || "",
       );
@@ -727,17 +810,36 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     try {
       const provider = findProvider(details.candidate.site) || new AkwamProvider();
       const targetUrl = chosenSource?.url || ep.url;
-      const stream = provider.resolveStream
-        ? await provider.resolveStream(targetUrl)
-        : await new AkwamProvider().resolveStream(targetUrl);
+      const stream = await resolveBestDirectStream(
+        provider,
+        targetUrl,
+        details.title,
+        "series",
+        ep.season || (stored.seasonIdx !== undefined ? stored.seasonIdx + 1 : 1),
+        ep.episode,
+      );
 
       const title = `${details.title} - ${ep.title}`;
       const quality = chosenSource?.quality || stream.quality || "720p HD";
       const size = chosenSource?.fileSize || stream.size;
 
+      const streamKey = shortKey();
+      await store.put(
+        `mov_str:${streamKey}`,
+        JSON.stringify({
+          directVideoUrl: stream.directVideoUrl,
+          title,
+          quality,
+          size,
+          poster: details.poster,
+        }),
+        3600,
+      );
+
       const text = views.formatStreamReadyCard(title, quality, size, true);
       const keyboard = kb.buildStreamReadyKeyboard(
         stream.directVideoUrl,
+        streamKey,
         `mov|be|${stored.itemKey}|${stored.seasonIdx || 0}`,
         stored.searchKey || "",
       );
@@ -751,6 +853,61 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
         {
           reply_markup: {
             inline_keyboard: [[{ text: "🔙 رجوع للحلقات", callback_data: `mov|be|${stored.itemKey}|${stored.seasonIdx || 0}` }]],
+          },
+        },
+      );
+    }
+    return;
+  }
+
+  // Send Video directly into Telegram chat: mov|send|{streamKey}
+  if (data.startsWith("mov|send|")) {
+    const [, , streamKey] = data.split("|");
+    const raw = await store.get(`mov_str:${streamKey}`);
+    if (!raw) {
+      await bot.answerCallbackQuery(callbackId, "⌛ انتهت الجلسة. أعد اختيار الجودة.", true);
+      return;
+    }
+    const item = JSON.parse(raw);
+    await bot.answerCallbackQuery(callbackId, "⏳ جاري إرسال الفيديو للتليجرام...");
+
+    const statusMsg = await bot.sendMessage(
+      chatId,
+      `⏳ <b>جاري إرسال الفيديو مباشرة داخل شات التليجرام...</b>\n🎬 <b>${views.escapeHtml(item.title)}</b>\n🎯 الجودة: <b>${item.quality}</b>\n<i>يرجى الانتظار بضع ثوانٍ بينما يقوم سيرفر التليجرام بالمعالجة...</i>`,
+    );
+    const statusMsgId = extractMsgId(statusMsg);
+
+    const caption = `🎬 <b>${views.escapeHtml(item.title)}</b>\n🎯 الجودة: <b>${item.quality}</b>${item.size ? ` • 📦 ${item.size}` : ""}\n\n🍿 مشاهدة ممتعة عبر بوت فيلماتي!`;
+    const videoKeyboard = {
+      inline_keyboard: [
+        [{ text: "⬇️ رابط التحميل المباشر (.mp4)", url: item.directVideoUrl }],
+      ],
+    };
+
+    try {
+      const res = await bot.sendVideo(chatId, item.directVideoUrl, caption, {
+        reply_markup: videoKeyboard,
+      });
+
+      if (res && (res.ok || res.message_id)) {
+        if (statusMsgId) await bot.deleteMessage(chatId, statusMsgId).catch(() => undefined);
+        return;
+      }
+      throw new Error(res?.description || "Failed to send video directly");
+    } catch (err: any) {
+      if (statusMsgId) await bot.deleteMessage(chatId, statusMsgId).catch(() => undefined);
+      await bot.sendMessage(
+        chatId,
+        `⚠️ <b>تنبيه من سيرفرات التليجرام:</b>
+حجم الفيديو كبير (أكبر من 50MB) أو قيود سيرفر التليجرام تمنع استيراده تلقائياً في الشات.
+
+👇 <b>يمكنك تحميله فوراً وبأقصى سرعة (.mp4) أو تشغيله مباشرة:</b>`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "⬇️ تحميل مباشر (.mp4)", url: item.directVideoUrl }],
+              [{ text: "▶️ مشاهدة مباشرة أونلاين", url: item.directVideoUrl }],
+            ],
           },
         },
       );
