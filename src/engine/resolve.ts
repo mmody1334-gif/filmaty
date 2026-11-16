@@ -399,19 +399,20 @@ export function vidlinkUrl(
   return `https://vidlink.pro/movie/${tmdbId}`;
 }
 
-// The vidsrc embed fallback. Unlike vidlink, vidsrc plays inside a
-// sandboxed iframe, so its popups/redirects stay blocked (no
+// The EmbedWave embed fallback. Unlike vidlink/vidsrc, EmbedWave plays
+// inside a sandboxed iframe (verified live: Interstellar played with
+// no ads/popups), so its popups/redirects stay blocked (no
 // allow-popups / allow-top-navigation).
-export function vidsrcUrl(
+export function embedwaveUrl(
   type: "movie" | "tv",
   tmdbId: number,
   season?: number,
   episode?: number,
 ): string {
   if (type === "tv") {
-    return `https://vidsrc.to/embed/tv/${tmdbId}/${season || 1}/${episode || 1}`;
+    return `https://embedwave.cc/embed/tv/${tmdbId}/${season || 1}/${episode || 1}`;
   }
-  return `https://vidsrc.to/embed/movie/${tmdbId}`;
+  return `https://embedwave.cc/embed/movie/${tmdbId}`;
 }
 
 // Do two quality labels name the same resolution? ("720p HD" vs "720p")

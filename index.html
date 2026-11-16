@@ -660,20 +660,20 @@
       return server && server.name === 'vidlink';
     }
 
-    function isVidsrcServer(server) {
-      return server && server.name === 'vidsrc';
+    function isEmbedwaveServer(server) {
+      return server && server.name === 'embedwave';
     }
 
-    // Either iframe embed server (vidsrc or vidlink), as opposed to a
+    // Either iframe embed server (embedwave or vidlink), as opposed to a
     // native direct-stream server.
     function isEmbedServer(server) {
-      return isVidlinkServer(server) || isVidsrcServer(server);
+      return isVidlinkServer(server) || isEmbedwaveServer(server);
     }
 
-    // Sandbox flags for the vidsrc iframe: scripts + same-origin so the
+    // Sandbox flags for the embedwave iframe: scripts + same-origin so the
     // player can run, but NO allow-popups / allow-top-navigation, so its
     // ads cannot open tabs or hijack the page.
-    const VIDSRC_SANDBOX = 'allow-same-origin allow-scripts allow-presentation allow-forms';
+    const EMBEDWAVE_SANDBOX = 'allow-same-origin allow-scripts allow-presentation allow-forms';
 
     function renderServerControls() {
       const wrap = document.getElementById('serverControls');
@@ -730,10 +730,10 @@
       playerContainer.classList.remove('hidden');
       if (isEmbedServer(server)) {
         resetPlayer();
-        // vidsrc plays sandboxed (ads blocked); vidlink refuses any
+        // embedwave plays sandboxed (ads blocked); vidlink refuses any
         // sandbox, so its attribute is removed for that server.
-        if (isVidsrcServer(server)) {
-          videoIframe.setAttribute('sandbox', VIDSRC_SANDBOX);
+        if (isEmbedwaveServer(server)) {
+          videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
         } else {
           videoIframe.removeAttribute('sandbox');
         }
@@ -753,7 +753,7 @@
 
     // Native player failure: try the next quality of the same server
     // first; only when no quality is left, fall back to the embed
-    // servers (vidsrc first, then vidlink).
+    // servers (embedwave first, then vidlink).
     function tryNextQualityOrFallback() {
       const server = selectedServer();
       if (server && !isEmbedServer(server) && selectedQualityIdx < server.qualities.length - 1) {
@@ -766,14 +766,14 @@
       loadEmbedFallback();
     }
 
-    // Embed fallback: pick the vidsrc server if it exists and is not
+    // Embed fallback: pick the embedwave server if it exists and is not
     // already selected (sandboxed, ads blocked); otherwise the vidlink
     // server (unsandboxed last resort).
     function loadEmbedFallback() {
       if (!currentServers) { loadVidlinkFallback(); return; }
-      const vidsrcIdx = currentServers.findIndex((s) => s.name === 'vidsrc');
-      if (vidsrcIdx >= 0 && vidsrcIdx !== selectedServerIdx) {
-        selectedServerIdx = vidsrcIdx;
+      const embedwaveIdx = currentServers.findIndex((s) => s.name === 'embedwave');
+      if (embedwaveIdx >= 0 && embedwaveIdx !== selectedServerIdx) {
+        selectedServerIdx = embedwaveIdx;
         selectedQualityIdx = 0;
         renderServerControls();
         playSelected();
@@ -801,7 +801,7 @@
         if (vidIdx >= 0) { selectedServerIdx = vidIdx; selectedQualityIdx = 0; renderServerControls(); }
       }
       resetPlayer();
-      // Vidlink refuses any sandbox, so drop the attribute (the vidsrc
+      // Vidlink refuses any sandbox, so drop the attribute (the embedwave
       // server may have left it on) before loading it.
       videoIframe.removeAttribute('sandbox');
       let streamUrl = '';
@@ -843,7 +843,7 @@
     }
 
     // In-App Instant Player: ad-free native <video> first, then the
-    // sandboxed vidsrc embed, then the vidlink fallback
+    // sandboxed embedwave embed, then the vidlink fallback
     btnPlayInApp.addEventListener('click', playActiveStream);
 
     async function playActiveStream() {
@@ -866,7 +866,7 @@
         playSelected();
         return;
       }
-      // No direct source: fall back to the embed servers (vidsrc
+      // No direct source: fall back to the embed servers (embedwave
       // sandboxed first, then vidlink unsandboxed).
       loadEmbedFallback();
     }
