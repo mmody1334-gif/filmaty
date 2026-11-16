@@ -364,7 +364,9 @@ export function matchesKnownTitles(candidateTitle: string, knownTitles: string[]
 // Arabic round. Stopping at the first round with any match would
 // declare the title unresolvable without ever trying the later round.
 // The resolver drives the rounds and stops as soon as one resolves.
-async function fetchResolveCandidateRounds(
+// TEMP export for the /api/debug-rounds diagnostics endpoint (see
+// src/index.ts). Remove together with that endpoint.
+export async function fetchResolveCandidateRounds(
   env: Env,
   type: "movie" | "tv",
   tmdbId: number,
