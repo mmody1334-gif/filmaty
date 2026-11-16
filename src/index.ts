@@ -1,6 +1,6 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { embedwaveUrl, qualityMatches, resolveServersByTmdb, validateDirectUrl, vidlinkUrl } from "./engine/resolve.ts";
+import { embedwaveUrl, qualityMatches, resolveAllDirectStreams, resolveServersByTmdb, validateDirectUrl, vidlinkUrl } from "./engine/resolve.ts";
 import { fetchResolveCandidateRounds } from "./engine/resolve.ts";
 import { parseSeasonEpisode } from "./engine/normalize.ts";
 import {
@@ -161,6 +161,118 @@ export default {
         );
       } catch (err: any) {
         return new Response(JSON.stringify({ ok: false, site, error: String(err?.message || err) }), {
+          status: 500,
+          headers: corsHeaders(),
+        });
+      }
+    }
+
+    // TEMPORARY diagnostics part 4: replays the resolver loop exactly
+    // (rounds -> guard -> getDetails -> pickTargetUrl -> resolveAllDirectStreams)
+    // for a TMDB id inside the Worker, reporting every step per
+    // candidate — so a candidate that resolves in isolation but not in
+    // the loop shows exactly where it drops out. Params: type, id, s, e.
+    if (url.pathname === "/api/debug-loop" && request.method === "GET") {
+      const type = url.searchParams.get("type") === "movie" ? "movie" : "tv";
+      const tmdbId = Number(url.searchParams.get("id") || "0");
+      const s = Number(url.searchParams.get("s") || "1");
+      const e = Number(url.searchParams.get("e") || "1");
+      if (!tmdbId) {
+        return new Response(JSON.stringify({ ok: false, error: "bad id" }), {
+          status: 400,
+          headers: corsHeaders(),
+        });
+      }
+      try {
+        const found = await fetchResolveCandidateRounds(env, type, tmdbId);
+        if (!found) {
+          return new Response(JSON.stringify({ ok: false, error: "no TMDB title" }), {
+            headers: corsHeaders(),
+          });
+        }
+        const tried = new Set<string>();
+        const trace: any[] = [];
+        let round: any;
+        outer: while ((round = await found.nextRound())) {
+          for (const candidate of round) {
+            const step: any = { site: candidate.site, title: candidate.title };
+            if (tried.has(candidate.url)) {
+              step.outcome = "skipped-duplicate-url";
+              trace.push(step);
+              continue;
+            }
+            tried.add(candidate.url);
+            const declared = parseSeasonEpisode(candidate.title);
+            if (
+              (declared.season !== undefined && declared.season !== s) ||
+              (declared.episode !== undefined && declared.episode !== e)
+            ) {
+              step.outcome = "guard-skip";
+              trace.push(step);
+              continue;
+            }
+            const provider = findProvider(candidate.site);
+            if (!provider) {
+              step.outcome = "no-provider";
+              trace.push(step);
+              continue;
+            }
+            try {
+              const details = await provider.getDetails(candidate);
+              step.seasons = (details.seasons || []).map((ss: any) => ({
+                season: ss.season,
+                episodes: (ss.episodes || []).map((ep: any) => ep.episode),
+              }));
+              // pickTargetUrl, mirrored: episode sources win over the
+              // episode page URL when the provider returns any.
+              let targetUrl: string | null = null;
+              if (type === "tv") {
+                const sg = (details.seasons || []).find((x: any) => x.season === s);
+                const ep = sg?.episodes?.find((x: any) => x.episode === e);
+                if (ep) {
+                  try {
+                    const epSources = await provider.getEpisodeSources(ep);
+                    targetUrl = epSources.length > 0 ? epSources[0].url : ep.url;
+                    step.epSources = epSources.length;
+                  } catch {
+                    targetUrl = ep.url;
+                  }
+                }
+              } else {
+                targetUrl = details.sources?.[0]?.url || candidate.url;
+              }
+              step.targetUrl = targetUrl;
+              if (!targetUrl) {
+                step.outcome = "no-target-url";
+                trace.push(step);
+                continue;
+              }
+              const streams = await resolveAllDirectStreams(
+                provider,
+                targetUrl,
+                found.enTitle.originalTitle,
+                type === "tv" ? "series" : "movie",
+                s,
+                e,
+              );
+              step.streams = streams.map((st: any) => ({ quality: st.quality, url: st.directVideoUrl }));
+              if (streams.length > 0) {
+                step.outcome = "RESOLVED";
+                trace.push(step);
+                break outer;
+              }
+              step.outcome = "no-streams";
+              trace.push(step);
+            } catch (err: any) {
+              step.outcome = "error: " + String(err?.message || err);
+              trace.push(step);
+              continue;
+            }
+          }
+        }
+        return new Response(JSON.stringify({ ok: true, trace }), { headers: corsHeaders() });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ ok: false, error: String(err?.message || err) }), {
           status: 500,
           headers: corsHeaders(),
         });
