@@ -1,8 +1,9 @@
 import type { Env } from "../env.ts";
 import { parseOwnerIds } from "../env.ts";
 import { AppStore } from "../engine/store.ts";
+import { fetchTmdbDetails, resolveBestDirectStream, tmdbTitleOf } from "../engine/resolve.ts";
 import { ALL_PROVIDERS, findProvider, searchAllProviders } from "../providers/index.ts";
-import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SourceLink } from "../providers/types.ts";
+import type { Candidate, Episode, MediaDetails, MediaKind, SourceLink } from "../providers/types.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import {
   detectSocialPlatform,
@@ -34,70 +35,55 @@ function extractMsgId(msg: any): number | undefined {
   return undefined;
 }
 
-function isDirectMediaUrl(url?: string): boolean {
-  if (!url) return false;
-  return (
-    url.includes("downet.net") ||
-    url.includes("okprimeone.site") ||
-    /\.(mp4|mkv|webm|avi)(\?|$)/i.test(url)
-  );
+// -----------------------------------------------------------------------------
+// Deep-link payloads: short, always valid for Telegram start parameters
+// (only A-Za-z0-9_- allowed, max 64 chars). Movie: m<tmdbId>, e.g. m550.
+// Series: t<tmdbId> or t<tmdbId>s<season>e<episode>, e.g. t1399s1e3.
+// -----------------------------------------------------------------------------
+
+export interface StartPayload {
+  type: "movie" | "tv";
+  tmdbId: number;
+  season?: number;
+  episode?: number;
 }
 
-async function resolveBestDirectStream(
-  provider: Provider,
-  targetUrl: string,
-  title: string,
-  kind: MediaKind,
-  seasonNum?: number,
-  episodeNum?: number,
-): Promise<ResolvedStream> {
-  // 1. Try provider's own resolver
-  if (provider.resolveStream) {
-    try {
-      const stream = await provider.resolveStream(targetUrl);
-      if (stream && isDirectMediaUrl(stream.directVideoUrl)) {
-        return stream;
-      }
-    } catch {
-      /* continue to lookup */
-    }
+export function parseStartPayload(payload: string): StartPayload | null {
+  const movie = /^m(\d+)$/.exec(payload);
+  if (movie) {
+    const tmdbId = Number(movie[1]);
+    return tmdbId > 0 ? { type: "movie", tmdbId } : null;
   }
+  const tv = /^t(\d+)(?:s(\d+)e(\d+))?$/.exec(payload);
+  if (tv) {
+    const tmdbId = Number(tv[1]);
+    if (tmdbId <= 0) return null;
+    return {
+      type: "tv",
+      tmdbId,
+      season: tv[2] ? Number(tv[2]) : undefined,
+      episode: tv[3] ? Number(tv[3]) : undefined,
+    };
+  }
+  return null;
+}
 
-  // 2. Direct lookup on Akwam to obtain real direct .mp4 CDN URL
-  try {
-    const akwam = new AkwamProvider();
-    const cleanQ = title.replace(/\([^)]*\)/g, "").trim();
-    const results = await akwam.search(cleanQ, kind);
-    if (results.length > 0) {
-      const cand = results[0];
-      const details = await akwam.getDetails(cand);
-      if (kind === "movie" && details.sources.length > 0) {
-        return await akwam.resolveStream(details.sources[0].url);
-      }
-      if (kind === "series" && details.seasons.length > 0) {
-        const s =
-          details.seasons.find((sg) => sg.season === (seasonNum || 1)) ||
-          details.seasons[0];
-        const ep =
-          s.episodes.find((e) => e.episode === (episodeNum || 1)) ||
-          s.episodes[0];
-        if (ep) {
-          const epSources = await akwam.getEpisodeSources(ep);
-          if (epSources.length > 0) {
-            return await akwam.resolveStream(epSources[0].url);
-          }
-        }
-      }
+// Convert a Telegram WebApp sendData payload {type, id, s, e} to the same
+// short string form used by /start deep links. Returns null if invalid.
+export function webAppDataToPayload(data: any): string | null {
+  if (!data || typeof data !== "object") return null;
+  const id = Number(data.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  if (data.type === "movie") return `m${id}`;
+  if (data.type === "tv") {
+    const s = Number(data.s);
+    const e = Number(data.e);
+    if (Number.isInteger(s) && s > 0 && Number.isInteger(e) && e > 0) {
+      return `t${id}s${s}e${e}`;
     }
-  } catch {
-    /* ignore and continue */
+    return `t${id}`;
   }
-
-  // 3. Final fallback
-  if (provider.resolveStream) {
-    return await provider.resolveStream(targetUrl);
-  }
-  return await new AkwamProvider().resolveStream(targetUrl);
+  return null;
 }
 
 export async function handleTelegramUpdate(update: any, env: Env): Promise<Response> {
@@ -106,6 +92,26 @@ export async function handleTelegramUpdate(update: any, env: Env): Promise<Respo
 
   try {
     if (update.message) {
+      // Telegram WebApp sendData arrives as message.web_app_data (usually
+      // with no text). Route it through the same /start payload logic.
+      const wad = update.message.web_app_data?.data;
+      if (typeof wad === "string" && wad) {
+        let payloadStr: string | null = null;
+        try {
+          payloadStr = webAppDataToPayload(JSON.parse(wad));
+        } catch {
+          payloadStr = null;
+        }
+        if (payloadStr) {
+          await handleMessage(
+            { ...update.message, text: `/start ${payloadStr}` },
+            bot,
+            store,
+            env,
+          );
+          return new Response("OK", { status: 200 });
+        }
+      }
       await handleMessage(update.message, bot, store, env);
     } else if (update.callback_query) {
       await handleCallbackQuery(update.callback_query, bot, store, env);
@@ -150,10 +156,21 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
   }
 
   // 2. Commands
-  if (text === "/start") {
-    await bot.sendMessage(chatId, views.formatWelcome(), {
-      reply_markup: kb.buildMainMenuKeyboard(),
-    });
+  if (text === "/start" || text.startsWith("/start ")) {
+    const payload = text === "/start" ? "" : text.slice("/start".length).trim();
+    if (!payload) {
+      await bot.sendMessage(chatId, views.formatWelcome(), {
+        reply_markup: kb.buildMainMenuKeyboard(),
+      });
+      return;
+    }
+    const parsed = parseStartPayload(payload);
+    if (parsed) {
+      await handleStartPayload(chatId, parsed, bot, store, env);
+      return;
+    }
+    // Payload that does not match m/t form: treat it as a plain search query.
+    await executeSearch(chatId, payload, undefined, bot, store, env);
     return;
   }
 
@@ -325,6 +342,55 @@ async function handleYouTube(url: string, chatId: number, bot: TelegramClient, s
 // -----------------------------------------------------------------------------
 // Movie & Series Search & Flow
 // -----------------------------------------------------------------------------
+
+// Handle a /start deep-link payload (m<tmdbId> / t<tmdbId>[s..e..]): look the
+// title up on TMDB (English first) and run the normal search flow for it.
+async function handleStartPayload(
+  chatId: number,
+  payload: StartPayload,
+  bot: TelegramClient,
+  store: AppStore,
+  env: Env,
+): Promise<void> {
+  const enData = await fetchTmdbDetails(env, payload.type, payload.tmdbId, "en-US");
+  let tmdbTitle = tmdbTitleOf(enData, payload.type);
+  if (!tmdbTitle) {
+    const arData = await fetchTmdbDetails(env, payload.type, payload.tmdbId, "ar");
+    tmdbTitle = tmdbTitleOf(arData, payload.type);
+  }
+  if (!tmdbTitle) {
+    await bot.sendMessage(chatId, "❌ تعذر العثور على هذا العمل.");
+    return;
+  }
+
+  // Remember the requested season/episode so the episode picker can open
+  // on it (best effort; the normal search flow runs regardless).
+  if (
+    payload.type === "tv" &&
+    payload.season !== undefined &&
+    payload.episode !== undefined
+  ) {
+    await store.put(
+      `pref_ep:${chatId}`,
+      JSON.stringify({
+        tmdbId: payload.tmdbId,
+        season: payload.season,
+        episode: payload.episode,
+      }),
+      3600,
+    );
+  }
+
+  await bot.sendMessage(chatId, `⏳ جاري البحث عن: ${views.escapeHtml(tmdbTitle.title)}`);
+  await executeSearch(
+    chatId,
+    tmdbTitle.originalTitle,
+    payload.type === "tv" ? "series" : "movie",
+    bot,
+    store,
+    env,
+  );
+}
 
 async function executeSearch(
   chatId: number,

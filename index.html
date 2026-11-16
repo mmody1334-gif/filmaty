@@ -102,7 +102,9 @@
 
       <!-- Video Player Frame Area -->
       <div id="playerContainer" class="hidden relative aspect-video w-full bg-black">
-        <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0"></iframe>
+        <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" sandbox="allow-same-origin allow-scripts allow-presentation allow-forms" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
+        <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
+        <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/70 text-white text-sm font-bold px-4 text-center"></div>
       </div>
 
       <!-- Modal Content Body -->
@@ -151,6 +153,7 @@
   </div>
 
   <script>
+    const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
     const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
     const TMDB_BASE = 'https://api.themoviedb.org/3';
     const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
@@ -159,6 +162,9 @@
     let selectedSeason = 1;
     let selectedEpisode = 1;
     let debounceTimer = null;
+    // Last successful /api/resolve result, reused by the download button
+    // without a second request. { key: 'movie:550:0:0', data: {...} }
+    let lastResolved = null;
 
     // Telegram Mini App initialization
     if (window.Telegram && window.Telegram.WebApp) {
@@ -188,6 +194,8 @@
     const episodesGrid = document.getElementById('episodesGrid');
     const playerContainer = document.getElementById('playerContainer');
     const videoIframe = document.getElementById('videoIframe');
+    const videoNative = document.getElementById('videoNative');
+    const playerStatus = document.getElementById('playerStatus');
     const btnPlayInApp = document.getElementById('btnPlayInApp');
     const btnDirectDownload = document.getElementById('btnDirectDownload');
     const btnOpenInBot = document.getElementById('btnOpenInBot');
@@ -339,8 +347,8 @@
         modalStory.innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
 
         // Player reset
+        resetPlayer();
         playerContainer.classList.add('hidden');
-        videoIframe.src = '';
 
         if (mediaType === 'tv') {
           seriesControls.classList.remove('hidden');
@@ -398,13 +406,89 @@
       }
     }
 
-    // In-App Instant Player
+    function resolveKey(type, id, s, e) {
+      return `${type}:${id}:${s || 0}:${e || 0}`;
+    }
+
+    // Ask the Worker for a direct mp4 stream. 12s timeout; null on any
+    // failure or timeout (caller falls back to sandboxed vidlink).
+    async function fetchResolve(type, id, s, e) {
+      const params = new URLSearchParams({ type, id: String(id) });
+      if (s) params.set('s', String(s));
+      if (e) params.set('e', String(e));
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      try {
+        const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data && data.ok ? data : null;
+      } catch (err) {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function showPlayerStatus(msg) {
+      playerStatus.innerText = msg;
+      playerStatus.classList.remove('hidden');
+    }
+
+    function hidePlayerStatus() {
+      playerStatus.classList.add('hidden');
+    }
+
+    function resetPlayer() {
+      videoNative.pause();
+      videoNative.removeAttribute('src');
+      videoNative.load();
+      videoNative.classList.add('hidden');
+      videoIframe.src = '';
+      videoIframe.classList.remove('hidden');
+      hidePlayerStatus();
+    }
+
+    function showToast(msg) {
+      let toast = document.getElementById('toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl border border-brand-border shadow-2xl max-w-[90vw] text-center';
+        document.body.appendChild(toast);
+      }
+      toast.innerText = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+
+    // In-App Instant Player: ad-free native <video> first, sandboxed vidlink fallback
     btnPlayInApp.addEventListener('click', playActiveStream);
 
-    function playActiveStream() {
+    async function playActiveStream() {
       if (!currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      playerContainer.classList.remove('hidden');
+      showPlayerStatus('⏳ جاري تجهيز مشغّل بدون إعلانات...');
+      const resolved = await fetchResolve(type, currentItem.id, s, e);
+      if (resolved) {
+        lastResolved = { key: resolveKey(type, currentItem.id, s, e), data: resolved };
+        videoIframe.src = '';
+        videoIframe.classList.add('hidden');
+        videoNative.src = resolved.stream;
+        videoNative.classList.remove('hidden');
+        hidePlayerStatus();
+        videoNative.play().catch(() => {});
+        return;
+      }
+      // No direct source: fall back to vidlink inside the sandboxed iframe
+      // (no allow-popups / allow-top-navigation, so its ads cannot open tabs).
+      resetPlayer();
       let streamUrl = '';
-      if (currentItem.media_type === 'tv') {
+      if (type === 'tv') {
         streamUrl = `https://vidlink.pro/tv/${currentItem.id}/${selectedSeason}/${selectedEpisode}`;
       } else {
         streamUrl = `https://vidlink.pro/movie/${currentItem.id}`;
@@ -414,33 +498,64 @@
     }
 
     // Direct Download & Telegram Bot Request
-    btnDirectDownload.addEventListener('click', () => {
+    btnDirectDownload.addEventListener('click', async () => {
       if (!currentItem) return;
-      const title = currentItem.title || currentItem.name;
-      // Direct fast link bridge: opens the Telegram bot with the exact title for instant .mp4 delivery
-      const tgUrl = `https://t.me/filmatibot?start=${encodeURIComponent(title)}`;
-      window.open(tgUrl, '_blank');
-    });
-
-    btnOpenInBot.addEventListener('click', () => {
-      if (!currentItem) return;
-      const title = currentItem.title || currentItem.name;
-      const targetQuery = currentItem.media_type === 'tv'
-        ? `/series ${title}`
-        : `/film ${title}`;
-      const tgUrl = `https://t.me/filmatibot?start=${encodeURIComponent(title)}`;
-
-      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.sendData) {
-        window.Telegram.WebApp.sendData(targetQuery);
-      } else {
-        window.open(tgUrl, '_blank');
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      const key = resolveKey(type, currentItem.id, s, e);
+      const originalHtml = btnDirectDownload.innerHTML;
+      btnDirectDownload.disabled = true;
+      btnDirectDownload.innerHTML = '<span>⏳</span> <span>جاري تجهيز الرابط...</span>';
+      try {
+        let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
+        if (!resolved) {
+          resolved = await fetchResolve(type, currentItem.id, s, e);
+          if (resolved) lastResolved = { key, data: resolved };
+        }
+        if (resolved) {
+          const a = document.createElement('a');
+          a.href = resolved.download;
+          a.download = '';
+          a.rel = 'noopener';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          return;
+        }
+        showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
+        openBotRequest();
+      } finally {
+        btnDirectDownload.disabled = false;
+        btnDirectDownload.innerHTML = originalHtml;
       }
     });
+
+    // Short deep-link payload: m<tmdbId> for movies, t<tmdbId>[s..e..] for series.
+    // (Telegram start parameters only allow A-Za-z0-9_-, max 64 chars.)
+    function botPayload(item, s, e) {
+      if (item.media_type === 'tv') return (s && e) ? `t${item.id}s${s}e${e}` : `t${item.id}`;
+      return `m${item.id}`;
+    }
+
+    function openBotRequest() {
+      if (!currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData && window.Telegram.WebApp.sendData) {
+        window.Telegram.WebApp.sendData(JSON.stringify({ type, id: currentItem.id, s, e }));
+      } else {
+        window.open('https://t.me/filmatibot?start=' + botPayload(currentItem, s, e), '_blank');
+      }
+    }
+
+    btnOpenInBot.addEventListener('click', openBotRequest);
 
     closeModal.addEventListener('click', () => {
       mediaModal.classList.add('hidden');
       document.body.classList.remove('overflow-hidden');
-      videoIframe.src = '';
+      resetPlayer();
       playerContainer.classList.add('hidden');
     });
 

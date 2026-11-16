@@ -1,6 +1,7 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { verifyToken } from "./engine/token.ts";
+import { resolveByTmdb } from "./engine/resolve.ts";
+import { signToken, verifyToken } from "./engine/token.ts";
 import { renderPlayerHtml } from "./player/html.ts";
 import { FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
 import { handleTelegramUpdate } from "./telegram/handlers.ts";
@@ -32,6 +33,18 @@ export default {
           headers: { "content-type": "application/json; charset=utf-8" },
         },
       );
+    }
+
+    // CORS preflight for API routes (index.html is served from GitHub Pages,
+    // a different origin than this Worker).
+    if (url.pathname.startsWith("/api/") && request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
+    // Resolve a TMDB title to a direct mp4 stream (ad-free native player
+    // + direct download). GET /api/resolve?type=movie|tv&id=123&s=1&e=2
+    if (url.pathname === "/api/resolve" && request.method === "GET") {
+      return await handleApiResolve(request, env, url);
     }
 
     // Telegram webhook handler
@@ -100,3 +113,90 @@ export default {
     console.log("Filmaty cron running:", new Date().toISOString());
   },
 };
+
+function corsHeaders(): Record<string, string> {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-headers": "*",
+  };
+}
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders() },
+  });
+}
+
+// Simple KV rate limit for /api/resolve: max 30 requests per IP per 10 min.
+// Fails open (allows the request) if KV is unavailable.
+async function checkResolveRateLimit(env: Env, ip: string): Promise<boolean> {
+  try {
+    if (!env.CACHE) return true;
+    const key = `rl:resolve:${ip}`;
+    const raw = await env.CACHE.get(key);
+    const count = raw ? Number.parseInt(raw, 10) || 0 : 0;
+    if (count >= 30) return false;
+    await env.CACHE.put(key, String(count + 1), { expirationTtl: 600 });
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+async function handleApiResolve(request: Request, env: Env, url: URL): Promise<Response> {
+  const type = url.searchParams.get("type");
+  const idRaw = url.searchParams.get("id");
+  const id = idRaw ? Number(idRaw) : Number.NaN;
+
+  if (type !== "movie" && type !== "tv") {
+    return jsonResponse({ ok: false, error: "invalid type" }, 400);
+  }
+  if (!idRaw || !Number.isInteger(id) || id <= 0) {
+    return jsonResponse({ ok: false, error: "invalid id" }, 400);
+  }
+
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+
+  const sRaw = url.searchParams.get("s");
+  const eRaw = url.searchParams.get("e");
+  const season = sRaw ? Number(sRaw) : undefined;
+  const episode = eRaw ? Number(eRaw) : undefined;
+
+  const resolved = await resolveByTmdb(
+    env,
+    type,
+    id,
+    season !== undefined && Number.isInteger(season) && season > 0 ? season : undefined,
+    episode !== undefined && Number.isInteger(episode) && episode > 0 ? episode : undefined,
+  );
+  if (!resolved) {
+    return jsonResponse({ ok: false }, 404);
+  }
+
+  const publicBase = env.PUBLIC_BASE || url.origin;
+  const token = await signToken(
+    {
+      u: resolved.directVideoUrl,
+      n: resolved.title,
+      k: "mp4",
+      e: Math.floor(Date.now() / 1000) + 3 * 3600,
+    },
+    env.SIGNING_SECRET,
+  );
+  const stream = `${publicBase}/stream?t=${encodeURIComponent(token)}`;
+  return jsonResponse(
+    {
+      ok: true,
+      title: resolved.title,
+      quality: resolved.quality,
+      stream,
+      download: `${stream}&dl=1`,
+    },
+    200,
+  );
+}

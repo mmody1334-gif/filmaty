@@ -10,6 +10,7 @@ crons = ["*/15 * * * *"]
 
 [vars]
 PUBLIC_BASE = "https://filmaty.hudhaifa-bio.workers.dev"
+TMDB_KEY = "15d2ea6d0dc1d476efbca3eba2b9bbfb"
 
 [observability]
 enabled = true

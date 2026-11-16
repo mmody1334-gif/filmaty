@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
+    "build:webapp": "node scripts/build-webapp.mjs",
+    "typecheck": "npm run build:webapp && tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "bot": "node src/bot-runner.ts",
     "runner": "node src/bot-runner.ts",

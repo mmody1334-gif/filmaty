@@ -78,6 +78,16 @@ export async function handleStreamProxy(request: Request, secret: string): Promi
       responseHeaders.set("content-type", "video/mp4");
     }
 
+    // Force a file download when requested (?dl=1). Range support above is
+    // untouched, so interrupted downloads can still resume.
+    if (url.searchParams.get("dl") === "1") {
+      const safe = (payload.n || "filmaty").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 120);
+      responseHeaders.set(
+        "content-disposition",
+        `attachment; filename="filmaty.mp4"; filename*=UTF-8''${encodeURIComponent(safe)}.mp4`,
+      );
+    }
+
     return new Response(upstream.body, {
       status: upstream.status,
       headers: responseHeaders,

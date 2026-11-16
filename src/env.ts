@@ -7,6 +7,9 @@ export interface Env {
   WEBHOOK_SECRET?: string;
   PUBLIC_BASE?: string;
   PROVIDERS_DISABLED?: string;
+  // TMDB API key. Already public: the same key ships in index.html and
+  // src/providers/netflix-global.ts, so it lives in [vars], not in secrets.
+  TMDB_KEY?: string;
 }
 
 export function parseOwnerIds(raw?: string): Set<number> {
