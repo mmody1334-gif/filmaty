@@ -28,7 +28,7 @@ export class LarozaProvider implements Provider {
     try {
       const res = await fetch(searchUrl, {
         headers: this.headers,
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(12000),
       });
       if (!res.ok) return [];
       const html = await res.text();
@@ -91,7 +91,7 @@ export class LarozaProvider implements Provider {
     try {
       const res = await fetch(candidate.url, {
         headers: this.headers,
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(12000),
       });
       const html = await res.text();
 
@@ -186,8 +186,8 @@ export class LarozaProvider implements Provider {
 
     try {
       const [playRes, dlRes] = await Promise.all([
-        fetch(playUrl, { headers: this.headers, signal: AbortSignal.timeout(5000) }),
-        fetch(dlUrl, { headers: this.headers, signal: AbortSignal.timeout(5000) }),
+        fetch(playUrl, { headers: this.headers, signal: AbortSignal.timeout(12000) }),
+        fetch(dlUrl, { headers: this.headers, signal: AbortSignal.timeout(12000) }),
       ]);
 
       if (dlRes.ok) {
