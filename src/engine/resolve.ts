@@ -329,6 +329,32 @@ export async function resolveByTmdb(
 // bot, all servers/qualities for /api/resolve): TMDB title (English
 // first) + provider search + strict title filter + Arabic fallback.
 // Identical behaviour on both paths — do not diverge them.
+// Strict title filter against every known name of the work (original,
+// English display, Arabic display). A candidate matches when its title
+// is one of the known names, or one known name followed only by
+// season/episode metadata or by another known name (providers often
+// list a show as "Arabic title + English title", e.g. "حب متنكر Love
+// in Disguise"). Anything else — "Dexter: Resurrection" for "Dexter" —
+// is still rejected: the remainder is neither metadata nor a known name.
+export function matchesKnownTitles(candidateTitle: string, knownTitles: string[]): boolean {
+  const cand = normalizeTitleForMatch(candidateTitle);
+  if (!cand) return false;
+  const known = [...new Set(knownTitles.map(normalizeTitleForMatch).filter(Boolean))];
+  if (known.includes(cand)) return true;
+  for (const k of known) {
+    if (!cand.startsWith(k + " ")) continue;
+    const rest = cand.slice(k.length).trim();
+    if (SEASON_ONLY_SUFFIX.test(rest)) return true;
+    if (known.includes(rest)) return true;
+    for (const k2 of known) {
+      if (k2 !== k && rest.startsWith(k2 + " ") && SEASON_ONLY_SUFFIX.test(rest.slice(k2.length).trim())) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 async function fetchResolveCandidates(
   env: Env,
   type: "movie" | "tv",
@@ -342,22 +368,30 @@ async function fetchResolveCandidates(
   const enTitle = tmdbTitleOf(enData, type);
   if (!enTitle) return null;
 
-  let candidates = await searchAllProviders(enTitle.originalTitle, kind, disabled, true);
-  // Strict title filter: provider search is loose (isRelevant accepts a
-  // substring), so a spin-off such as "Dexter: Resurrection" can outrank
-  // the real "Dexter" and resolve to the wrong show/episode. Drop every
-  // candidate whose title does not strictly match the requested title.
-  candidates = candidates.filter((c) => titlesMatch(c.title, enTitle.originalTitle));
+  const knownTitles = [enTitle.originalTitle, enTitle.title];
+  const tryQueries = async (queries: string[]): Promise<Candidate[]> => {
+    for (const q of [...new Set(queries.filter(Boolean))]) {
+      const found = await searchAllProviders(q, kind, disabled, true);
+      const matched = found.filter((c) => matchesKnownTitles(c.title, knownTitles));
+      if (matched.length > 0) return matched;
+    }
+    return [];
+  };
 
-  // Arabic fallback if the English title matched nothing.
+  // Query titles in order: original-language title, then the English
+  // display title. For non-Latin originals (e.g. Korean "나의 유죄인간"
+  // for "حب متنكر" / "Love in Disguise") providers list the show by its
+  // Arabic/English name, so the original title alone matches nothing —
+  // and the old Arabic fallback never ran, because it compared
+  // originalTitle (identical in both languages) instead of the display
+  // title. So fall back to the Arabic display title too.
+  let candidates = await tryQueries([enTitle.originalTitle, enTitle.title]);
   if (candidates.length === 0) {
     const arData = await fetchTmdbDetails(env, type, tmdbId, "ar");
     const arTitle = tmdbTitleOf(arData, type);
-    if (arTitle && arTitle.originalTitle !== enTitle.originalTitle) {
-      const arCandidates = await searchAllProviders(arTitle.originalTitle, kind, disabled, true);
-      candidates = arCandidates.filter((c) =>
-        titlesMatch(c.title, arTitle.originalTitle),
-      );
+    if (arTitle) {
+      knownTitles.push(arTitle.title, arTitle.originalTitle);
+      candidates = await tryQueries([arTitle.title, arTitle.originalTitle]);
     }
   }
 
@@ -437,11 +471,12 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv5: after the Laroza episode-<select> fix — the srv4:
-  // entries cached before it can hold a resolve that never saw the
-  // full episode list (e.g. VisionQuest S1E4 cached as "no download"
-  // because only prev/next links were read) and must not be reused.
-  const cacheKey = `srv5:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv6: after the multi-title resolve fix — the srv5:
+  // entries cached before it can hold a resolve that never tried the
+  // Arabic/English display title (e.g. حب متنكر cached as "no download"
+  // because only its Korean original title was ever searched) and must
+  // not be reused.
+  const cacheKey = `srv6:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
