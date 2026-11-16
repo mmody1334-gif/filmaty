@@ -84,6 +84,14 @@ test("TV page has a Netflix-cinematic look: hero banner + poster rows on a near-
   assert.ok(tv.includes("renderHero"), "TV page must fill the hero from the most-watched title");
 });
 
+test("lowercase tv/ forwards to the Tv/ page (GitHub Pages URLs are case-sensitive)", () => {
+  const lowerPath = join(process.cwd(), "tv", "index.html");
+  assert.ok(existsSync(lowerPath), "tv/index.html must exist");
+  const lower = readFileSync(lowerPath, "utf-8");
+  assert.ok(lower.includes("../Tv/"), "lowercase tv/ must forward to ../Tv/");
+  assert.ok(lower.includes("location.replace"), "lowercase tv/ must redirect with JS as well as meta refresh");
+});
+
 const remotePath = join(process.cwd(), "Tv", "remote", "index.html");
 
 test("phone remote page exists and sends picks to /api/tv-command", () => {
