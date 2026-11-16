@@ -358,6 +358,42 @@ async function handleYouTube(url: string, chatId: number, bot: TelegramClient, s
 // Movie & Series Search & Flow
 // -----------------------------------------------------------------------------
 
+// A deep link's requested episode, stored under `pref_ep:<chatId>` by
+// handleStartPayload and consumed by the search-result pick handler so
+// the episode's quality list opens directly instead of the picker.
+interface PrefEpisode {
+  tmdbId: number;
+  season: number;
+  episode: number;
+  title?: string;
+  originalTitle?: string;
+}
+
+async function readPrefEpisode(store: AppStore, chatId: number): Promise<PrefEpisode | null> {
+  try {
+    const raw = await store.get(`pref_ep:${chatId}`);
+    if (!raw) return null;
+    const pref = JSON.parse(raw) as PrefEpisode;
+    if (typeof pref.season !== "number" || typeof pref.episode !== "number") return null;
+    return pref;
+  } catch {
+    return null;
+  }
+}
+
+function prefMatchesCandidate(pref: PrefEpisode, candidate: Candidate): boolean {
+  // Exact TMDB id when the candidate carries one (unified engine path).
+  if (candidate.tmdbId !== undefined && pref.tmdbId !== undefined) {
+    return candidate.tmdbId === pref.tmdbId;
+  }
+  // Strict title match for raw provider-search results (no TMDB id).
+  return Boolean(
+    (pref.title && titlesMatch(candidate.title, pref.title)) ||
+      (pref.originalTitle && titlesMatch(candidate.title, pref.originalTitle)) ||
+      (pref.title && titlesMatch(pref.title, candidate.title)),
+  );
+}
+
 // Handle a /start deep-link payload (m<tmdbId> / t<tmdbId>[s..e..]): look the
 // title up on TMDB (English first) and run the normal search flow for it.
 async function handleStartPayload(
@@ -379,7 +415,9 @@ async function handleStartPayload(
   }
 
   // Remember the requested season/episode so the episode picker can open
-  // on it (best effort; the normal search flow runs regardless).
+  // on it (best effort; the normal search flow runs regardless). The titles
+  // are stored too so a picked result can be matched even when it carries
+  // no TMDB id (raw provider-search fallback).
   if (
     payload.type === "tv" &&
     payload.season !== undefined &&
@@ -391,6 +429,8 @@ async function handleStartPayload(
         tmdbId: payload.tmdbId,
         season: payload.season,
         episode: payload.episode,
+        title: tmdbTitle.title,
+        originalTitle: tmdbTitle.originalTitle,
       }),
       3600,
     );
@@ -519,6 +559,7 @@ async function attachProviderCandidate(
         title: arTitle,
         year: year || match.year,
         kind,
+        tmdbId: item.id ?? undefined,
         poster: item.poster_path
           ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
           : match.poster,
@@ -787,6 +828,31 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
     await store.put(`mov_d:${itemKey}`, JSON.stringify({ details, searchKey }), 3600);
 
     if (details.kind === "series" && details.seasons.length > 0) {
+      // Deep-link episode preference: if the user arrived via /start
+      // t<id>s<season>e<episode> and just picked this same title, skip
+      // the season/episode picker and open the episode's qualities
+      // directly. A mismatch (or a missing season/episode in the
+      // provider data) falls through to the normal picker, and the
+      // preference is only consumed when it actually fires.
+      const pref = await readPrefEpisode(store, chatId);
+      if (pref && prefMatchesCandidate(pref, candidate)) {
+        const seasonIdx = details.seasons.findIndex((s) => s.season === pref.season);
+        const season = seasonIdx >= 0 ? details.seasons[seasonIdx] : undefined;
+        const epIdx = season?.episodes.findIndex((e) => e.episode === pref.episode) ?? -1;
+        if (season && epIdx >= 0) {
+          await store.delete(`pref_ep:${chatId}`);
+          const ep = season.episodes[epIdx];
+          await bot.safeEdit(chatId, messageId, `⏳ جاري جلب جودات <b>${views.escapeHtml(ep.title)}</b>...`);
+          const epSources = await provider.getEpisodeSources(ep);
+          const epKey = shortKey();
+          await store.put(`mov_e:${epKey}`, JSON.stringify({ ep, epSources, itemKey, details, seasonIdx }), 3600);
+          const text = views.formatEpisodeDetails(details.title, ep.title);
+          const keyboard = kb.buildEpisodeQualitiesKeyboard(epKey, itemKey, epSources);
+          await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
+          return;
+        }
+      }
+
       if (details.seasons.length > 1) {
         // Multi-season series: show season picker first
         const text = views.formatSeriesSeasons(details);
