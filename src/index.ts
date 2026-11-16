@@ -2,15 +2,21 @@ import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
 import { verifyToken } from "./engine/token.ts";
 import { renderPlayerHtml } from "./player/html.ts";
+import { FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
 import { handleTelegramUpdate } from "./telegram/handlers.ts";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // Root redirect to GitHub Pages WebApp
-    if (url.pathname === "/" || url.pathname === "") {
-      return Response.redirect("https://mmody1334-gif.github.io/filmaty/", 302);
+    // Serve Filmaty WebApp directly at root
+    if (url.pathname === "/" || url.pathname === "" || url.pathname === "/app" || url.pathname === "/web") {
+      return new Response(FILMATY_WEBAPP_HTML, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "public, max-age=3600",
+        },
+      });
     }
 
     // Health check endpoint
