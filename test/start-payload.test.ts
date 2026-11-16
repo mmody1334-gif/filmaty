@@ -157,7 +157,13 @@ test("/start t1399s1e3 searches the series and stores the episode preference", a
     );
     const pref = map.get("pref_ep:12345678");
     assert.ok(pref, "expected pref_ep to be stored");
-    assert.deepEqual(JSON.parse(pref!), { tmdbId: 1399, season: 1, episode: 3 });
+    assert.deepEqual(JSON.parse(pref!), {
+      tmdbId: 1399,
+      season: 1,
+      episode: 3,
+      title: "Game of Thrones",
+      originalTitle: "Game of Thrones",
+    });
   } finally {
     restore();
   }

@@ -290,8 +290,9 @@ test("built webapp has the hamburger drawer, browse categories and no direct dis
 // played fine). The videoIframe tag itself carries no sandbox attribute
 // in the HTML (it is set from JS), and the embedwave server is always
 // sandboxed so its popups stay blocked — there is no unsandboxed
-// server anymore (vidlink was removed), so the sandbox is never
-// removed.
+// server anymore (vidlink was removed). The ONE exception is the
+// trailer: the YouTube embed (a trusted Google player) plays without
+// a sandbox, and embedwave re-adds its sandbox on every play.
 test("built webapp gives slow streams 45s and always sandboxes the embed iframe", () => {
   assert.ok(
     FILMATY_WEBAPP_HTML.includes("}, 45000);"),
@@ -309,6 +310,10 @@ test("built webapp gives slow streams 45s and always sandboxes the embed iframe"
   ]) {
     assert.ok(FILMATY_WEBAPP_HTML.includes(s), `built webapp must contain: ${s}`);
   }
-  assert.ok(!FILMATY_WEBAPP_HTML.includes("removeAttribute('sandbox')"), "the embed sandbox must never be removed");
+  // The sandbox may only ever be removed for the YouTube trailer.
+  const removals = [...FILMATY_WEBAPP_HTML.matchAll(/removeAttribute\('sandbox'\)/g)];
+  assert.equal(removals.length, 1, "the sandbox must be removed in exactly one place (the trailer)");
+  const around = FILMATY_WEBAPP_HTML.slice(Math.max(0, removals[0].index - 400), removals[0].index + 400);
+  assert.ok(around.includes("youtube.com/embed/"), "the single sandbox removal must be the YouTube trailer handler");
   assert.ok(!FILMATY_WEBAPP_HTML.includes("vidlink"), "no vidlink fallback may remain in the player");
 });

@@ -48,7 +48,12 @@ test("TV page is watch-only: no download, no bot", () => {
   const tv = readFileSync(tvPath, "utf-8");
   assert.ok(!tv.includes("bot-code"), "TV page must not offer bot codes");
   assert.ok(!tv.includes("downloadQuality"), "TV page must not offer direct downloads");
-  assert.ok(!tv.includes("t.me/"), "TV page must not link out to Telegram");
+  // No tappable Telegram link and no window.open: the TV never pulls
+  // the viewer out of the page. The report-a-problem QR only encodes
+  // a t.me/share URL as data for the phone to scan — it is not a link
+  // on the TV itself.
+  assert.ok(!tv.includes('href="https://t.me'), "TV page must not link out to Telegram");
+  assert.ok(!tv.includes("window.open"), "TV page must never open a new window");
   assert.ok(tv.includes('href="../"'), "TV page must link back to the main site");
 });
 
