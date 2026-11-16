@@ -72,6 +72,18 @@ test("TV page plays a tapped film fullscreen at the best quality, by itself", ()
   assert.ok(tv.includes("autoplay"), "TV page must autoplay a tapped film");
 });
 
+test("TV page has a Netflix-cinematic look: hero banner + poster rows on a near-black theme", () => {
+  const tv = readFileSync(tvPath, "utf-8");
+  assert.ok(tv.includes("tvHero"), "TV page must have a hero banner");
+  assert.ok(tv.includes("tvHeroPlay"), "hero must have a Play button");
+  assert.ok(tv.includes("w1280"), "hero/backdrop must use the wide TMDB backdrop size");
+  assert.ok(tv.includes("tvBackdropImg"), "details overlay must show a cinematic backdrop");
+  assert.ok(tv.includes("tv-row"), "home sections must be horizontal poster rows");
+  assert.ok(tv.includes("overflow-x-auto"), "poster rows must scroll horizontally");
+  assert.ok(tv.includes("#141414"), "TV page theme must be the near-black Netflix background");
+  assert.ok(tv.includes("renderHero"), "TV page must fill the hero from the most-watched title");
+});
+
 const remotePath = join(process.cwd(), "Tv", "remote", "index.html");
 
 test("phone remote page exists and sends picks to /api/tv-command", () => {
