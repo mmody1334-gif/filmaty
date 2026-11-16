@@ -186,7 +186,7 @@
            is ever listed on this page, so nothing can open a pop-up. -->
       <div id="tvServerWrap" class="hidden space-y-3">
         <div>
-          <p class="text-sm font-extrabold text-slate-400 mb-2">السيرفر</p>
+          <p class="text-sm font-extrabold text-slate-400 mb-2">المشغّل — المباشر هو الأساسي</p>
           <div id="tvServers" class="flex flex-wrap gap-2"></div>
         </div>
         <div>
@@ -696,7 +696,7 @@
       if (s) params.set('s', String(s));
       if (e) params.set('e', String(e));
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
+      const timer = setTimeout(() => controller.abort(), 30000);
       try {
         const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
         return await res.json().catch(() => null);
@@ -774,8 +774,11 @@
         return;
       }
       wrap.classList.remove('hidden');
+      // Server choice, labelled plainly: a native server is "مباشر"
+      // (with its provider name), the embed is "EmbedWave". The direct
+      // server is the primary one and is pre-selected.
       serversRow.innerHTML = currentServers.map((s, i) => `
-        <button data-server="${i}" class="tv-server tv-focus ${i === selectedServerIdx ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-5 py-3 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${s.name}</button>
+        <button data-server="${i}" class="tv-server tv-focus ${i === selectedServerIdx ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-6 py-4 text-lg font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${isEmbedServer(s) ? '▶ EmbedWave' : `▶ مباشر (${s.name})`}</button>
       `).join('');
       const server = selectedServer();
       qualitiesRow.innerHTML = (server ? server.qualities : []).map((q, i) => `
@@ -852,6 +855,23 @@
       } catch (e) {}
     }
 
+    // EmbedWave fallback when the resolve fails, times out, or finds
+    // no direct copy: its URL is built from the TMDB id alone, so no
+    // Worker call is needed — the TV never ends on a dead screen.
+    function playEmbedwaveFallback(type) {
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      const url = type === 'tv'
+        ? `https://embedwave.cc/embed/tv/${currentItem.id}/${s || 1}/${e || 1}`
+        : `https://embedwave.cc/embed/movie/${currentItem.id}`;
+      currentServers = [{ name: 'embedwave', qualities: [{ quality: 'HD', stream: url }] }];
+      selectedServerIdx = 0;
+      selectedQualityIdx = 0;
+      renderServerControls();
+      playActiveStream();
+      enterFullscreen();
+    }
+
     // Play the current title/episode at the best quality: first server,
     // first quality (the resolver already orders both best-first), then
     // fullscreen. Used by the Play button, by a film tap, by an episode
@@ -866,8 +886,7 @@
       btn.innerText = '▶ تشغيل';
       btn.disabled = false;
       if (!data || !data.servers || data.servers.length === 0) {
-        showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
-        document.getElementById('tvPlayerWrap').classList.remove('hidden');
+        playEmbedwaveFallback(type);
         return;
       }
       // TV page: only direct native servers + the sandboxed embed. A
@@ -879,8 +898,7 @@
         (s) => s.name === 'embedwave' || (s.qualities && s.qualities.some((q) => q.download)),
       );
       if (!currentServers.length) {
-        showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
-        document.getElementById('tvPlayerWrap').classList.remove('hidden');
+        playEmbedwaveFallback(type);
         return;
       }
       selectedServerIdx = 0;
