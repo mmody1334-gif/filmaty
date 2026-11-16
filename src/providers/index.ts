@@ -26,6 +26,15 @@ export async function searchAllProviders(
   query: string,
   kind?: MediaKind,
   disabledSites: string[] = [],
+  // When true, the same title from different providers is kept as
+  // separate candidates (one per site) instead of being merged into the
+  // first provider's entry. The resolver needs this: if the first
+  // provider's copy is on a dead host, the next provider's copy of the
+  // SAME title is the only working download — VisionQuest S1E1: Akwam's
+  // file hangs on its s204d1 node, Laroza's validates fine, but the
+  // merge dropped Laroza entirely so the resolver never saw it.
+  // UI callers keep the default merge (one entry per title).
+  keepPerSite = false,
 ): Promise<Candidate[]> {
   const activeProviders = ALL_PROVIDERS.filter((p) => !disabledSites.includes(p.id));
 
@@ -53,7 +62,10 @@ export async function searchAllProviders(
 
       if (!isRelevant(cand.title, query)) continue;
 
-      const key = `${cand.kind}:${cand.title.toLowerCase().replace(/[\s\-_:]+/g, "")}:${cand.year || ""}`;
+      const normTitle = cand.title.toLowerCase().replace(/[\s\-_:]+/g, "");
+      const key = keepPerSite
+        ? `${cand.site}:${cand.kind}:${normTitle}:${cand.year || ""}`
+        : `${cand.kind}:${normTitle}:${cand.year || ""}`;
       const existing = seenTitles.get(key);
       if (!existing) {
         seenTitles.set(key, cand);
