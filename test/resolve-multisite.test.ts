@@ -191,3 +191,54 @@ test("VisionQuest S1E1 resolves to Laroza when Akwam's only file is on a dead no
     restore();
   }
 });
+
+test("Laroza series page: episode <select> maps every episode to its own page", async () => {
+  const { LarozaProvider } = await import("../src/providers/laroza.ts");
+  const SELECT_PAGE = `
+<html><head><title>مسلسل VisionQuest الموسم الاول الحلقة 2 الثانية مترجمة</title></head><body>
+<ul aria-label="اختيار الموسم">
+  <li data-serie="1" class="active"><button class="lr-episode-season-tab" type="button">الموسم 1 <span class="lr-season-tab-count">(9 حلقة)</span></button></li>
+</ul>
+<select aria-label="Episodes" class="episodeoption" id="MSeason1">
+  <option value="select-ep">قائمه الحلقات</option>
+  <option value='video.php?vid=51eb1353d'> الحلقة 1</option>
+  <option selected value='video.php?vid=935f0b66d'> الحلقة 2</option>
+  <option value='video.php?vid=ca3aa4f29'> الحلقة 3</option>
+  <option value='video.php?vid=4de45820f'> الحلقة 4</option>
+</select>
+<a href="./video.php?vid=51eb1353d">الحلقة السابقة 1</a>
+<a href="./video.php?vid=ca3aa4f29">الحلقة التالية 3</a>
+</body></html>
+`;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes("laroza1.bond/video.php?vid=935f0b66d")) {
+      return new Response(SELECT_PAGE, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
+    return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
+  };
+  try {
+    const provider = new LarozaProvider();
+    const details = await provider.getDetails({
+      id: "laroza:935f0b66d",
+      title: "VisionQuest",
+      kind: "series",
+      site: "laroza",
+      siteLabel: "لاروزا",
+      url: "https://laroza1.bond/video.php?vid=935f0b66d",
+    });
+    assert.equal(details.seasons.length, 1);
+    const eps = details.seasons[0].episodes;
+    // All 4 episodes from the <select>, each with its own vid — and
+    // NOT the prev/next anchors misnumbered by list order.
+    assert.deepEqual(
+      eps.map((e) => e.episode),
+      [1, 2, 3, 4],
+    );
+    assert.equal(eps[3].url, "https://laroza1.bond/video.php?vid=4de45820f");
+    assert.equal(eps[0].url, "https://laroza1.bond/video.php?vid=51eb1353d");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
