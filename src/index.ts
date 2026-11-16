@@ -1,6 +1,6 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { embedwaveUrl, qualityMatches, resolveServersByTmdb, vidlinkUrl } from "./engine/resolve.ts";
+import { embedwaveUrl, qualityMatches, resolveServersByTmdb, validateDirectUrl, vidlinkUrl } from "./engine/resolve.ts";
 import {
   BOT_CODE_TTL_SECONDS,
   botCodeKey,
@@ -95,6 +95,70 @@ export default {
         );
       } catch (err: any) {
         return new Response(JSON.stringify({ ok: false, site, query: q, error: String(err?.message || err) }), {
+          status: 500,
+          headers: corsHeaders(),
+        });
+      }
+    }
+
+    // TEMPORARY diagnostics part 2: traces one candidate through
+    // getDetails -> episode URL -> resolveStream -> validation, inside
+    // the Worker. Params: site, url (candidate page), title, kind, s, e.
+    if (url.pathname === "/api/debug-resolve-one" && request.method === "GET") {
+      const site = url.searchParams.get("site") || "";
+      const pageUrl = url.searchParams.get("url") || "";
+      const title = url.searchParams.get("title") || "";
+      const kind = url.searchParams.get("kind") === "movie" ? "movie" : "series";
+      const s = Number(url.searchParams.get("s") || "1");
+      const e = Number(url.searchParams.get("e") || "1");
+      const provider = findProvider(site);
+      if (!provider || !pageUrl) {
+        return new Response(JSON.stringify({ ok: false, error: "bad site or url" }), {
+          status: 400,
+          headers: corsHeaders(),
+        });
+      }
+      try {
+        const details = await provider.getDetails({
+          id: `${site}:debug`,
+          title,
+          kind: kind as "movie" | "series",
+          site,
+          siteLabel: site,
+          url: pageUrl,
+        });
+        const seasons = (details.seasons || []).map((ss: any) => ({
+          season: ss.season,
+          episodes: (ss.episodes || []).map((ep: any) => ep.episode),
+        }));
+        const ep = (details.seasons || [])
+          .find((ss: any) => ss.season === s)
+          ?.episodes?.find((ep: any) => ep.episode === e);
+        const targetUrl = ep?.url || (details.sources?.[0]?.url as string | undefined) || null;
+        let streams: any[] = [];
+        if (targetUrl) {
+          // Same as the resolver's tryAllFromWatch: resolveStreams when
+          // the provider offers it, else the single resolveStream.
+          const raw = provider.resolveStreams
+            ? await provider.resolveStreams(targetUrl)
+            : provider.resolveStream
+              ? [await provider.resolveStream(targetUrl)]
+              : [];
+          for (const st of raw.filter(Boolean)) {
+            streams.push({
+              quality: st.quality,
+              size: st.size,
+              directVideoUrl: st.directVideoUrl,
+              validated: await validateDirectUrl(st.directVideoUrl),
+            });
+          }
+        }
+        return new Response(
+          JSON.stringify({ ok: true, site, seasons, targetUrl, streams }),
+          { headers: corsHeaders() },
+        );
+      } catch (err: any) {
+        return new Response(JSON.stringify({ ok: false, site, error: String(err?.message || err) }), {
           status: 500,
           headers: corsHeaders(),
         });
