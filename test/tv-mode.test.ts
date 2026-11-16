@@ -84,6 +84,15 @@ test("TV page has a Netflix-cinematic look: hero banner + poster rows on a near-
   assert.ok(tv.includes("renderHero"), "TV page must fill the hero from the most-watched title");
 });
 
+test("TV page seeks with number keys: 1 back 10s, 3 forward 10s (native player only)", () => {
+  const tv = readFileSync(tvPath, "utf-8");
+  assert.ok(tv.includes("e.key === '1'"), "TV page must handle the 1 key");
+  assert.ok(tv.includes("e.key === '3'"), "TV page must handle the 3 key");
+  assert.ok(tv.includes("currentTime"), "TV page must seek the native video");
+  assert.ok(tv.includes("nativeActive"), "seeking must only apply while the native player is active");
+  assert.ok(tv.includes("المشغّل المباشر فقط"), "TV page must say seeking is native-player only on embeds");
+});
+
 test("lowercase tv/ forwards to the Tv/ page (GitHub Pages URLs are case-sensitive)", () => {
   const lowerPath = join(process.cwd(), "tv", "index.html");
   assert.ok(existsSync(lowerPath), "tv/index.html must exist");
