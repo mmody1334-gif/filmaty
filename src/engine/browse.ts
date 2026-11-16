@@ -24,6 +24,10 @@ export interface BrowseParams {
   sort: "popular" | "top_rated";
   page: number;
   collection?: BrowseCollection;
+  // Optional TMDB company ids (comma-separated) for brand discovery
+  // ("429" = DC Comics, "2" = Disney, "3" = Pixar). Used by the search
+  // engine's brand layer; mutually exclusive with `collection`.
+  companies?: string;
 }
 
 export interface BrowseOutcome {
@@ -34,7 +38,7 @@ export interface BrowseOutcome {
 const BROWSE_CACHE_TTL = 10 * 60; // 10 minutes
 
 function browseCacheKey(p: BrowseParams): string {
-  const scope = p.collection || p.lang || "all";
+  const scope = p.collection || p.companies || p.lang || "all";
   const origin = p.origin ? `:origin:${p.origin}` : "";
   return `browse:${p.type}:${scope}:${p.sort}:${p.page}${origin}`;
 }
@@ -50,6 +54,8 @@ function browseUrl(env: Env, p: BrowseParams): string {
   } else if (p.collection === "netflix") {
     if (p.type === "tv") u.searchParams.set("with_networks", "213");
     else u.searchParams.set("with_companies", "11946");
+  } else if (p.companies) {
+    u.searchParams.set("with_companies", p.companies);
   } else if (p.lang) {
     u.searchParams.set("with_original_language", p.lang);
   }

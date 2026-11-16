@@ -12,6 +12,106 @@ import { searchAllProviders } from "../providers/index.ts";
 import type { Candidate } from "../providers/types.ts";
 import { titlesMatch } from "./resolve.ts";
 import { POPULAR_TITLES } from "../data/popular-titles.ts";
+import { browseTitles } from "./browse.ts";
+// NOTE: browse.ts imports TMDB_BASE/tmdbApiKey from this file, so this
+// is a circular import — safe because both sides only use each other
+// inside function bodies (lazy, at call time), never at module top level.
+
+// Brand/franchise layer (search rebuild, stage 1).
+// A query like "Marvel" / "مارفل" is not a title search at all: TMDB's
+// title index can only return titles that literally contain the word
+// "Marvel" (Daredevil, Punisher, Captain Marvel...), so the famous MCU
+// movies — Avengers: Endgame, Iron Man, Thor — can NEVER appear. The
+// user asked for "كل الاعمال الخاصة بمارڤل", so a brand query means
+// "works FROM this brand": TMDB discover by production company.
+// Keys are normalized queries (see normalizeArabicQuery); the match is
+// exact after stripping generic media words ("افلام مارفل", "Marvel
+// movies") and a leading "ال" ("المارفل"). A query with extra title
+// words ("marvel endgame") is NOT a brand query — it goes through the
+// normal title pipeline, which finds Endgame by title.
+export interface Brand {
+  key: string;
+  label: string;
+  collection?: "marvel" | "netflix";
+  companies?: string;
+}
+
+const BRANDS: Record<string, Brand> = {
+  marvel: { key: "marvel", label: "Marvel", collection: "marvel" },
+  مارفل: { key: "مارفل", label: "Marvel", collection: "marvel" },
+  مارفيل: { key: "مارفيل", label: "Marvel", collection: "marvel" },
+  netflix: { key: "netflix", label: "Netflix", collection: "netflix" },
+  نتفليكس: { key: "نتفليكس", label: "Netflix", collection: "netflix" },
+  dc: { key: "dc", label: "DC", companies: "429" },
+  "دي سي": { key: "دي سي", label: "DC", companies: "429" },
+  disney: { key: "disney", label: "Disney", companies: "2" },
+  ديزني: { key: "ديزني", label: "Disney", companies: "2" },
+  pixar: { key: "pixar", label: "Pixar", companies: "3" },
+  بيكسار: { key: "بيكسار", label: "Pixar", companies: "3" },
+  dreamworks: { key: "dreamworks", label: "DreamWorks", companies: "521" },
+  "دريم ووركس": { key: "دريم ووركس", label: "DreamWorks", companies: "521" },
+  warner: { key: "warner", label: "Warner Bros.", companies: "174" },
+  وارنر: { key: "وارنر", label: "Warner Bros.", companies: "174" },
+};
+
+const BRAND_GENERIC_WORDS = new Set([
+  "افلام",
+  "فيلم",
+  "مسلسل",
+  "مسلسلات",
+  "movie",
+  "movies",
+  "series",
+  "tv",
+  "show",
+  "shows",
+]);
+
+export function matchBrand(query: string): Brand | null {
+  const norm = normalizeArabicQuery(query);
+  if (!norm) return null;
+  let rest = norm
+    .split(/\s+/)
+    .filter((w) => !BRAND_GENERIC_WORDS.has(w))
+    .join(" ")
+    .trim();
+  if (rest.startsWith("ال") && rest.length > 2) rest = rest.slice(2);
+  if (!rest) return null;
+  return BRANDS[rest] || null;
+}
+
+// Brand search: the brand's most popular movies + series from TMDB
+// discover (10 each, by popularity), then any literal title matches
+// not already in the pool. A pure popularity sort across both types
+// would be all movies (MCU films outrank the series), so the 10+10
+// split keeps the mix the user actually asked for: "كل الاعمال الخاصة
+// بمارڤل" — movies AND series.
+async function searchBrand(
+  env: Env,
+  brand: Brand,
+  normalizedQuery: string,
+): Promise<SearchResultItem[]> {
+  const scope = brand.collection
+    ? { collection: brand.collection }
+    : { companies: brand.companies! };
+  const [movies, tvs, ar, en] = await Promise.all([
+    browseTitles(env, { type: "movie", sort: "popular", page: 1, ...scope }),
+    browseTitles(env, { type: "tv", sort: "popular", page: 1, ...scope }),
+    tmdbSearch(env, normalizedQuery, "ar"),
+    tmdbSearch(env, normalizedQuery, "en-US"),
+  ]);
+  const byPopularity = (a: SearchResultItem, b: SearchResultItem) =>
+    (b.popularity || 0) - (a.popularity || 0);
+  const brandPool = mergeTmdbResults([
+    movies.results.slice(0, 10),
+    tvs.results.slice(0, 10),
+  ]).sort(byPopularity);
+  const seen = new Set(brandPool.map((r) => `${r.media_type}:${r.id}`));
+  const titleMatches = mergeTmdbResults([ar, en, searchPopularIndex(normalizedQuery)]).filter(
+    (r) => r.id !== null && !seen.has(`${r.media_type}:${r.id}`),
+  );
+  return [...brandPool, ...rerankResults(titleMatches, normalizedQuery)].slice(0, 20);
+}
 
 export const TMDB_BASE = "https://api.themoviedb.org/3";
 // Same public TMDB key already embedded in the frontend (index.html) and
@@ -257,6 +357,14 @@ export async function searchTitles(env: Env, query: string): Promise<SearchOutco
   // Search TMDB with the normalized query in both languages: "ڤيجن"
   // becomes "فيجن", so TMDB can match "واندافيجن".
   const normalizedQuery = normalizeArabicQuery(query);
+  // Brand/franchise query ("Marvel", "مارفل", "افلام مارفل"): the
+  // brand's catalog from TMDB discover, not a title search — see
+  // matchBrand(). This runs BEFORE the title pipeline: a brand query
+  // must not come back as "titles containing the word Marvel".
+  const brand = matchBrand(query);
+  if (brand) {
+    return { results: await searchBrand(env, brand, normalizedQuery), source: "tmdb" };
+  }
   // Single-token queries also get provider augmentation in parallel:
   // TMDB's word index handles multi-word queries, but a lone partial
   // word ("vision", "فيجن") misses compound titles like WandaVision.
