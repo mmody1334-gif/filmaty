@@ -422,7 +422,19 @@ export class AkwamProvider implements Provider {
 
     const seasons: SeasonGroup[] = [];
     if (isSeries) {
-      const epRegex = /href="(https:\/\/akwam\.ss\/episode\/(\d+)\/[^"]*\/[^\d"]*(\d+))"/g;
+      // The season page itself tells us which season this is ("Dexter
+      // (الموسم 8)"); every page's episodes belong to that season — never
+      // hardcode season 1, or a season-8 page would satisfy a season-1
+      // request with the wrong episode.
+      const pageSeason =
+        parseSeasonEpisode(candidate.title + " " + candidate.url).season ?? 1;
+      // Real episode links look like /episode/1176/dexter — the episode
+      // number is NOT in the URL, it is in the link text ("حلقة 1 :
+      // مسلسل Dexter الموسم الاول ..."). The old regex required a
+      // trailing number in the URL and matched nothing, so seasons was
+      // always empty and no Akwam series episode could ever resolve.
+      const epRegex =
+        /<a[^>]*href="(https:\/\/akwam\.ss\/episode\/(\d+)\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
       let epMatch: RegExpExecArray | null;
       const seenEpisodes = new Set<string>();
       const episodes: Episode[] = [];
@@ -430,13 +442,15 @@ export class AkwamProvider implements Provider {
       while ((epMatch = epRegex.exec(html)) !== null) {
         const epUrl = epMatch[1];
         const epId = epMatch[2];
-        const epNumber = Number(epMatch[3]) || 1;
         if (seenEpisodes.has(epId)) continue;
         seenEpisodes.add(epId);
+        const linkText = epMatch[3].replace(/<[^>]+>/g, " ");
+        const epNumber =
+          parseSeasonEpisode(linkText).episode ?? episodes.length + 1;
 
         episodes.push({
           id: epId,
-          season: 1,
+          season: pageSeason,
           episode: epNumber,
           title: `الحلقة ${epNumber}`,
           url: epUrl,
@@ -445,7 +459,7 @@ export class AkwamProvider implements Provider {
 
       episodes.sort((a, b) => a.episode - b.episode);
       if (episodes.length > 0) {
-        seasons.push({ season: 1, episodes });
+        seasons.push({ season: pageSeason, episodes });
       }
     }
 

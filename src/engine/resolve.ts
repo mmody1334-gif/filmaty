@@ -1,6 +1,6 @@
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
-import { toLatinDigits } from "./normalize.ts";
+import { normalizeArabic, parseSeasonEpisode } from "./normalize.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import { findProvider, searchAllProviders } from "../providers/index.ts";
 import type { MediaKind, Provider, ResolvedStream } from "../providers/types.ts";
@@ -65,14 +65,24 @@ export async function validateDirectUrl(url: string): Promise<boolean> {
 // only accept an exact match — or the requested title followed by nothing
 // but season/episode metadata ("Dexter Season 2"). A subtitle after the
 // title ("Resurrection", "New Blood") is a different show and is rejected.
+//
+// Season metadata must be stripped BEFORE comparing, in both forms
+// providers actually use: digits ("الموسم 1", "Season 2") AND Arabic
+// ordinal words ("الموسم الاول", "الموسم الثاني"). Akwam titles carry
+// both at once — "Dexter الموسم الاول (الموسم 1)" — so the strip runs
+// globally. Without the word form, the real Dexter S1 candidate was
+// rejected and the resolver returned null live (2026-11-16).
+const SEASON_WORD =
+  "(?:الموسم|موسم|جزء|season|series|part)\\s+(?:\\d{1,2}|الحادي عشر|الثاني عشر|الاولي|الثانيه|الثالثه|الرابعه|الخامسه|السادسه|السابعه|الثامنه|التاسعه|العاشره|الاول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)";
+
 export function normalizeTitleForMatch(raw: string): string {
-  return toLatinDigits(raw)
-    .toLowerCase()
+  return normalizeArabic(raw)
     .replace(/\([^)]*\)/g, " ")
     .replace(/\[[^\]]*\]/g, " ")
     .replace(/&/g, " and ")
     .replace(/\b(19|20)\d{2}\b/g, " ")
     .replace(/\bs\d{1,2}\s*e\d{1,3}\b/gi, " ")
+    .replace(new RegExp(SEASON_WORD, "g"), " ")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -349,6 +359,31 @@ async function resolveByTmdbUncached(
   }
 
   for (const candidate of candidates) {
+    // Series: a candidate page is one season's page (Akwam titles carry
+    // it — "Dexter (الموسم 2)"), and a video page can be one episode's
+    // page ("...الحلقة 4"). Never resolve a request for season N /
+    // episode M from a page that declares a different season or episode:
+    // Akwam's details parser used to label every page's episodes as
+    // season 1, and Laroza used to default any bare title to episode 1,
+    // so without this filter a season-2 page or an episode-4 page listed
+    // first would hand back the wrong episode.
+    if (type === "tv") {
+      const declared = parseSeasonEpisode(candidate.title);
+      if (
+        season !== undefined &&
+        declared.season !== undefined &&
+        declared.season !== season
+      ) {
+        continue;
+      }
+      if (
+        episode !== undefined &&
+        declared.episode !== undefined &&
+        declared.episode !== episode
+      ) {
+        continue;
+      }
+    }
     const provider = findProvider(candidate.site);
     if (!provider) continue;
     try {
@@ -391,9 +426,12 @@ async function pickTargetUrl(
   }
   // Series: the matched show must actually contain the requested
   // season/episode — never fall back to season/episode [0], which would
-  // hand the user a different episode. If the provider gave no season
-  // structure at all there is nothing to check, so fall through to its
-  // sources as before.
+  // hand the user a different episode, and never fall back to the
+  // page's first source when no season structure exists at all: a
+  // bare-title video page can be any episode (Laroza once returned an
+  // episode-4 file for an episode-1 request this way). If the episode
+  // cannot be verified, return null so the caller tries the next
+  // candidate (or falls back to vidlink).
   if (details.seasons.length > 0) {
     const seasonGroup = details.seasons.find((sg) => sg.season === (season || 1));
     if (!seasonGroup) return null;
@@ -407,5 +445,5 @@ async function pickTargetUrl(
     }
     return ep.url;
   }
-  return details.sources[0]?.url || fallbackUrl;
+  return null;
 }

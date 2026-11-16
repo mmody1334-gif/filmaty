@@ -154,7 +154,10 @@ const ARABIC_NUM_WORDS: Record<string, number> = {
 };
 
 export function parseSeasonEpisode(text: string): { season?: number; episode?: number } {
-  const norm = normalizeArabic(text);
+  // Dots/underscores/slashes act as separators in file-style titles
+  // ("Dexter.الموسم.الاول.الحلقة.4.mp4") — normalise them to spaces so
+  // the season/episode patterns below can see the words and numbers.
+  const norm = normalizeArabic(text).replace(/[._\-/]+/g, " ");
   let season: number | undefined;
   let episode: number | undefined;
 

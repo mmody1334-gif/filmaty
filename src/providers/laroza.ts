@@ -107,20 +107,35 @@ export class LarozaProvider implements Provider {
           }
         }
 
-        // If no explicit season tabs found, add default episode from candidate
+        // If no explicit season tabs found, this page is a single video
+        // page. Its episode number lives in the page <title>/<h1>
+        // ("... الحلقة 4"), not in the bare candidate title — never
+        // assume episode 1: a bare "Dexter" title once resolved to an
+        // episode-4 file as if it were episode 1. Fabricate the episode
+        // only when its number is actually known (title or page title);
+        // otherwise leave seasons empty so the resolver skips this
+        // candidate instead of guessing.
         if (seasons.length === 0) {
-          const se = parseSeasonEpisode(candidate.title);
-          seasons.push({
-            season: se.season || 1,
-            episodes: [
-              {
-                season: se.season || 1,
-                episode: se.episode || 1,
-                title: candidate.title,
-                url: candidate.url,
-              },
-            ],
-          });
+          const pageTitle =
+            html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ??
+            html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ??
+            "";
+          const ep = parseSeasonEpisode(
+            candidate.title + " " + pageTitle.replace(/<[^>]+>/g, " "),
+          );
+          if (ep.episode !== undefined) {
+            seasons.push({
+              season: ep.season || 1,
+              episodes: [
+                {
+                  season: ep.season || 1,
+                  episode: ep.episode,
+                  title: candidate.title,
+                  url: candidate.url,
+                },
+              ],
+            });
+          }
         }
       } else {
         // Movie: extract servers directly
