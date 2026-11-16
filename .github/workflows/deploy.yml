@@ -39,6 +39,11 @@ jobs:
       # getWebhookInfo, 2026-11-16). So on every deploy, generate one
       # fresh secret, set it as the Worker secret AND re-register the
       # webhook with it, atomically. Never prints the secret or token.
+      # (v1 used the Cloudflare secrets REST API; its PUT failed in run
+      # #22 with no visible reason, so v2 uses `wrangler secret put` —
+      # the same tool and token that already deploy the Worker here.
+      # printf '%s' (no newline) so no trailing newline lands in the
+      # secret value.)
       - name: Sync Telegram webhook secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -46,15 +51,11 @@ jobs:
         run: |
           set -e
           SECRET=$(openssl rand -hex 24)
-          PUT_RESP=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/filmaty/secrets" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"name\":\"WEBHOOK_SECRET\",\"text\":\"${SECRET}\",\"type\":\"secret_text\"}")
-          echo "$PUT_RESP" | grep -q '"success":true' || { echo "Setting WEBHOOK_SECRET failed"; exit 1; }
+          printf '%s' "$SECRET" | npx wrangler secret put WEBHOOK_SECRET
           TOKEN=$(grep -oP 'BOT_TOKEN = process\.env\.BOT_TOKEN \|\| "\K[^"]+' src/bot-runner.ts)
           HOOK_RESP=$(curl -s -X POST "https://api.telegram.org/bot${TOKEN}/setWebhook" \
             -d "url=https://filmaty.hudhaifa-bio.workers.dev/telegram/webhook" \
             -d "secret_token=${SECRET}" \
             --data-urlencode 'allowed_updates=["message","callback_query"]')
-          echo "$HOOK_RESP" | grep -q '"ok":true' || { echo "setWebhook failed"; exit 1; }
+          echo "$HOOK_RESP" | grep -q '"ok":true' || { echo "setWebhook failed: $HOOK_RESP"; exit 1; }
           echo "Webhook secret synced."
