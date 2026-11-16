@@ -160,13 +160,64 @@ test("sort=top_rated sorts by vote_average with a vote-count floor", async () =>
   }
 });
 
-test("browse defaults lang to ar when omitted", async () => {
+test("browse omits the language filter when lang is omitted (global)", async () => {
   const { seen, restore } = installMock();
   const { env } = mockEnv();
   try {
     const res = await worker.fetch(new Request(`${BASE}/api/browse?type=tv`), env, {} as any);
     assert.equal(res.status, 200);
-    assert.equal(new URL(seen[0]).searchParams.get("with_original_language"), "ar");
+    assert.equal(new URL(seen[0]).searchParams.get("with_original_language"), null);
+  } finally {
+    restore();
+  }
+});
+
+test("origin=US sets with_origin_country=US (American English)", async () => {
+  const { seen, restore } = installMock();
+  const { env } = mockEnv();
+  try {
+    const res = await worker.fetch(
+      new Request(`${BASE}/api/browse?type=movie&lang=en&origin=US&sort=popular&page=1`),
+      env,
+      {} as any,
+    );
+    assert.equal(res.status, 200);
+    assert.equal(seen.length, 1);
+    const url = new URL(seen[0]);
+    assert.equal(url.searchParams.get("with_original_language"), "en");
+    assert.equal(url.searchParams.get("with_origin_country"), "US");
+  } finally {
+    restore();
+  }
+});
+
+test("origin works without lang and is uppercased", async () => {
+  const { seen, restore } = installMock();
+  const { env } = mockEnv();
+  try {
+    const res = await worker.fetch(
+      new Request(`${BASE}/api/browse?type=tv&origin=us`),
+      env,
+      {} as any,
+    );
+    assert.equal(res.status, 200);
+    const url = new URL(seen[0]);
+    assert.equal(url.searchParams.get("with_origin_country"), "US");
+    assert.equal(url.searchParams.get("with_original_language"), null);
+  } finally {
+    restore();
+  }
+});
+
+test("origin is part of the cache key", async () => {
+  const { seen, restore } = installMock();
+  const { env } = mockEnv();
+  try {
+    await browseTitles(env, { type: "movie", lang: "en", origin: "US", sort: "popular", page: 1 });
+    await browseTitles(env, { type: "movie", lang: "en", origin: "US", sort: "popular", page: 1 });
+    assert.equal(seen.length, 1);
+    await browseTitles(env, { type: "movie", lang: "en", origin: "GB", sort: "popular", page: 1 });
+    assert.equal(seen.length, 2);
   } finally {
     restore();
   }
@@ -184,6 +235,9 @@ test("invalid browse params return 400", async () => {
       "type=movie&page=6",
       "type=movie&page=abc",
       "type=movie&collection=disney",
+      "type=movie&origin=USA",
+      "type=movie&origin=U",
+      "type=movie&origin=1S",
       "lang=ar",
     ]) {
       const res = await worker.fetch(new Request(`${BASE}/api/browse?${qs}`), env, {} as any);

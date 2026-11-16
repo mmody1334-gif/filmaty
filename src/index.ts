@@ -193,16 +193,30 @@ async function handleApiHome(request: Request, env: Env): Promise<Response> {
   return jsonResponse({ ok: true, mostWatched, topRated }, 200);
 }
 
-// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&sort=popular|top_rated&page=1..5&collection=marvel|netflix
+// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&origin=US&sort=popular|top_rated&page=1..5&collection=marvel|netflix
+// lang and origin are optional: omitted lang = global (no language
+// filter), omitted origin = any origin country.
 // TMDB discover behind the Worker (cached 10 min). { ok, results, total_pages }.
 async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Response> {
   const type = url.searchParams.get("type");
   if (type !== "movie" && type !== "tv") {
     return jsonResponse({ ok: false, error: "invalid type" }, 400);
   }
-  const lang = url.searchParams.get("lang") || "ar";
-  if (!(BROWSE_LANGS as readonly string[]).includes(lang)) {
-    return jsonResponse({ ok: false, error: "invalid lang" }, 400);
+  const langRaw = url.searchParams.get("lang");
+  let lang: (typeof BROWSE_LANGS)[number] | undefined;
+  if (langRaw !== null) {
+    if (!(BROWSE_LANGS as readonly string[]).includes(langRaw)) {
+      return jsonResponse({ ok: false, error: "invalid lang" }, 400);
+    }
+    lang = langRaw as (typeof BROWSE_LANGS)[number];
+  }
+  const originRaw = url.searchParams.get("origin");
+  let origin: string | undefined;
+  if (originRaw !== null) {
+    if (!/^[A-Za-z]{2}$/.test(originRaw)) {
+      return jsonResponse({ ok: false, error: "invalid origin" }, 400);
+    }
+    origin = originRaw.toUpperCase();
   }
   const sort = url.searchParams.get("sort") || "popular";
   if (sort !== "popular" && sort !== "top_rated") {
@@ -223,7 +237,8 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
   }
   const { results, total_pages } = await browseTitles(env, {
     type,
-    lang: lang as (typeof BROWSE_LANGS)[number],
+    lang,
+    origin,
     sort,
     page,
     collection: (collection as (typeof BROWSE_COLLECTIONS)[number]) || undefined,

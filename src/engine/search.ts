@@ -1,12 +1,15 @@
 // Unified search for /api/search: TMDB in Arabic + English in parallel
 // (the old frontend searched Arabic only, so English queries and Arabic
-// transliterations missed), merged and deduped; if TMDB returns nothing,
-// fall back to a direct provider search.
+// transliterations missed), merged and deduped; single-token queries also
+// get provider augmentation (TMDB's word index misses compound titles
+// like WandaVision for "vision", provider substring search finds them);
+// if TMDB returns nothing, fall back to a direct provider search.
 
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
 import { cleanTitle, normalizeArabicQuery } from "./normalize.ts";
 import { searchAllProviders } from "../providers/index.ts";
+import type { Candidate } from "../providers/types.ts";
 import { titlesMatch } from "./resolve.ts";
 
 export const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -75,23 +78,23 @@ function mergeTmdbResults(lists: any[][]): SearchResultItem[] {
   return [...byKey.values()];
 }
 
-// Provider fallback: search the providers directly and attach a TMDB id
-// when the candidate title matches a TMDB search (bounded: top 5).
-// Only candidates that strictly match the query are shown: provider
-// search is loose (a substring match), so without this an Arabic query
-// TMDB does not know (e.g. "المئة" — TMDB itself returns 0 hits for it)
-// came back with junk like "ابو العروسة الجزء الثانى المئة". If nothing
-// matches strictly, keep the loose top results rather than returning
-// nothing at all.
-async function providerFallback(env: Env, query: string): Promise<SearchResultItem[]> {
-  const disabled = parseList(env.PROVIDERS_DISABLED);
-  const candidates = await searchAllProviders(query, undefined, disabled);
-  const cleanQ = cleanTitle(query) || query;
-  const strict = candidates.filter(
-    (c) => titlesMatch(c.title, cleanQ) || titlesMatch(c.title, query),
-  );
-  const pool = strict.length > 0 ? strict : candidates;
+// Shared provider-candidate processing: attach a TMDB id to every
+// candidate whose title exactly matches a TMDB title. The attach is what
+// keeps junk out — a candidate that does not match a real TMDB title
+// comes back as a provider-only entry (id null + provider link) instead.
+// Returns both the attached items and the provider-only entries, in
+// pool order, plus the attached-only subset for the augmentation path.
+interface AttachedCandidates {
+  items: SearchResultItem[];
+  attached: SearchResultItem[];
+}
+
+async function attachProviderCandidates(
+  env: Env,
+  pool: Candidate[],
+): Promise<AttachedCandidates> {
   const items: SearchResultItem[] = [];
+  const attached: SearchResultItem[] = [];
   const seen = new Set<string>();
   for (const c of pool.slice(0, 5)) {
     const hits = await tmdbSearch(env, c.title, "en-US");
@@ -104,6 +107,7 @@ async function providerFallback(env: Env, query: string): Promise<SearchResultIt
       const key = `${match.media_type}:${match.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      attached.push(match);
       items.push(match);
       continue;
     }
@@ -121,7 +125,44 @@ async function providerFallback(env: Env, query: string): Promise<SearchResultIt
       providerUrl: c.url,
     });
   }
+  return { items, attached };
+}
+
+// Provider fallback: search the providers directly and attach a TMDB id
+// when the candidate title matches a TMDB search (bounded: top 5).
+// Only candidates that strictly match the query are shown: provider
+// search is loose (a substring match), so without this an Arabic query
+// TMDB does not know (e.g. "المئة" — TMDB itself returns 0 hits for it)
+// came back with junk like "ابو العروسة الجزء الثانى المئة". If nothing
+// matches strictly, keep the loose top results rather than returning
+// nothing at all.
+async function providerFallback(env: Env, query: string): Promise<SearchResultItem[]> {
+  const disabled = parseList(env.PROVIDERS_DISABLED);
+  const candidates = await searchAllProviders(query, undefined, disabled);
+  const cleanQ = cleanTitle(query) || query;
+  const strict = candidates.filter(
+    (c) => titlesMatch(c.title, cleanQ) || titlesMatch(c.title, query),
+  );
+  const pool = strict.length > 0 ? strict : candidates;
+  const { items } = await attachProviderCandidates(env, pool);
   return items;
+}
+
+// Provider augmentation for single-token queries: TMDB's search index
+// matches whole words only, so a compound title like "WandaVision" can
+// never come back for q=vision — but provider site search does substring
+// matching (Akwam returns WandaVision for the normalized "فيجن").
+// Search the providers with the normalized query, keep candidates whose
+// (normalized) title contains the query, and return only the ones that
+// attach to a real TMDB title.
+async function providerAugment(env: Env, normalizedQuery: string): Promise<SearchResultItem[]> {
+  const disabled = parseList(env.PROVIDERS_DISABLED);
+  const candidates = await searchAllProviders(normalizedQuery, undefined, disabled);
+  const pool = candidates.filter((c) =>
+    normalizeArabicQuery(c.title).includes(normalizedQuery),
+  );
+  const { attached } = await attachProviderCandidates(env, pool);
+  return attached;
 }
 
 // Re-rank merged TMDB results by match quality, then popularity.
@@ -165,11 +206,16 @@ export async function searchTitles(env: Env, query: string): Promise<SearchOutco
   // Search TMDB with the normalized query in both languages: "ڤيجن"
   // becomes "فيجن", so TMDB can match "واندافيجن".
   const normalizedQuery = normalizeArabicQuery(query);
-  const [ar, en] = await Promise.all([
+  // Single-token queries also get provider augmentation in parallel:
+  // TMDB's word index handles multi-word queries, but a lone partial
+  // word ("vision", "فيجن") misses compound titles like WandaVision.
+  const singleToken = normalizedQuery.length > 0 && !/\s/.test(normalizedQuery);
+  const [ar, en, augmented] = await Promise.all([
     tmdbSearch(env, normalizedQuery, "ar"),
     tmdbSearch(env, normalizedQuery, "en-US"),
+    singleToken ? providerAugment(env, normalizedQuery) : Promise.resolve([]),
   ]);
-  const merged = mergeTmdbResults([ar, en]);
+  const merged = mergeTmdbResults([ar, en, augmented]);
   if (merged.length > 0) return { results: rerankResults(merged, normalizedQuery), source: "tmdb" };
   const fallback = await providerFallback(env, query);
   return { results: fallback, source: "providers" };

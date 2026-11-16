@@ -14,7 +14,13 @@ export type BrowseCollection = (typeof BROWSE_COLLECTIONS)[number];
 
 export interface BrowseParams {
   type: "movie" | "tv";
-  lang: BrowseLang;
+  // Optional: when omitted the discover is global (no language filter).
+  // The tabs and top-rated browse globally; only the drawer language
+  // items pass a lang.
+  lang?: BrowseLang;
+  // Optional 2-letter origin country code (e.g. "US" for American
+  // English content) -> TMDB with_origin_country.
+  origin?: string;
   sort: "popular" | "top_rated";
   page: number;
   collection?: BrowseCollection;
@@ -28,8 +34,9 @@ export interface BrowseOutcome {
 const BROWSE_CACHE_TTL = 10 * 60; // 10 minutes
 
 function browseCacheKey(p: BrowseParams): string {
-  const scope = p.collection || p.lang;
-  return `browse:${p.type}:${scope}:${p.sort}:${p.page}`;
+  const scope = p.collection || p.lang || "all";
+  const origin = p.origin ? `:origin:${p.origin}` : "";
+  return `browse:${p.type}:${scope}:${p.sort}:${p.page}${origin}`;
 }
 
 function browseUrl(env: Env, p: BrowseParams): string {
@@ -43,8 +50,11 @@ function browseUrl(env: Env, p: BrowseParams): string {
   } else if (p.collection === "netflix") {
     if (p.type === "tv") u.searchParams.set("with_networks", "213");
     else u.searchParams.set("with_companies", "11946");
-  } else {
+  } else if (p.lang) {
     u.searchParams.set("with_original_language", p.lang);
+  }
+  if (p.origin) {
+    u.searchParams.set("with_origin_country", p.origin);
   }
   if (p.sort === "top_rated") {
     u.searchParams.set("sort_by", "vote_average.desc");

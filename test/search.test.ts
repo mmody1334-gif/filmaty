@@ -328,6 +328,81 @@ test("normalized Arabic query 'ڤيجن' finds واندافيجن first", async 
   }
 });
 
+// Live-faithful TMDB mapping for the augmentation tests: TMDB's word
+// index never returns WandaVision for "vision" (compound token), and
+// returns nothing at all for the normalized "فيجن" — the provider
+// augmentation is what finds it. Attach lookups by exact title do
+// return the hit.
+function tmdbSearchResultLive(query: string, lang: string): any[] {
+  if (query === "vision") {
+    return lang === "ar" ? [visionOn, randomShow] : [theVision];
+  }
+  if (query === "فيجن") return [];
+  if (query === "WandaVision") return [wandaVisionEn];
+  if (query === "واندافيجن") return [wandaVisionAr];
+  return [];
+}
+
+function installAugmentMock(akwamHtml: string) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes("api.themoviedb.org/3/search/multi")) {
+      const u = new URL(url);
+      return jsonResponse({
+        results: tmdbSearchResultLive(u.searchParams.get("query") || "", u.searchParams.get("language") || ""),
+      });
+    }
+    if (url.includes("api.themoviedb.org")) {
+      return jsonResponse({ results: [] });
+    }
+    if (url.includes("akwam.ss/search")) {
+      return new Response(akwamHtml, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
+    return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
+  };
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
+test("provider augmentation finds WandaVision for q=vision (TMDB never returns it)", async () => {
+  const restore = installAugmentMock(`
+    <div class="entry-box"><h3 class="entry-title"><a href="https://akwam.ss/movie/85271/wandavision">WandaVision</a></h3></div>
+  `);
+  const { env } = mockEnv();
+  try {
+    // Live: TMDB returns only word-matches for "vision" (Vision On,
+    // The Vision...) and no WandaVision at all. Akwam's substring
+    // search finds it, the attach maps it to TMDB 85271, and the
+    // re-rank puts it first.
+    const { results, source } = await searchTitles(env, "vision");
+    assert.equal(source, "tmdb");
+    assert.equal(results[0].id, 85271);
+    assert.equal(results[0].title, "WandaVision");
+  } finally {
+    restore();
+  }
+});
+
+test("provider augmentation finds واندافيجن for q=ڤيجن (TMDB returns nothing)", async () => {
+  const restore = installAugmentMock(`
+    <div class="entry-box"><h3 class="entry-title"><a href="https://akwam.ss/movie/85271/wandavision">واندافيجن</a></h3></div>
+  `);
+  const { env } = mockEnv();
+  try {
+    // Live: TMDB ar returns 0 hits for the normalized "فيجن", so
+    // without augmentation this fell back to a junk provider-only
+    // entry. Akwam finds واندافيجن, the attach maps it to TMDB 85271.
+    const { results, source } = await searchTitles(env, "ڤيجن");
+    assert.equal(source, "tmdb");
+    assert.equal(results[0].id, 85271);
+    assert.equal(results[0].title, "واندافيجن");
+  } finally {
+    restore();
+  }
+});
+
 test("TMDB empty falls back to provider search (provider-only entries)", async () => {
   const restore = installMock();
   const { env } = mockEnv();

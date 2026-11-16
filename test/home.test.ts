@@ -257,6 +257,13 @@ test("built webapp has the hamburger drawer, browse categories and no direct dis
     'data-lang="es"',
     'data-lang="fr"',
     'data-lang="ja"',
+    // Arabic + American English are prominent; the other languages live
+    // under a «لغات أخرى» sub-group inside each of movies/series.
+    "لغات أخرى",
+    "drawer-movies-other",
+    "drawer-tv-other",
+    'data-origin="US"',
+    "إنجليزي (أمريكي)",
     "الأعلى تقييمًا",
     "🦸‍♂️ مارفل",
     "🔴 نتفليكس",
