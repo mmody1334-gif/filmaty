@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0f19">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="apple-touch-icon" href="../icons/icon-192.png">
   <title>فيلماتي 📺 وضع التلفزيون</title>
   <!-- TV mode: watch-only. No pop-ups, no downloads, no bot, no new windows.
        Entry is ONLY the "وضع التلفزيون" button in the main site header —
@@ -100,12 +103,14 @@
   </div>
 
   <!-- Search: one big field; the TV on-screen keyboard types into it. -->
-  <div class="px-4 md:px-8 pt-4">
+  <div class="px-4 md:px-8 pt-4 relative">
     <form id="tvSearchForm" class="flex gap-2">
       <input id="tvSearchInput" type="search" placeholder="🔍 ابحث عن فيلم أو مسلسل…" autocomplete="off"
         class="tv-focus flex-1 min-w-0 px-5 py-3 rounded-full bg-black/60 border border-white/20 text-white text-lg font-bold placeholder:text-slate-500">
       <button type="submit" class="tv-focus px-6 py-3 rounded-full bg-red-600 text-white text-lg font-extrabold transition">بحث</button>
     </form>
+    <!-- Search suggestions dropdown (stage E) -->
+    <div id="tvSuggest" class="hidden absolute right-4 left-4 md:right-8 md:left-8 top-full mt-2 bg-[#1f1f1f] border border-white/10 rounded-2xl shadow-2xl z-40 overflow-hidden"></div>
   </div>
 
   <!-- Home sections / grid -->
@@ -177,7 +182,29 @@
               <div id="tvEpisodes" class="flex flex-wrap gap-2 max-h-44 overflow-y-auto scrollbar-hide"></div>
             </div>
           </div>
-          <button id="tvPlay" class="tv-focus px-8 py-4 rounded-2xl bg-red-600 text-white text-xl font-black hover:bg-red-500 transition">▶ تشغيل</button>
+          <div class="flex flex-wrap gap-3">
+            <button id="tvPlay" class="tv-focus px-8 py-4 rounded-2xl bg-red-600 text-white text-xl font-black hover:bg-red-500 transition">▶ تشغيل</button>
+            <button id="tvRestart" class="tv-focus hidden px-6 py-4 rounded-2xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:bg-slate-700 transition">↺ من الأول</button>
+            <button id="tvMyList" class="tv-focus px-6 py-4 rounded-2xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:border-red-500 transition">🤍 أضف لقائمتي</button>
+            <button id="tvTrailer" class="tv-focus hidden px-6 py-4 rounded-2xl bg-red-600/20 text-red-300 text-base font-bold border border-red-500/30 hover:bg-red-600 hover:text-white transition">🎬 التريلر</button>
+            <button id="tvReport" class="tv-focus px-6 py-4 rounded-2xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:border-amber-500 transition">⚠️ بلّغ عن مشكلة</button>
+          </div>
+          <!-- Report a problem (stage F): pick the problem, scan the QR
+               with the phone — Telegram opens with the report prefilled. -->
+          <div id="tvReportPanel" class="hidden space-y-3 pt-2">
+            <p class="text-sm font-extrabold text-slate-400">إيه المشكلة؟</p>
+            <div class="flex flex-wrap gap-2">
+              <button class="tv-report-problem-btn tv-focus px-5 py-3 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:border-red-500 transition" data-problem="المشغّل مش شغال">المشغّل مش شغال</button>
+              <button class="tv-report-problem-btn tv-focus px-5 py-3 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:border-red-500 transition" data-problem="الفيديو بيقطّع أو الجودة ضعيفة">الفيديو بيقطّع</button>
+              <button class="tv-report-problem-btn tv-focus px-5 py-3 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:border-red-500 transition" data-problem="الصوت أو الترجمة فيها مشكلة">الصوت / الترجمة</button>
+              <button class="tv-report-problem-btn tv-focus px-5 py-3 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-brand-border hover:border-red-500 transition" data-problem="مشكلة تانية">مشكلة تانية</button>
+            </div>
+            <div id="tvReportQrWrap" class="hidden bg-white rounded-2xl p-4 w-fit">
+              <div id="tvReportQr"></div>
+            </div>
+            <p id="tvReportHint" class="hidden text-sm text-slate-300 font-bold">امسح الكود بالموبايل — هيفتح تيليجرام بالنص جاهز للبوت.</p>
+            <p id="tvReportText" class="hidden text-xs text-slate-400 whitespace-pre-wrap break-words"></p>
+          </div>
         </div>
       </div>
 
@@ -203,6 +230,21 @@
           <iframe id="tvFrame" class="w-full h-full hidden" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>
         </div>
       </div>
+
+      <!-- Auto-next episode countdown (series only, native player) -->
+      <div id="tvAutoNextBar" class="hidden items-center justify-between gap-3 rounded-2xl bg-red-600/15 border border-red-500/30 px-4 py-3 mt-3">
+        <span id="tvAutoNextText" class="text-base font-bold text-white">الحلقة التالية خلال 5 ثواني…</span>
+        <span class="flex gap-2 shrink-0">
+          <button id="tvAutoNextNow" class="tv-focus px-5 py-2.5 rounded-xl bg-red-600 text-white text-base font-bold">تشغيل الآن</button>
+          <button id="tvAutoNextCancel" class="tv-focus px-5 py-2.5 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-slate-700">إلغاء</button>
+        </span>
+      </div>
+
+      <!-- Similar titles (stage D) -->
+      <div id="tvSimilarWrap" class="hidden mt-4">
+        <h4 class="text-xl font-extrabold text-white mb-3 px-1">🎬 أعمال شبه ده</h4>
+        <div id="tvSimilarRow" class="tv-row flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x"></div>
+      </div>
     </div>
   </div>
 
@@ -227,6 +269,116 @@
     let nativeActive = false;
     let nativePlayTimer = null;
     let overlayOpen = false;
+
+    // Continue watching (stage A): resume positions + watched marks,
+    // kept in localStorage on this device only (no accounts). Same keys
+    // and shape as the main site.
+    const PROGRESS_KEY = 'filmaty:progress:v1';
+    const WATCHED_KEY = 'filmaty:watched:v1';
+    const MAX_PROGRESS_ITEMS = 20;
+    function progressKey(type, id, s, e) {
+      return `${type}:${id}:${s || 0}:${e || 0}`;
+    }
+    function readProgressStore() {
+      try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function readWatchedStore() {
+      try { return JSON.parse(localStorage.getItem(WATCHED_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function getProgress(type, id, s, e) {
+      return readProgressStore()[progressKey(type, id, s, e)] || null;
+    }
+    function isWatched(type, id, s, e) {
+      return !!readWatchedStore()[progressKey(type, id, s, e)];
+    }
+    function saveProgressEntry(type, id, s, e, t, d, meta) {
+      if (!Number.isFinite(t) || t < 5) return;
+      const store = readProgressStore();
+      const key = progressKey(type, id, s, e);
+      store[key] = {
+        type, id, s: s || 0, e: e || 0,
+        t: Math.floor(t), d: Number.isFinite(d) && d > 0 ? Math.floor(d) : 0,
+        updated: Date.now(), title: meta.title || '', poster: meta.poster || '', kind: meta.kind || '',
+      };
+      const entries = Object.values(store).sort((a, b) => b.updated - a.updated).slice(0, MAX_PROGRESS_ITEMS);
+      const capped = {};
+      entries.forEach((en) => { capped[progressKey(en.type, en.id, en.s, en.e)] = en; });
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(capped)); } catch (e) {}
+    }
+    function clearProgressEntry(type, id, s, e) {
+      const store = readProgressStore();
+      delete store[progressKey(type, id, s, e)];
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(store)); } catch (e) {}
+    }
+    function markWatchedEntry(type, id, s, e) {
+      const store = readWatchedStore();
+      store[progressKey(type, id, s, e)] = Date.now();
+      const keys = Object.keys(store).sort((a, b) => store[b] - store[a]).slice(0, 200);
+      const capped = {};
+      keys.forEach((k) => { capped[k] = store[k]; });
+      try { localStorage.setItem(WATCHED_KEY, JSON.stringify(capped)); } catch (e) {}
+      clearProgressEntry(type, id, s, e);
+    }
+    function formatTime(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+    }
+    function getContinueItems() {
+      return Object.values(readProgressStore()).sort((a, b) => b.updated - a.updated).slice(0, 10);
+    }
+    function currentResumeEntry() {
+      if (!currentItem) return null;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      return getProgress(type, currentItem.id, type === 'tv' ? selectedSeason : 0, type === 'tv' ? selectedEpisode : 0);
+    }
+    function updateTvResumeButton() {
+      const btn = document.getElementById('tvPlay');
+      const restart = document.getElementById('tvRestart');
+      if (!btn || !restart) return;
+      const entry = currentResumeEntry();
+      btn.innerText = entry ? `▶ أكمل من ${formatTime(entry.t)}` : '▶ تشغيل';
+      restart.classList.toggle('hidden', !entry);
+    }
+
+    // My list (stage B): same keys and shape as the main site.
+    const MYLIST_KEY = 'filmaty:mylist:v1';
+    const MAX_MYLIST_ITEMS = 50;
+    function myListKey(type, id) {
+      return `${type}:${id}`;
+    }
+    function readMyListStore() {
+      try { return JSON.parse(localStorage.getItem(MYLIST_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function isInMyList(type, id) {
+      return !!readMyListStore()[myListKey(type, id)];
+    }
+    function toggleMyList(type, id, meta) {
+      const store = readMyListStore();
+      const key = myListKey(type, id);
+      if (store[key]) {
+        delete store[key];
+        try { localStorage.setItem(MYLIST_KEY, JSON.stringify(store)); } catch (e) {}
+        return false;
+      }
+      store[key] = { type, id, title: meta.title || '', poster: meta.poster || '', kind: meta.kind || '', added: Date.now() };
+      const entries = Object.values(store).sort((a, b) => b.added - a.added).slice(0, MAX_MYLIST_ITEMS);
+      const capped = {};
+      entries.forEach((en) => { capped[myListKey(en.type, en.id)] = en; });
+      try { localStorage.setItem(MYLIST_KEY, JSON.stringify(capped)); } catch (e) {}
+      return true;
+    }
+    function getMyListItems() {
+      return Object.values(readMyListStore()).sort((a, b) => b.added - a.added);
+    }
+    function updateTvMyListButton() {
+      const btn = document.getElementById('tvMyList');
+      if (!btn || !currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      btn.innerText = isInMyList(type, currentItem.id) ? '❤️ في قائمتي' : '🤍 أضف لقائمتي';
+    }
 
     const tvHome = document.getElementById('tvHome');
     const tvGridWrap = document.getElementById('tvGridWrap');
@@ -419,7 +571,7 @@
       tvGridWrap.classList.remove('hidden');
       document.getElementById('tvHero').classList.add('hidden');
     }
-    function cardHtml(item) {
+    function cardHtml(item, extraClass = '') {
       const title = item.title || item.name || 'بدون عنوان';
       const date = item.release_date || item.first_air_date || '';
       const year = date ? date.slice(0, 4) : '';
@@ -428,7 +580,7 @@
       const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
       const type = item.media_type || (item.name ? 'tv' : 'movie');
       return `
-        <div class="tv-card tv-focus group cursor-pointer" tabindex="0" role="button" data-id="${item.id}" data-type="${type}">
+        <div class="tv-card tv-focus group cursor-pointer${extraClass ? ' ' + extraClass : ''}" tabindex="0" role="button" data-id="${item.id}" data-type="${type}">
           <div class="relative aspect-[2/3] bg-[#1f1f1f] overflow-hidden rounded-xl">
             <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover rounded-xl group-hover:opacity-90 transition">
             <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 text-amber-400 text-sm font-extrabold border border-amber-500/20">⭐ ${rating}</span>
@@ -444,7 +596,9 @@
         </div>`;
     }
     function bindCards(root) {
-      root.querySelectorAll('.tv-card').forEach((card) => {
+      // Continue-watching cards have their own binding (they open a
+      // saved season/episode and resume); skip them here.
+      root.querySelectorAll('.tv-card:not(.tv-continue-card)').forEach((card) => {
         // Tap a film: it plays by itself, fullscreen, best quality.
         // Tap a series: the episode picker opens first (an episode tap
         // then plays the same way).
@@ -497,17 +651,79 @@
       openDetails(heroItem.id, type, false);
     });
 
+    // Continue watching row (stage A): personal, newest first. Cards
+    // carry a progress bar and "أكمل من M:SS"; tapping one opens the
+    // saved season/episode and plays from the saved position.
+    function tvContinueRowHtml(items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h2 class="text-xl md:text-2xl font-extrabold text-white mb-3 px-1">▶ أكمل المشاهدة</h2>
+          <div class="tv-row flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x">
+            ${items.map((en) => {
+              const pct = en.d > 0 ? Math.min(100, Math.round((en.t / en.d) * 100)) : 0;
+              const item = { id: en.id, media_type: en.type, title: en.title, poster: en.poster, vote_average: 0 };
+              return `<div class="shrink-0 w-40 md:w-48 snap-start" data-season="${en.s}" data-episode="${en.e}">${cardHtml(item, 'tv-continue-card')}
+                <div class="h-1.5 bg-white/20 rounded-full mt-1 mx-1"><div class="h-full bg-red-600 rounded-full" style="width:${pct}%"></div></div>
+                <p class="text-xs text-slate-400 font-bold mt-1 px-1">أكمل من ${formatTime(en.t)}</p>
+              </div>`;
+            }).join('')}
+          </div>
+        </section>`;
+    }
+    function bindContinueCards(root) {
+      root.querySelectorAll('.tv-continue-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          const wrap = card.closest('[data-season]');
+          const s = wrap ? Number(wrap.dataset.season) || 0 : 0;
+          const e = wrap ? Number(wrap.dataset.episode) || 0 : 0;
+          openDetails(Number(card.dataset.id), card.dataset.type, true, s || null, e || null);
+        });
+      });
+    }
+
+    // My list row (stage B): normal cards, so the standard binding
+    // handles taps (a film plays, a series opens its picker).
+    function tvMyListRowHtml(items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h2 class="text-xl md:text-2xl font-extrabold text-white mb-3 px-1">❤️ قائمتي</h2>
+          <div class="tv-row flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x">
+            ${items.map((en) => {
+              const item = { id: en.id, media_type: en.type, title: en.title, poster: en.poster, vote_average: 0 };
+              return `<div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(item)}</div>`;
+            }).join('')}
+          </div>
+        </section>`;
+    }
+
     async function loadHome() {
       showHomeView();
       tvHome.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
       try {
-        const res = await fetch(`${API_BASE}/api/home`);
-        const data = await res.json();
+        const [homeRes, airingRes, upcomingRes] = await Promise.all([
+          fetch(`${API_BASE}/api/home`),
+          fetch(`${TMDB_BASE}/tv/airing_today?api_key=${TMDB_KEY}&language=ar`).catch(() => null),
+          fetch(`${TMDB_BASE}/movie/upcoming?api_key=${TMDB_KEY}&language=ar`).catch(() => null),
+        ]);
+        const data = await homeRes.json();
+        // New episodes + coming soon (stage H): TMDB direct, each
+        // failure degrades to an empty row instead of breaking home.
+        const airing = airingRes ? await airingRes.json().catch(() => null) : null;
+        const upcoming = upcomingRes ? await upcomingRes.json().catch(() => null) : null;
+        const newEpisodes = ((airing?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'tv' }));
+        const upcomingMovies = ((upcoming?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'movie' }));
         tvHome.innerHTML =
+          tvContinueRowHtml(getContinueItems()) +
+          tvMyListRowHtml(getMyListItems()) +
           sectionHtml('🔥 الأكثر مشاهدة', data.mostWatched || []) +
-          sectionHtml('⭐ الأعلى تقييمًا', data.topRated || []);
+          sectionHtml('⭐ الأعلى تقييمًا', data.topRated || []) +
+          sectionHtml('🆕 حلقات جديدة', newEpisodes) +
+          sectionHtml('📅 قريبًا', upcomingMovies);
         renderHero((data.mostWatched || [])[0] || (data.topRated || [])[0] || null);
         bindCards(tvHome);
+        bindContinueCards(tvHome);
       } catch (e) {
         renderHero(null);
         tvHome.innerHTML = '<div class="text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
@@ -536,6 +752,8 @@
     }
 
     async function runSearch(query) {
+      saveTvRecentSearch(query);
+      hideTvSuggest();
       showGridView();
       tvGridTitle.innerText = `🔍 نتائج البحث: ${query}`;
       tvGrid.innerHTML = Array(10).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>').join('');
@@ -579,6 +797,82 @@
       e.preventDefault();
       const q = document.getElementById('tvSearchInput').value.trim();
       if (q) runSearch(q);
+    });
+
+    // Search suggestions + recent searches (stage E): same as the main
+    // site — top 6 live results while typing, recent searches on focus
+    // of an empty box.
+    const TV_RECENT_SEARCHES_KEY = 'filmaty:recent-searches:v1';
+    const tvSearchInput = document.getElementById('tvSearchInput');
+    const tvSuggest = document.getElementById('tvSuggest');
+    let tvSuggestTimer = null;
+    let tvSuggestSeq = 0;
+    function readTvRecentSearches() {
+      try { return JSON.parse(localStorage.getItem(TV_RECENT_SEARCHES_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function saveTvRecentSearch(q) {
+      q = q.trim();
+      if (!q) return;
+      const list = readTvRecentSearches().filter((x) => x !== q);
+      list.unshift(q);
+      try { localStorage.setItem(TV_RECENT_SEARCHES_KEY, JSON.stringify(list.slice(0, 8))); } catch (e) {}
+    }
+    function hideTvSuggest() {
+      tvSuggest.classList.add('hidden');
+      tvSuggest.innerHTML = '';
+    }
+    function renderTvSuggestItems(items, isRecent) {
+      if (!items.length) { hideTvSuggest(); return; }
+      const title = isRecent ? '🕘 بحثات أخيرة' : '💡 اقتراحات';
+      tvSuggest.innerHTML = `
+        <p class="px-5 pt-3 pb-1 text-sm font-extrabold text-slate-400">${title}</p>
+        ${items.map((it) => {
+          if (isRecent) {
+            const q = String(it).replace(/"/g, '&quot;');
+            return `<button class="tv-suggest-item tv-focus w-full text-right px-5 py-3 text-base font-bold text-white hover:bg-slate-800 transition flex items-center gap-2" data-query="${q}"><span>🕘</span><span class="truncate">${q}</span></button>`;
+          }
+          const name = (it.title || it.name || 'بدون عنوان').replace(/"/g, '&quot;');
+          const date = it.release_date || it.first_air_date || '';
+          const year = date ? date.slice(0, 4) : '';
+          const kind = (it.media_type || (it.name ? 'tv' : 'movie')) === 'tv' ? 'مسلسل' : 'فيلم';
+          return `<button class="tv-suggest-item tv-focus w-full text-right px-5 py-3 text-base font-bold text-white hover:bg-slate-800 transition flex items-center justify-between gap-2" data-id="${it.id}" data-type="${it.media_type || (it.name ? 'tv' : 'movie')}"><span class="truncate">${name}</span><span class="text-sm text-slate-400 shrink-0">${kind} ${year}</span></button>`;
+        }).join('')}
+      `;
+      tvSuggest.classList.remove('hidden');
+      tvSuggest.querySelectorAll('.tv-suggest-item').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          hideTvSuggest();
+          if (btn.dataset.query) {
+            tvSearchInput.value = btn.dataset.query;
+            runSearch(btn.dataset.query);
+            return;
+          }
+          openDetails(Number(btn.dataset.id), btn.dataset.type, btn.dataset.type === 'movie');
+        });
+      });
+    }
+    async function fetchTvSuggest(q) {
+      const seq = ++tvSuggestSeq;
+      try {
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (seq !== tvSuggestSeq) return;
+        if (tvSearchInput.value.trim() !== q) return;
+        renderTvSuggestItems((data.results || []).filter((i) => !i.providerUrl).slice(0, 6), false);
+      } catch (e) {}
+    }
+    tvSearchInput.addEventListener('input', () => {
+      const q = tvSearchInput.value.trim();
+      clearTimeout(tvSuggestTimer);
+      if (!q) { hideTvSuggest(); return; }
+      tvSuggestTimer = setTimeout(() => fetchTvSuggest(q), 250);
+    });
+    tvSearchInput.addEventListener('focus', () => {
+      if (!tvSearchInput.value.trim()) renderTvSuggestItems(readTvRecentSearches(), true);
+    });
+    tvSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTvSuggest(); });
+    document.addEventListener('click', (e) => {
+      if (!tvSuggest.contains(e.target) && e.target !== tvSearchInput) hideTvSuggest();
     });
 
     // ---------- Details + player ----------
@@ -625,14 +919,50 @@
         overlayOpen = true;
         document.body.classList.add('overflow-hidden');
         overlay.scrollTop = 0;
+        updateTvResumeButton();
+        updateTvMyListButton();
+        loadTvTrailerAndSimilar(id, mediaType);
         if (autoplay) {
-          playBest();
+          playWithResume();
         } else {
           focusEl(document.getElementById('tvPlay'));
         }
       } catch (err) {
         alert('تعذر فتح تفاصيل العمل.');
       }
+    }
+
+    // Trailer + similar titles (stage D): same as the main site — the
+    // trailer plays in the TV iframe (YouTube is trusted, no sandbox;
+    // embedwave re-adds its sandbox on play).
+    let tvTrailerKey = null;
+    let tvTrailerLoadSeq = 0;
+    async function loadTvTrailerAndSimilar(id, mediaType) {
+      const loadId = ++tvTrailerLoadSeq;
+      tvTrailerKey = null;
+      const btn = document.getElementById('tvTrailer');
+      const wrap = document.getElementById('tvSimilarWrap');
+      const row = document.getElementById('tvSimilarRow');
+      btn.classList.add('hidden');
+      wrap.classList.add('hidden');
+      row.innerHTML = '';
+      try {
+        const [videosRes, similarRes] = await Promise.all([
+          fetch(`${TMDB_BASE}/${mediaType}/${id}/videos?api_key=${TMDB_KEY}&language=en-US`),
+          fetch(`${TMDB_BASE}/${mediaType}/${id}/similar?api_key=${TMDB_KEY}&language=ar`),
+        ]);
+        if (loadId !== tvTrailerLoadSeq) return;
+        const videos = await videosRes.json().catch(() => null);
+        const trailer = (videos?.results || []).find((v) => v.site === 'YouTube' && v.type === 'Trailer');
+        if (trailer) { tvTrailerKey = trailer.key; btn.classList.remove('hidden'); }
+        const similar = await similarRes.json().catch(() => null);
+        const items = (similar?.results || []).slice(0, 10);
+        if (items.length) {
+          row.innerHTML = items.map((it) => `<div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(it)}</div>`).join('');
+          wrap.classList.remove('hidden');
+          bindCards(row);
+        }
+      } catch (e) {}
     }
 
     function setupSeasons(tv, wantSeason = null, wantEpisode = null) {
@@ -665,9 +995,14 @@
 
     function renderEpisodes(count, wantEpisode = 1) {
       selectedEpisode = wantEpisode && wantEpisode >= 1 && wantEpisode <= count ? wantEpisode : 1;
-      document.getElementById('tvEpisodes').innerHTML = Array.from({ length: count }, (_, i) => i + 1).map((epNum) => `
-        <button data-ep="${epNum}" class="tv-ep tv-focus ${epNum === selectedEpisode ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-4 py-2.5 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">حلقة ${epNum}</button>
-      `).join('');
+      currentSeasonEpisodeCount = count;
+      document.getElementById('tvEpisodes').innerHTML = Array.from({ length: count }, (_, i) => i + 1).map((epNum) => {
+        const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
+        const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
+        const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
+        return `
+        <button data-ep="${epNum}" class="tv-ep tv-focus relative overflow-hidden ${epNum === selectedEpisode ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-4 py-2.5 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${watched ? '✓ ' : ''}حلقة ${epNum}${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}</button>
+      `; }).join('');
       document.querySelectorAll('.tv-ep').forEach((btn) => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.tv-ep').forEach((b) => {
@@ -677,10 +1012,13 @@
           btn.classList.remove('bg-slate-800', 'text-slate-300');
           btn.classList.add('bg-red-600', 'text-white');
           selectedEpisode = Number(btn.dataset.ep);
+          updateTvResumeButton();
+          clearTvAutoNext();
           // Tap an episode: it plays by itself, fullscreen, best quality.
-          playBest();
+          playWithResume();
         });
       });
+      updateTvResumeButton();
     }
 
     function closeOverlay() {
@@ -688,6 +1026,10 @@
       overlay.classList.add('hidden');
       overlayOpen = false;
       document.body.classList.remove('overflow-hidden');
+      document.getElementById('tvReportPanel').classList.add('hidden');
+      // Refresh home so the continue-watching row reflects what was
+      // just watched.
+      loadHome();
     }
     document.getElementById('tvClose').addEventListener('click', closeOverlay);
 
@@ -724,6 +1066,8 @@
       }, ms);
     }
     function resetPlayer() {
+      trackProgress(true);
+      clearTvAutoNext();
       nativeActive = false;
       clearNativePlayTimeout();
       tvVideo.pause();
@@ -753,6 +1097,95 @@
       tryNextQualityOrFallback();
     });
     tvVideo.addEventListener('playing', clearNativePlayTimeout);
+
+    // Continue watching: save the position while playing (throttled to
+    // every 5s), on pause, and when the page hides; mark watched at the
+    // end (or past 90%). pendingResume is consumed once by the
+    // loadedmetadata listener — quality/server switches never re-seek.
+    let lastProgressSave = 0;
+    let pendingResume = null; // seconds to seek to once metadata loads
+    function currentProgressMeta() {
+      if (!currentItem) return null;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      return { type, s: type === 'tv' ? selectedSeason : 0, e: type === 'tv' ? selectedEpisode : 0, title: currentItem.title || currentItem.name || '', poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '', kind: type };
+    }
+    function trackProgress(force) {
+      const meta = currentProgressMeta();
+      if (!meta || !nativeActive) return;
+      const t = tvVideo.currentTime;
+      const d = tvVideo.duration;
+      if (!Number.isFinite(t) || t < 5) return;
+      const now = Date.now();
+      if (!force && now - lastProgressSave < 5000) return;
+      lastProgressSave = now;
+      if (Number.isFinite(d) && d > 0 && t >= d - 30) { markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e); updateTvResumeButton(); return; }
+      saveProgressEntry(meta.type, currentItem.id, meta.s, meta.e, t, d, meta);
+    }
+    tvVideo.addEventListener('timeupdate', () => trackProgress(false));
+    tvVideo.addEventListener('pause', () => trackProgress(true));
+    tvVideo.addEventListener('ended', () => {
+      const meta = currentProgressMeta();
+      if (meta) markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e);
+      updateTvResumeButton();
+      armTvAutoNext();
+    });
+    document.addEventListener('pagehide', () => trackProgress(true));
+    tvVideo.addEventListener('loadedmetadata', () => {
+      if (pendingResume != null && Number.isFinite(tvVideo.duration) && tvVideo.duration > 0) {
+        tvVideo.currentTime = Math.min(pendingResume, Math.max(0, tvVideo.duration - 10));
+        pendingResume = null;
+      }
+    });
+
+    // Play the current title/episode at the best quality. The Play
+    // button resumes from the saved position when one exists; the
+    // restart button plays from the beginning.
+    function playWithResume() {
+      const entry = currentResumeEntry();
+      pendingResume = entry ? entry.t : null;
+      playBest();
+    }
+    function playFromStart() {
+      pendingResume = null;
+      playBest();
+    }
+
+    // Auto-next episode (stage C): same rules as the main site — a
+    // series episode ending on the native player starts the next one
+    // after a 5s countdown the user can cancel or skip.
+    let tvAutoNextTimer = null;
+    let tvAutoNextEpisode = null;
+    let currentSeasonEpisodeCount = 10;
+    function clearTvAutoNext() {
+      if (tvAutoNextTimer) { clearTimeout(tvAutoNextTimer); tvAutoNextTimer = null; }
+      tvAutoNextEpisode = null;
+      const bar = document.getElementById('tvAutoNextBar');
+      if (bar) { bar.classList.add('hidden'); bar.classList.remove('flex'); }
+    }
+    function armTvAutoNext() {
+      clearTvAutoNext();
+      if (!currentItem || currentItem.media_type !== 'tv') return;
+      if (!nativeActive) return;
+      if (selectedEpisode >= currentSeasonEpisodeCount) return;
+      tvAutoNextEpisode = selectedEpisode + 1;
+      let left = 5;
+      const bar = document.getElementById('tvAutoNextBar');
+      const text = document.getElementById('tvAutoNextText');
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      const tick = () => {
+        if (left <= 0) {
+          const nextBtn = document.querySelectorAll('.tv-ep')[tvAutoNextEpisode - 1];
+          clearTvAutoNext();
+          if (nextBtn) nextBtn.click();
+          return;
+        }
+        text.innerText = `الحلقة التالية (حلقة ${tvAutoNextEpisode}) خلال ${left} ثواني…`;
+        left--;
+        tvAutoNextTimer = setTimeout(tick, 1000);
+      };
+      tick();
+    }
 
     function selectedServer() {
       return currentServers ? currentServers[selectedServerIdx] : null;
@@ -883,7 +1316,7 @@
       btn.disabled = true;
       const type = currentItem.media_type;
       const data = await fetchResolve(type, currentItem.id, type === 'tv' ? selectedSeason : 0, type === 'tv' ? selectedEpisode : 0);
-      btn.innerText = '▶ تشغيل';
+      updateTvResumeButton();
       btn.disabled = false;
       if (!data || !data.servers || data.servers.length === 0) {
         playEmbedwaveFallback(type);
@@ -915,7 +1348,83 @@
       } catch (e) {}
     }
 
-    document.getElementById('tvPlay').addEventListener('click', playBest);
+    document.getElementById('tvPlay').addEventListener('click', playWithResume);
+    document.getElementById('tvRestart').addEventListener('click', playFromStart);
+    // Report a problem (stage F): no backend — the report text is
+    // prefilled (title, episode, server, quality, problem) and shown
+    // as a QR the phone scans; Telegram opens with the text ready.
+    function buildTvReportText(problem) {
+      const title = currentItem ? (currentItem.title || currentItem.name || '—') : '—';
+      const date = currentItem ? (currentItem.release_date || currentItem.first_air_date || '') : '';
+      const year = date ? date.slice(0, 4) : '';
+      const kind = currentItem ? (currentItem.media_type === 'tv' ? 'مسلسل' : 'فيلم') : '—';
+      const type = currentItem ? (currentItem.media_type === 'tv' ? 'tv' : 'movie') : 'movie';
+      const s = type === 'tv' ? selectedSeason : 0;
+      const e = type === 'tv' ? selectedEpisode : 0;
+      const server = selectedServer();
+      const quality = selectedQuality();
+      const lines = [
+        '⚠️ بلاغ مشكلة — فيلماتي',
+        `العمل: ${title} (${kind}${year ? ' ' + year : ''})`,
+      ];
+      if (type === 'tv') lines.push(`الموسم ${s} — الحلقة ${e}`);
+      lines.push(`السيرفر: ${server ? server.name : '—'} — الجودة: ${quality ? quality.quality : '—'}`);
+      lines.push(`المشكلة: ${problem}`);
+      return lines.join('\n');
+    }
+    function showTvReport(problem) {
+      const text = buildTvReportText(problem);
+      const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent('https://mmody1334-gif.github.io/filmaty/') + '&text=' + encodeURIComponent(text);
+      const qrBox = document.getElementById('tvReportQr');
+      const qrWrap = document.getElementById('tvReportQrWrap');
+      qrBox.innerHTML = '';
+      try {
+        if (window.qrcode) {
+          const qr = qrcode(0, 'M');
+          qr.addData(shareUrl);
+          qr.make();
+          qrBox.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+          qrWrap.classList.remove('hidden');
+        } else {
+          qrWrap.classList.add('hidden');
+        }
+      } catch (e) { qrWrap.classList.add('hidden'); }
+      document.getElementById('tvReportHint').classList.remove('hidden');
+      const textEl = document.getElementById('tvReportText');
+      textEl.innerText = text;
+      textEl.classList.remove('hidden');
+    }
+
+    document.getElementById('tvTrailer').addEventListener('click', () => {
+      if (!tvTrailerKey) return;
+      resetPlayer();
+      document.getElementById('tvPlayerWrap').classList.remove('hidden');
+      tvFrame.removeAttribute('sandbox');
+      tvFrame.classList.remove('hidden');
+      tvFrame.src = `https://www.youtube.com/embed/${tvTrailerKey}?autoplay=1&rel=0`;
+      hidePlayerStatus();
+      enterFullscreen();
+    });
+    document.getElementById('tvAutoNextNow').addEventListener('click', () => {
+      const nextBtn = tvAutoNextEpisode ? document.querySelectorAll('.tv-ep')[tvAutoNextEpisode - 1] : null;
+      clearTvAutoNext();
+      if (nextBtn) nextBtn.click();
+    });
+    document.getElementById('tvAutoNextCancel').addEventListener('click', clearTvAutoNext);
+    document.getElementById('tvReport').addEventListener('click', () => {
+      document.getElementById('tvReportPanel').classList.toggle('hidden');
+    });
+    document.querySelectorAll('.tv-report-problem-btn').forEach((btn) => {
+      btn.addEventListener('click', () => showTvReport(btn.dataset.problem));
+    });
+    document.getElementById('tvMyList').addEventListener('click', () => {
+      if (!currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const meta = { title: currentItem.title || currentItem.name || '', poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '', kind: type };
+      const added = toggleMyList(type, currentItem.id, meta);
+      updateTvMyListButton();
+      flashPlayerStatus(added ? 'تمت الإضافة لقائمتي ❤️' : 'تمت الإزالة من قائمتي', 2000);
+    });
 
     renderPairing();
     pollTimer = setInterval(pollRemoteCommands, 10000);
