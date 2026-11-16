@@ -1037,26 +1037,6 @@
     }
 
     // Direct Download & Telegram Bot Request
-    // Cheap liveness probe: a Range fetch for the first byte must answer
-    // 2xx before we trigger the browser download. Without this, a dead
-    // stream produced a fake 16-byte "Dexter.mp4" and Chrome reported the
-    // download as failed.
-    async function isDownloadAlive(url) {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: { Range: 'bytes=0-0' },
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-        return res.status >= 200 && res.status < 300;
-      } catch (err) {
-        return false;
-      }
-    }
-
     btnDirectDownload.addEventListener('click', async () => {
       if (!currentItem) return;
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
@@ -1106,23 +1086,29 @@
       }
     });
 
-    // Probe then trigger the browser download of one quality.
+    // Trigger the browser download of one quality immediately — no
+    // liveness probe first. The probe used to gate this (8s timeout) but
+    // the upstream host is slow to first byte, so the probe kept timing
+    // out on healthy links and the app pushed the user to the bot instead
+    // of downloading. A dead upstream is now handled server-side (the
+    // Worker never serves an error body as a download), so the browser
+    // either starts the real download or shows the error itself. The bot
+    // fallback stays only when there is no download URL at all.
     async function downloadQuality(q, key) {
-      if (await isDownloadAlive(q.download)) {
-        const a = document.createElement('a');
-        a.href = q.download;
-        a.download = '';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+      if (!q.download) {
+        if (lastResolved && lastResolved.key === key) lastResolved = null;
+        showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
+        openBotRequest();
         return;
       }
-      // Dead link: forget it so the next attempt re-resolves instead
-      // of reusing it, then fall through to the toast + bot request.
-      if (lastResolved && lastResolved.key === key) lastResolved = null;
-      showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
-      openBotRequest();
+      const a = document.createElement('a');
+      a.href = q.download;
+      a.download = '';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('بدأ التحميل — هتلاقي الملف في التنزيلات');
     }
 
     // Short deep-link payload: m<tmdbId> for movies, t<tmdbId>[s..e..] for series.
