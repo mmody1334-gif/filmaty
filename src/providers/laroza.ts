@@ -6,8 +6,14 @@ export class LarozaProvider implements Provider {
   label = "لاروزا";
   kinds: MediaKind[] = ["movie", "series"];
 
-  private baseUrls = ["https://laroza1.quest", "https://laroza1.site", "https://laroza.lol"];
-  private currentBase = "https://laroza1.quest";
+  // Live domain first: laroza1.quest/.site/.lol all 301-redirect (to
+  // laroza1.website, which 301s again), while laroza1.bond serves the
+  // search/details/play/download pages directly (verified 2026-11-16).
+  // The old bases made the provider silently return nothing from the
+  // Worker, so titles only Laroza had (e.g. VisionQuest S1E1's working
+  // copy) never resolved.
+  private baseUrls = ["https://laroza1.bond", "https://laroza1.website", "https://laroza1.quest", "https://laroza1.site", "https://laroza.lol"];
+  private currentBase = "https://laroza1.bond";
 
   private headers = {
     "User-Agent":
