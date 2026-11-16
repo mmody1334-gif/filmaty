@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فيلماتي 📺 وضع التلفزيون</title>
+  <!-- TV mode: watch-only. No pop-ups, no downloads, no bot, no new windows.
+       Entry is ONLY the "وضع التلفزيون" button in the main site header —
+       this page never auto-opens and never redirects anything to itself.
+       The phone remote works through the Worker: the TV shows a QR with a
+       session code, the phone scans it and POSTs play commands to
+       /api/tv-command, the TV polls that endpoint and plays them. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              red: '#e50914',
+              gold: '#f59e0b',
+              dark: '#0b0f19',
+              card: '#161e2e',
+              border: '#26334d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+    * { font-family: 'Cairo', system-ui, -apple-system, sans-serif; }
+    body { background-color: #0b0f19; color: #f8fafc; }
+    .glass { background: rgba(22, 30, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    /* Remote (D-pad) focus: a thick gold ring the user can see from the couch. */
+    .tv-focus { outline: none; }
+    .tv-focus:focus {
+      outline: 4px solid #f59e0b !important;
+      outline-offset: 3px;
+      border-radius: 1rem;
+      box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.25);
+    }
+    .tv-card:focus { transform: scale(1.04); }
+    .tv-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-12">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 glass border-b border-brand-border px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">🎬</span>
+      <h1 class="text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300">
+        فيلماتي <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-500/40">📺 وضع التلفزيون</span>
+      </h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="tvPairBtn" class="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500 hover:text-white transition">
+        <span>📱 ربط الموبايل</span>
+      </button>
+      <a href="../" class="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-700/40 text-slate-200 border border-white/10 text-xs font-bold hover:bg-slate-700 transition">
+        <span>🌐 الموقع العادي</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Phone pairing: shown as soon as the TV page opens. Scan the QR with
+       the phone camera — the phone becomes the remote (search + pick, the
+       TV plays). The Start button is also the fullscreen gesture: the TV
+       browser only allows fullscreen from a real tap, so entering it here
+       keeps the whole session fullscreen, including films picked later
+       from the phone. -->
+  <div id="tvPairOverlay" class="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-4">
+    <div class="max-w-lg w-full text-center space-y-5">
+      <p class="text-4xl">📱📺</p>
+      <h2 class="text-2xl md:text-3xl font-black text-white">شغّل من موبايلك</h2>
+      <p class="text-slate-300 text-base font-semibold">امسح الكود بكاميرا الموبايل — الموبايل يبقى الريموت: تبحث وتختار، والفيلم يشتغل هنا على التلفزيون فول سكرين بأعلى جودة.</p>
+      <div id="tvQrBox" class="mx-auto w-64 h-64 bg-white rounded-3xl p-3 flex items-center justify-center overflow-hidden"></div>
+      <p class="text-slate-400 text-sm font-bold">أو افتح من الموبايل: <span id="tvRemoteUrl" class="text-amber-300 select-all" dir="ltr"></span></p>
+      <p class="text-slate-400 text-sm font-bold">الكود: <span id="tvSessionCode" class="text-3xl font-black tracking-[0.3em] text-amber-400 select-all" dir="ltr"></span></p>
+      <button id="tvStartBtn" class="tv-focus px-8 py-4 rounded-2xl bg-red-600 text-white text-xl font-black hover:bg-red-500 transition">▶ ابدأ المشاهدة</button>
+      <div>
+        <button id="tvPairSkip" class="tv-focus text-slate-400 text-sm font-bold hover:text-white transition">تخطي — أتفرج بالريموت بس</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top tabs: the only navigation. No drawer, no menus that trap focus. -->
+  <nav class="px-4 pt-4 flex flex-wrap gap-2 items-center" aria-label="التصنيفات">
+    <button data-tab="home" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-red-600 text-white transition">🏠 الرئيسية</button>
+    <button data-tab="movie-ar" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🎬 أفلام عربي</button>
+    <button data-tab="movie-en" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🇺🇸 أفلام إنجليزي</button>
+    <button data-tab="tv-ar" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">📺 مسلسلات عربي</button>
+    <button data-tab="tv-en" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">🇺🇸 مسلسلات إنجليزي</button>
+    <button data-tab="top" class="tv-tab tv-focus px-5 py-3 rounded-2xl text-base font-extrabold bg-brand-card text-slate-300 border border-brand-border transition">⭐ الأعلى تقييمًا</button>
+  </nav>
+
+  <!-- Search: one big field; the TV on-screen keyboard types into it. -->
+  <div class="px-4 pt-4">
+    <form id="tvSearchForm" class="flex gap-2">
+      <input id="tvSearchInput" type="search" placeholder="🔍 ابحث عن فيلم أو مسلسل…" autocomplete="off"
+        class="tv-focus flex-1 min-w-0 px-5 py-3 rounded-2xl bg-brand-card border border-brand-border text-white text-lg font-bold placeholder:text-slate-500">
+      <button type="submit" class="tv-focus px-6 py-3 rounded-2xl bg-red-600 text-white text-lg font-extrabold transition">بحث</button>
+    </form>
+  </div>
+
+  <!-- Home sections / grid -->
+  <main class="px-4 pt-4 space-y-6">
+    <div id="tvHome" class="space-y-6"></div>
+    <div id="tvGridWrap" class="hidden">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="tvGridTitle" class="text-xl font-extrabold text-white"></h2>
+        <span id="tvGridCount" class="text-sm text-slate-400 font-bold"></span>
+      </div>
+      <div id="tvGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+    </div>
+    <p class="text-center text-slate-500 text-xs font-semibold pt-2">التنقّل بالأسهم من الريموت • OK للاختيار • رجوع للخروج</p>
+  </main>
+
+  <!-- Details + player overlay: everything inline, same page, no pop-ups. -->
+  <div id="tvOverlay" class="fixed inset-0 z-50 bg-black/95 overflow-y-auto hidden" role="dialog" aria-modal="true">
+    <div class="max-w-6xl mx-auto px-4 py-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-extrabold text-white">التفاصيل</h2>
+        <button id="tvClose" class="tv-focus w-12 h-12 rounded-full bg-slate-800 text-white text-xl font-bold flex items-center justify-center hover:bg-red-600 transition" aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="flex flex-col md:flex-row gap-5">
+        <img id="tvPoster" src="" alt="" class="w-48 md:w-64 rounded-2xl border border-brand-border object-cover self-start">
+        <div class="flex-1 space-y-3">
+          <h3 id="tvTitle" class="text-2xl md:text-3xl font-black text-white"></h3>
+          <div class="flex flex-wrap gap-2 text-sm font-bold">
+            <span id="tvRating" class="px-3 py-1 rounded-xl bg-black/60 text-amber-400 border border-amber-500/20"></span>
+            <span id="tvYear" class="px-3 py-1 rounded-xl bg-black/60 text-slate-300 border border-white/10"></span>
+            <span id="tvKind" class="px-3 py-1 rounded-xl bg-black/60 text-slate-300 border border-white/10"></span>
+          </div>
+          <p id="tvStory" class="text-slate-300 text-base leading-relaxed"></p>
+          <div id="tvSeriesControls" class="hidden space-y-3">
+            <div>
+              <p class="text-sm font-extrabold text-slate-400 mb-2">الموسم</p>
+              <div id="tvSeasons" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div>
+              <p class="text-sm font-extrabold text-slate-400 mb-2">الحلقة</p>
+              <div id="tvEpisodes" class="flex flex-wrap gap-2 max-h-44 overflow-y-auto scrollbar-hide"></div>
+            </div>
+          </div>
+          <button id="tvPlay" class="tv-focus px-8 py-4 rounded-2xl bg-red-600 text-white text-xl font-black hover:bg-red-500 transition">▶ تشغيل</button>
+        </div>
+      </div>
+
+      <!-- Server + quality, inline. Native direct servers first; the only
+           embed offered here is the sandboxed one. No unsandboxed server
+           is ever listed on this page, so nothing can open a pop-up. -->
+      <div id="tvServerWrap" class="hidden space-y-3">
+        <div>
+          <p class="text-sm font-extrabold text-slate-400 mb-2">السيرفر</p>
+          <div id="tvServers" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div>
+          <p class="text-sm font-extrabold text-slate-400 mb-2">الجودة</p>
+          <div id="tvQualities" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Player -->
+      <div id="tvPlayerWrap" class="hidden">
+        <p id="tvPlayerStatus" class="hidden text-center py-3 text-amber-300 text-sm font-bold"></p>
+        <div class="relative aspect-video bg-black rounded-2xl overflow-hidden border border-brand-border">
+          <video id="tvVideo" class="w-full h-full hidden" controls playsinline preload="none"></video>
+          <iframe id="tvFrame" class="w-full h-full hidden" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
+    const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+    const TMDB_BASE = 'https://api.themoviedb.org/3';
+    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+    // Sandbox flags for the embed iframe: scripts + same-origin so the
+    // player can run, but NO allow-popups / allow-top-navigation.
+    const EMBED_SANDBOX = 'allow-same-origin allow-scripts allow-presentation allow-forms';
+
+    let currentItem = null;
+    let selectedSeason = 1;
+    let selectedEpisode = 1;
+    let currentServers = null;
+    let selectedServerIdx = 0;
+    let selectedQualityIdx = 0;
+    let nativeActive = false;
+    let nativePlayTimer = null;
+    let overlayOpen = false;
+
+    const tvHome = document.getElementById('tvHome');
+    const tvGridWrap = document.getElementById('tvGridWrap');
+    const tvGrid = document.getElementById('tvGrid');
+    const tvGridTitle = document.getElementById('tvGridTitle');
+    const tvGridCount = document.getElementById('tvGridCount');
+    const overlay = document.getElementById('tvOverlay');
+    const tvVideo = document.getElementById('tvVideo');
+    const tvFrame = document.getElementById('tvFrame');
+    const tvPlayerStatus = document.getElementById('tvPlayerStatus');
+
+    // ---------- Phone pairing (QR + polling) ----------
+    // One random 6-char session per TV load, from the same unambiguous
+    // alphabet as the bot codes. The phone scans the QR, opens the remote
+    // page, and every pick is a POST to /api/tv-command; this page polls
+    // that endpoint every 10s and plays the newest command it hasn't
+    // applied yet. The GET is not rate-limited server-side (see
+    // src/index.ts), so polling can run all evening.
+    const TV_REMOTE_BASE = 'https://mmody1334-gif.github.io/filmaty/Tv/remote/';
+    const SESSION_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    function newSessionCode() {
+      let code = '';
+      for (let i = 0; i < 6; i++) code += SESSION_ALPHABET[Math.floor(Math.random() * SESSION_ALPHABET.length)];
+      return code;
+    }
+    const tvSession = newSessionCode();
+    const tvRemoteUrl = `${TV_REMOTE_BASE}?s=${tvSession}`;
+    let lastAppliedCmdId = null;
+    let pollTimer = null;
+
+    function renderPairing() {
+      document.getElementById('tvSessionCode').innerText = tvSession;
+      document.getElementById('tvRemoteUrl').innerText = tvRemoteUrl;
+      const box = document.getElementById('tvQrBox');
+      try {
+        if (window.qrcode) {
+          const qr = qrcode(0, 'M');
+          qr.addData(tvRemoteUrl);
+          qr.make();
+          box.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+          box.querySelector('svg').setAttribute('width', '100%');
+          box.querySelector('svg').setAttribute('height', '100%');
+        } else {
+          box.innerHTML = '<p class="text-slate-800 text-base font-bold px-4">تعذر رسم الكود — افتح الرابط من الموبايل</p>';
+        }
+      } catch (e) {
+        box.innerHTML = '<p class="text-slate-800 text-base font-bold px-4">تعذر رسم الكود — افتح الرابط من الموبايل</p>';
+      }
+    }
+
+    function openPairOverlay() {
+      document.getElementById('tvPairOverlay').classList.remove('hidden');
+      focusEl(document.getElementById('tvStartBtn'));
+    }
+    function closePairOverlay() {
+      document.getElementById('tvPairOverlay').classList.add('hidden');
+    }
+    document.getElementById('tvPairBtn').addEventListener('click', openPairOverlay);
+    document.getElementById('tvPairSkip').addEventListener('click', closePairOverlay);
+    document.getElementById('tvStartBtn').addEventListener('click', () => {
+      enterFullscreen();
+      closePairOverlay();
+      focusFirstCard();
+    });
+
+    function focusFirstCard() {
+      const first = focusables()[0];
+      if (first) focusEl(first);
+    }
+
+    async function pollRemoteCommands() {
+      try {
+        const res = await fetch(`${API_BASE}/api/tv-command?session=${tvSession}`);
+        const data = await res.json().catch(() => null);
+        if (!data || !data.ok || !data.command) return;
+        if (data.command.id === lastAppliedCmdId) return;
+        lastAppliedCmdId = data.command.id;
+        applyRemoteCommand(data.command);
+      } catch (e) {
+        // Poll failure is not fatal: the next tick retries.
+      }
+    }
+
+    async function applyRemoteCommand(cmd) {
+      if (cmd.action === 'toggle') {
+        if (!tvVideo.classList.contains('hidden')) {
+          if (tvVideo.paused) { tvVideo.play().catch(() => {}); } else { tvVideo.pause(); }
+        }
+        return;
+      }
+      if (cmd.action === 'close') {
+        closeOverlay();
+        return;
+      }
+      if (cmd.action === 'play' && cmd.type && cmd.tmdbId) {
+        await openDetails(cmd.tmdbId, cmd.type, true, cmd.season, cmd.episode);
+      }
+    }
+
+    // ---------- D-pad / remote navigation ----------
+    function focusables() {
+      // While an overlay is open, the remote only moves inside it —
+      // never to the cards hidden behind it.
+      const pairOverlay = document.getElementById('tvPairOverlay');
+      const scope = !pairOverlay.classList.contains('hidden')
+        ? pairOverlay
+        : overlayOpen ? overlay : document;
+      return [...scope.querySelectorAll('.tv-focus')].filter((el) => el.offsetParent !== null && !el.disabled);
+    }
+    function focusEl(el) {
+      if (!el) return;
+      el.focus({ preventScroll: false });
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    document.addEventListener('keydown', (e) => {
+      const active = document.activeElement;
+      const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+      // While typing in the search box, arrows move the caret, not focus.
+      if (typing) {
+        if (e.key === 'Escape') { active.blur(); }
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (active && active.classList.contains('tv-focus')) { e.preventDefault(); active.click(); }
+        return;
+      }
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        const pairOverlay = document.getElementById('tvPairOverlay');
+        if (!pairOverlay.classList.contains('hidden')) { e.preventDefault(); closePairOverlay(); return; }
+        if (overlayOpen) { e.preventDefault(); closeOverlay(); }
+        return;
+      }
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      const list = focusables();
+      if (!list.length) return;
+      if (!list.includes(active)) { e.preventDefault(); focusEl(list[0]); return; }
+      const r = active.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      let next = null;
+      if (e.key === 'ArrowLeft') {
+        // RTL: visually left is the next item in DOM order.
+        next = list[list.indexOf(active) + 1] || null;
+      } else if (e.key === 'ArrowRight') {
+        next = list[list.indexOf(active) - 1] || null;
+      } else {
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        const cands = list.filter((el) => {
+          const b = el.getBoundingClientRect();
+          return dir === 1 ? b.top > r.top + 4 : b.bottom < r.bottom - 4;
+        });
+        cands.sort((a, b) => {
+          const ab = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
+          const da = Math.abs((ab.left + ab.width / 2) - cx) + Math.abs((ab.top + ab.height / 2) - cy) * 2;
+          const db = Math.abs((bb.left + bb.width / 2) - cx) + Math.abs((bb.top + bb.height / 2) - cy) * 2;
+          return da - db;
+        });
+        next = cands[0] || null;
+      }
+      if (next) { e.preventDefault(); focusEl(next); }
+    });
+
+    // ---------- Lists ----------
+    function showHomeView() {
+      tvGridWrap.classList.add('hidden');
+      tvHome.classList.remove('hidden');
+    }
+    function showGridView() {
+      tvHome.classList.add('hidden');
+      tvGridWrap.classList.remove('hidden');
+    }
+    function cardHtml(item) {
+      const title = item.title || item.name || 'بدون عنوان';
+      const date = item.release_date || item.first_air_date || '';
+      const year = date ? date.slice(0, 4) : '';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
+      const poster = item.poster || (item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster');
+      const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+      const type = item.media_type || (item.name ? 'tv' : 'movie');
+      return `
+        <div class="tv-card tv-focus group cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60" tabindex="0" role="button" data-id="${item.id}" data-type="${type}">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover">
+            <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 text-amber-400 text-sm font-extrabold border border-amber-500/20">⭐ ${rating}</span>
+            <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 text-slate-300 text-xs font-bold border border-white/10">${kind}</span>
+          </div>
+          <div class="p-3">
+            <h4 class="text-base font-bold text-white truncate">${title}</h4>
+            <div class="flex items-center justify-between mt-1 text-sm text-slate-400 font-medium">
+              <span>${year}</span>
+              <span class="text-red-400 font-semibold">عرض ◀</span>
+            </div>
+          </div>
+        </div>`;
+    }
+    function bindCards(root) {
+      root.querySelectorAll('.tv-card').forEach((card) => {
+        // Tap a film: it plays by itself, fullscreen, best quality.
+        // Tap a series: the episode picker opens first (an episode tap
+        // then plays the same way).
+        const open = () => openDetails(
+          Number(card.dataset.id),
+          card.dataset.type,
+          card.dataset.type === 'movie',
+        );
+        card.addEventListener('click', open);
+      });
+    }
+    function sectionHtml(title, items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h2 class="text-xl font-extrabold text-white mb-3">${title}</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            ${items.map(cardHtml).join('')}
+          </div>
+        </section>`;
+    }
+
+    async function loadHome() {
+      showHomeView();
+      tvHome.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
+      try {
+        const res = await fetch(`${API_BASE}/api/home`);
+        const data = await res.json();
+        tvHome.innerHTML =
+          sectionHtml('🔥 الأكثر مشاهدة', data.mostWatched || []) +
+          sectionHtml('⭐ الأعلى تقييمًا', data.topRated || []);
+        bindCards(tvHome);
+      } catch (e) {
+        tvHome.innerHTML = '<div class="text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
+      }
+    }
+
+    async function loadBrowse(params, title) {
+      showGridView();
+      tvGridTitle.innerText = title;
+      tvGrid.innerHTML = Array(10).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>').join('');
+      try {
+        const qs = new URLSearchParams(params);
+        const res = await fetch(`${API_BASE}/api/browse?${qs.toString()}`);
+        const data = await res.json();
+        const items = data.results || [];
+        tvGridCount.innerText = `${items.length} عمل`;
+        if (!items.length) {
+          tvGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-base font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
+          return;
+        }
+        tvGrid.innerHTML = items.map(cardHtml).join('');
+        bindCards(tvGrid);
+      } catch (e) {
+        tvGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
+      }
+    }
+
+    async function runSearch(query) {
+      showGridView();
+      tvGridTitle.innerText = `🔍 نتائج البحث: ${query}`;
+      tvGrid.innerHTML = Array(10).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>').join('');
+      try {
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        const items = (data.results || []).filter((i) => !i.providerUrl);
+        tvGridCount.innerText = `${items.length} عمل`;
+        if (!items.length) {
+          tvGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-base font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
+          return;
+        }
+        tvGrid.innerHTML = items.map(cardHtml).join('');
+        bindCards(tvGrid);
+      } catch (e) {
+        tvGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
+      }
+    }
+
+    // Top tabs
+    document.querySelectorAll('.tv-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tv-tab').forEach((b) => {
+          b.classList.remove('bg-red-600', 'text-white');
+          b.classList.add('bg-brand-card', 'text-slate-300');
+        });
+        btn.classList.remove('bg-brand-card', 'text-slate-300');
+        btn.classList.add('bg-red-600', 'text-white');
+        document.getElementById('tvSearchInput').value = '';
+        const tab = btn.dataset.tab;
+        if (tab === 'home') loadHome();
+        else if (tab === 'movie-ar') loadBrowse({ type: 'movie', lang: 'ar', sort: 'popular', page: '1' }, '🎬 أفلام عربي');
+        else if (tab === 'movie-en') loadBrowse({ type: 'movie', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 أفلام إنجليزي (أمريكي)');
+        else if (tab === 'tv-ar') loadBrowse({ type: 'tv', lang: 'ar', sort: 'popular', page: '1' }, '📺 مسلسلات عربي');
+        else if (tab === 'tv-en') loadBrowse({ type: 'tv', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 مسلسلات إنجليزي (أمريكي)');
+        else if (tab === 'top') loadBrowse({ sort: 'top_rated', page: '1' }, '⭐ الأعلى تقييمًا');
+      });
+    });
+
+    document.getElementById('tvSearchForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = document.getElementById('tvSearchInput').value.trim();
+      if (q) runSearch(q);
+    });
+
+    // ---------- Details + player ----------
+    // autoplay: when true (tap on a film, or a command from the phone),
+    // the film starts by itself at the best quality, fullscreen — no
+    // extra Play tap. For series, autoplay needs a season+episode (the
+    // phone sends them; on the TV the episode buttons call playBest).
+    async function openDetails(id, mediaType, autoplay = false, season = null, episode = null) {
+      try {
+        const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}?api_key=${TMDB_KEY}&language=ar`);
+        currentItem = await res.json();
+        currentItem.media_type = mediaType;
+        const title = currentItem.title || currentItem.name;
+        const date = currentItem.release_date || currentItem.first_air_date || '';
+        const year = date ? date.slice(0, 4) : '';
+        const rating = currentItem.vote_average ? currentItem.vote_average.toFixed(1) : '8.0';
+        const poster = currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=Poster';
+        document.getElementById('tvPoster').src = poster;
+        document.getElementById('tvTitle').innerText = title;
+        document.getElementById('tvRating').innerText = `⭐ ${rating}`;
+        document.getElementById('tvYear').innerText = year;
+        document.getElementById('tvKind').innerText = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+        document.getElementById('tvStory').innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
+        resetPlayer();
+        document.getElementById('tvPlayerWrap').classList.add('hidden');
+        document.getElementById('tvServerWrap').classList.add('hidden');
+        if (mediaType === 'tv') {
+          document.getElementById('tvSeriesControls').classList.remove('hidden');
+          setupSeasons(currentItem, season, episode);
+        } else {
+          document.getElementById('tvSeriesControls').classList.add('hidden');
+          selectedSeason = 1;
+          selectedEpisode = 1;
+        }
+        overlay.classList.remove('hidden');
+        overlayOpen = true;
+        document.body.classList.add('overflow-hidden');
+        overlay.scrollTop = 0;
+        if (autoplay) {
+          playBest();
+        } else {
+          focusEl(document.getElementById('tvPlay'));
+        }
+      } catch (err) {
+        alert('تعذر فتح تفاصيل العمل.');
+      }
+    }
+
+    function setupSeasons(tv, wantSeason = null, wantEpisode = null) {
+      const seasons = (tv.seasons || []).filter((s) => s.season_number > 0);
+      selectedSeason = (wantSeason && seasons.some((s) => s.season_number === wantSeason))
+        ? wantSeason
+        : (seasons[0]?.season_number || 1);
+      document.getElementById('tvSeasons').innerHTML = seasons.map((s) => `
+        <button data-season="${s.season_number}" class="tv-season tv-focus ${s.season_number === selectedSeason ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-5 py-3 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">الموسم ${s.season_number}</button>
+      `).join('');
+      const current = seasons.find((s) => s.season_number === selectedSeason);
+      renderEpisodes(current?.episode_count || 10, wantEpisode);
+      document.querySelectorAll('.tv-season').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tv-season').forEach((b) => {
+            b.classList.remove('bg-red-600', 'text-white');
+            b.classList.add('bg-slate-800', 'text-slate-300');
+          });
+          btn.classList.remove('bg-slate-800', 'text-slate-300');
+          btn.classList.add('bg-red-600', 'text-white');
+          selectedSeason = Number(btn.dataset.season);
+          const s = seasons.find((x) => x.season_number === selectedSeason);
+          renderEpisodes(s?.episode_count || 10);
+          resetPlayer();
+          document.getElementById('tvPlayerWrap').classList.add('hidden');
+          document.getElementById('tvServerWrap').classList.add('hidden');
+        });
+      });
+    }
+
+    function renderEpisodes(count, wantEpisode = 1) {
+      selectedEpisode = wantEpisode && wantEpisode >= 1 && wantEpisode <= count ? wantEpisode : 1;
+      document.getElementById('tvEpisodes').innerHTML = Array.from({ length: count }, (_, i) => i + 1).map((epNum) => `
+        <button data-ep="${epNum}" class="tv-ep tv-focus ${epNum === selectedEpisode ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-4 py-2.5 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">حلقة ${epNum}</button>
+      `).join('');
+      document.querySelectorAll('.tv-ep').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tv-ep').forEach((b) => {
+            b.classList.remove('bg-red-600', 'text-white');
+            b.classList.add('bg-slate-800', 'text-slate-300');
+          });
+          btn.classList.remove('bg-slate-800', 'text-slate-300');
+          btn.classList.add('bg-red-600', 'text-white');
+          selectedEpisode = Number(btn.dataset.ep);
+          // Tap an episode: it plays by itself, fullscreen, best quality.
+          playBest();
+        });
+      });
+    }
+
+    function closeOverlay() {
+      resetPlayer();
+      overlay.classList.add('hidden');
+      overlayOpen = false;
+      document.body.classList.remove('overflow-hidden');
+    }
+    document.getElementById('tvClose').addEventListener('click', closeOverlay);
+
+    async function fetchResolve(type, id, s, e) {
+      const params = new URLSearchParams({ type, id: String(id) });
+      if (s) params.set('s', String(s));
+      if (e) params.set('e', String(e));
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      try {
+        const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
+        return await res.json().catch(() => null);
+      } catch (err) {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function showPlayerStatus(msg) {
+      tvPlayerStatus.innerText = msg;
+      tvPlayerStatus.classList.remove('hidden');
+    }
+    function hidePlayerStatus() {
+      tvPlayerStatus.classList.add('hidden');
+    }
+    function resetPlayer() {
+      nativeActive = false;
+      clearNativePlayTimeout();
+      tvVideo.pause();
+      tvVideo.removeAttribute('src');
+      tvVideo.load();
+      tvVideo.classList.add('hidden');
+      tvFrame.src = '';
+      tvFrame.classList.remove('hidden');
+      hidePlayerStatus();
+    }
+    function clearNativePlayTimeout() {
+      if (nativePlayTimer) { clearTimeout(nativePlayTimer); nativePlayTimer = null; }
+    }
+    function armNativePlayTimeout() {
+      clearNativePlayTimeout();
+      nativePlayTimer = setTimeout(() => {
+        if (!nativeActive) return;
+        if (tvVideo.readyState < 2) {
+          showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
+          tryNextQualityOrFallback();
+        }
+      }, 45000);
+    }
+    tvVideo.addEventListener('error', () => {
+      if (!nativeActive) return;
+      showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري تجربة مصدر آخر...');
+      tryNextQualityOrFallback();
+    });
+    tvVideo.addEventListener('playing', clearNativePlayTimeout);
+
+    function selectedServer() {
+      return currentServers ? currentServers[selectedServerIdx] : null;
+    }
+    function selectedQuality() {
+      const server = selectedServer();
+      return server ? server.qualities[selectedQualityIdx] : null;
+    }
+    function isEmbedServer(server) {
+      return server && server.name === 'embedwave';
+    }
+
+    function renderServerControls() {
+      const wrap = document.getElementById('tvServerWrap');
+      const serversRow = document.getElementById('tvServers');
+      const qualitiesRow = document.getElementById('tvQualities');
+      if (!currentServers || currentServers.length === 0) {
+        wrap.classList.add('hidden');
+        return;
+      }
+      wrap.classList.remove('hidden');
+      serversRow.innerHTML = currentServers.map((s, i) => `
+        <button data-server="${i}" class="tv-server tv-focus ${i === selectedServerIdx ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-5 py-3 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${s.name}</button>
+      `).join('');
+      const server = selectedServer();
+      qualitiesRow.innerHTML = (server ? server.qualities : []).map((q, i) => `
+        <button data-quality="${i}" class="tv-quality tv-focus ${i === selectedQualityIdx ? 'bg-amber-500 text-black' : 'bg-slate-800 text-slate-300'} rounded-xl px-5 py-3 text-base font-bold border border-brand-border hover:bg-amber-500 hover:text-black transition">${q.quality}</button>
+      `).join('');
+      serversRow.querySelectorAll('.tv-server').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          selectedServerIdx = Number(btn.dataset.server);
+          selectedQualityIdx = 0;
+          renderServerControls();
+          playActiveStream();
+        });
+      });
+      qualitiesRow.querySelectorAll('.tv-quality').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          selectedQualityIdx = Number(btn.dataset.quality);
+          renderServerControls();
+          playActiveStream();
+        });
+      });
+    }
+
+    function tryNextQualityOrFallback() {
+      const server = selectedServer();
+      if (server && selectedQualityIdx + 1 < server.qualities.length) {
+        selectedQualityIdx++;
+        renderServerControls();
+        playActiveStream();
+        return;
+      }
+      if (currentServers && selectedServerIdx + 1 < currentServers.length) {
+        selectedServerIdx++;
+        selectedQualityIdx = 0;
+        renderServerControls();
+        playActiveStream();
+        return;
+      }
+      showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
+    }
+
+    function playActiveStream() {
+      const server = selectedServer();
+      const quality = selectedQuality();
+      if (!server || !quality) return;
+      resetPlayer();
+      document.getElementById('tvPlayerWrap').classList.remove('hidden');
+      hidePlayerStatus();
+      if (isEmbedServer(server)) {
+        tvFrame.setAttribute('sandbox', EMBED_SANDBOX);
+        tvFrame.src = quality.stream;
+        tvFrame.classList.remove('hidden');
+      } else {
+        nativeActive = true;
+        tvVideo.src = quality.stream;
+        tvVideo.classList.remove('hidden');
+        tvVideo.play().catch(() => {});
+        armNativePlayTimeout();
+      }
+    }
+
+    // Fullscreen: only a real tap may open it (browser rule), so the
+    // Start button enters it for the whole session and every play
+    // retries it best-effort. If it is refused (e.g. a command that
+    // arrived from the phone with no tap on the TV yet), the film still
+    // plays in the big player — nothing breaks.
+    function enterFullscreen() {
+      const el = document.getElementById('tvPlayerWrap');
+      try {
+        const target = document.fullscreenElement ? el : document.documentElement;
+        if (target.requestFullscreen) {
+          const p = target.requestFullscreen();
+          if (p && p.catch) p.catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    // Play the current title/episode at the best quality: first server,
+    // first quality (the resolver already orders both best-first), then
+    // fullscreen. Used by the Play button, by a film tap, by an episode
+    // tap, and by a command from the phone.
+    async function playBest() {
+      if (!currentItem) return;
+      const btn = document.getElementById('tvPlay');
+      btn.innerText = '⏳ جاري تجهيز المشغّل...';
+      btn.disabled = true;
+      const type = currentItem.media_type;
+      const data = await fetchResolve(type, currentItem.id, type === 'tv' ? selectedSeason : 0, type === 'tv' ? selectedEpisode : 0);
+      btn.innerText = '▶ تشغيل';
+      btn.disabled = false;
+      if (!data || !data.servers || data.servers.length === 0) {
+        showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
+        document.getElementById('tvPlayerWrap').classList.remove('hidden');
+        return;
+      }
+      // TV page: only direct native servers + the sandboxed embed. A
+      // server is native when its qualities carry a download link; the
+      // sandboxed embed is allowed by name. Anything else in the
+      // response is dropped before it can be picked, so no unsandboxed
+      // server can ever appear here and open a pop-up.
+      currentServers = data.servers.filter(
+        (s) => s.name === 'embedwave' || (s.qualities && s.qualities.some((q) => q.download)),
+      );
+      if (!currentServers.length) {
+        showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
+        document.getElementById('tvPlayerWrap').classList.remove('hidden');
+        return;
+      }
+      selectedServerIdx = 0;
+      selectedQualityIdx = 0;
+      renderServerControls();
+      playActiveStream();
+      enterFullscreen();
+      try {
+        fetch(`${API_BASE}/api/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, id: currentItem.id }),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    document.getElementById('tvPlay').addEventListener('click', playBest);
+
+    renderPairing();
+    pollTimer = setInterval(pollRemoteCommands, 10000);
+    loadHome();
+  </script>
+</body>
+</html>
