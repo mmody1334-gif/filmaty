@@ -437,10 +437,11 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv4: after the Laroza timeout raise — the srv3: entries
-  // cached before it can hold a resolve that never got a fair chance at
-  // Laroza (its fetches were cut off at 5-6s) and must not be reused.
-  const cacheKey = `srv4:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv5: after the Laroza episode-<select> fix — the srv4:
+  // entries cached before it can hold a resolve that never saw the
+  // full episode list (e.g. VisionQuest S1E4 cached as "no download"
+  // because only prev/next links were read) and must not be reused.
+  const cacheKey = `srv5:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
