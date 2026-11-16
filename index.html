@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b0f19">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <title>فيلماتي | سينما وأفلام ومسلسلات بجودة فائقة</title>
   <!-- Telegram WebApp JS -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -125,6 +128,8 @@
       />
       <span class="absolute right-4 top-3.5 text-slate-400 text-lg">🔍</span>
       <button id="clearSearch" class="hidden absolute left-3 top-3 text-slate-400 hover:text-white text-sm bg-slate-800 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
+      <!-- Search suggestions dropdown (stage E) -->
+      <div id="searchSuggest" class="hidden absolute right-0 left-0 top-full mt-2 bg-brand-card border border-brand-border rounded-2xl shadow-2xl z-40 overflow-hidden"></div>
     </div>
 
     <!-- Quick Filters -->
@@ -176,6 +181,14 @@
 
       <!-- Modal Content Body -->
       <div class="p-5 overflow-y-auto space-y-4">
+        <!-- Auto-next episode countdown (series only, native player) -->
+        <div id="autoNextBar" class="hidden items-center justify-between gap-2 rounded-xl bg-red-600/15 border border-red-500/30 px-3 py-2">
+          <span id="autoNextText" class="text-xs font-bold text-white">الحلقة التالية خلال 5 ثواني…</span>
+          <span class="flex gap-2 shrink-0">
+            <button id="btnAutoNextNow" class="px-3 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-bold">تشغيل الآن</button>
+            <button id="btnAutoNextCancel" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-[11px] font-bold border border-slate-700">إلغاء</button>
+          </span>
+        </div>
         <div class="flex gap-4">
           <img id="modalPoster" src="" alt="Poster" class="w-24 h-36 object-cover rounded-xl shadow-md border border-brand-border flex-shrink-0 bg-slate-900" />
           <div class="flex-1 min-w-0">
@@ -217,7 +230,7 @@
         <div class="pt-3 border-t border-brand-border space-y-2">
           <div class="grid grid-cols-2 gap-2">
             <button id="btnPlayInApp" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg shadow-red-900/30">
-              <span>▶️</span> <span>مشاهدة فورية</span>
+              <span>▶️</span> <span id="btnPlayInAppLabel">مشاهدة فورية</span>
             </button>
             <button id="btnDirectDownload" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg shadow-emerald-900/30">
               <span>⬇️</span> <span>تحميل مباشر (.mp4)</span>
@@ -227,6 +240,34 @@
           <div id="downloadPicker" class="hidden space-y-2 pt-1">
             <label class="text-xs font-bold text-slate-300 block">اختر جودة التحميل:</label>
             <div id="downloadQualitiesRow" class="flex flex-wrap gap-2"></div>
+          </div>
+          <!-- Whole-season download (series only) -->
+          <button id="btnDownloadSeason" class="hidden w-full py-2.5 px-4 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition">⬇️ تحميل الموسم كامل</button>
+          <div id="seasonDownloadPicker" class="hidden space-y-2 pt-1">
+            <label class="text-xs font-bold text-slate-300 block">اختر جودة تحميل الموسم:</label>
+            <div id="seasonDownloadQualitiesRow" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div id="seasonDownloadProgress" class="hidden space-y-1 pt-1 max-h-32 overflow-y-auto pr-1">
+            <label class="text-xs font-bold text-slate-300 block">تقدّم تحميل الموسم:</label>
+            <div id="seasonDownloadList" class="space-y-1"></div>
+          </div>
+          <!-- Restart from the beginning (shown only when a saved position exists) -->
+          <button id="btnRestartPlay" class="hidden w-full py-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold text-[11px] hover:text-white transition">↺ تشغيل من الأول</button>
+          <!-- My list toggle -->
+          <button id="btnMyList" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 hover:border-red-500 transition">🤍 أضف لقائمتي</button>
+          <!-- Trailer (shown only when TMDB has one) -->
+          <button id="btnTrailer" class="hidden w-full py-2.5 px-4 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition">🎬 مشاهدة التريلر</button>
+          <!-- Report a problem -->
+          <button id="btnReport" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 hover:border-amber-500 hover:text-white transition">⚠️ بلّغ عن مشكلة في التشغيل</button>
+          <div id="reportPicker" class="hidden space-y-2 pt-1">
+            <label class="text-xs font-bold text-slate-300 block">إيه المشكلة؟</label>
+            <div class="flex flex-wrap gap-2">
+              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="المشغّل مش شغال">المشغّل مش شغال</button>
+              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="الفيديو بيقطّع أو الجودة ضعيفة">الفيديو بيقطّع</button>
+              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="الصوت أو الترجمة فيها مشكلة">الصوت / الترجمة</button>
+              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="مشكلة تانية">مشكلة تانية</button>
+            </div>
+            <p class="text-[11px] text-slate-500">هيفتح تيليجرام بالنص جاهز — ابعته للبوت.</p>
           </div>
           <button id="btnOpenInBot" class="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition">
             <span>🚀</span> <span>طلب إرسال الفيديو عبر بوت التليجرام</span>
@@ -249,6 +290,12 @@
             <button id="btnBotDeepLink" class="text-[11px] text-slate-500 underline">أو: فتح البوت برابط مباشر للفيلم</button>
           </div>
         </div>
+
+        <!-- Similar titles (stage D) -->
+        <div id="similarWrap" class="hidden pt-3 border-t border-brand-border">
+          <h4 class="text-sm font-extrabold text-white mb-2">🎬 أعمال شبه ده</h4>
+          <div id="similarRow" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -270,6 +317,99 @@
     let currentServers = null;
     let selectedServerIdx = 0;
     let selectedQualityIdx = 0;
+
+    // Continue watching (stage A): resume positions + watched marks,
+    // kept in localStorage on this device only (no accounts). The TV
+    // page uses the exact same keys and the same shape.
+    const PROGRESS_KEY = 'filmaty:progress:v1';
+    const WATCHED_KEY = 'filmaty:watched:v1';
+    const MAX_PROGRESS_ITEMS = 20;
+    function progressKey(type, id, s, e) {
+      return `${type}:${id}:${s || 0}:${e || 0}`;
+    }
+    function readProgressStore() {
+      try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function readWatchedStore() {
+      try { return JSON.parse(localStorage.getItem(WATCHED_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function getProgress(type, id, s, e) {
+      return readProgressStore()[progressKey(type, id, s, e)] || null;
+    }
+    function isWatched(type, id, s, e) {
+      return !!readWatchedStore()[progressKey(type, id, s, e)];
+    }
+    function saveProgressEntry(type, id, s, e, t, d, meta) {
+      if (!Number.isFinite(t) || t < 5) return;
+      const store = readProgressStore();
+      const key = progressKey(type, id, s, e);
+      store[key] = {
+        type, id, s: s || 0, e: e || 0,
+        t: Math.floor(t), d: Number.isFinite(d) && d > 0 ? Math.floor(d) : 0,
+        updated: Date.now(), title: meta.title || '', poster: meta.poster || '', kind: meta.kind || '',
+      };
+      const entries = Object.values(store).sort((a, b) => b.updated - a.updated).slice(0, MAX_PROGRESS_ITEMS);
+      const capped = {};
+      entries.forEach((en) => { capped[progressKey(en.type, en.id, en.s, en.e)] = en; });
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(capped)); } catch (e) {}
+    }
+    function clearProgressEntry(type, id, s, e) {
+      const store = readProgressStore();
+      delete store[progressKey(type, id, s, e)];
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(store)); } catch (e) {}
+    }
+    function markWatchedEntry(type, id, s, e) {
+      const store = readWatchedStore();
+      store[progressKey(type, id, s, e)] = Date.now();
+      const keys = Object.keys(store).sort((a, b) => store[b] - store[a]).slice(0, 200);
+      const capped = {};
+      keys.forEach((k) => { capped[k] = store[k]; });
+      try { localStorage.setItem(WATCHED_KEY, JSON.stringify(capped)); } catch (e) {}
+      clearProgressEntry(type, id, s, e);
+    }
+    function formatTime(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+    }
+    function getContinueItems() {
+      return Object.values(readProgressStore()).sort((a, b) => b.updated - a.updated).slice(0, 10);
+    }
+
+    // My list (stage B): titles the user saved to watch later, kept in
+    // localStorage on this device only (no accounts). Same keys on the
+    // TV page.
+    const MYLIST_KEY = 'filmaty:mylist:v1';
+    const MAX_MYLIST_ITEMS = 50;
+    function myListKey(type, id) {
+      return `${type}:${id}`;
+    }
+    function readMyListStore() {
+      try { return JSON.parse(localStorage.getItem(MYLIST_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function isInMyList(type, id) {
+      return !!readMyListStore()[myListKey(type, id)];
+    }
+    function toggleMyList(type, id, meta) {
+      const store = readMyListStore();
+      const key = myListKey(type, id);
+      if (store[key]) {
+        delete store[key];
+        try { localStorage.setItem(MYLIST_KEY, JSON.stringify(store)); } catch (e) {}
+        return false;
+      }
+      store[key] = { type, id, title: meta.title || '', poster: meta.poster || '', kind: meta.kind || '', added: Date.now() };
+      const entries = Object.values(store).sort((a, b) => b.added - a.added).slice(0, MAX_MYLIST_ITEMS);
+      const capped = {};
+      entries.forEach((en) => { capped[myListKey(en.type, en.id)] = en; });
+      try { localStorage.setItem(MYLIST_KEY, JSON.stringify(capped)); } catch (e) {}
+      return true;
+    }
+    function getMyListItems() {
+      return Object.values(readMyListStore()).sort((a, b) => b.added - a.added);
+    }
 
     // Telegram Mini App initialization
     if (window.Telegram && window.Telegram.WebApp) {
@@ -327,9 +467,22 @@
       const sectionsEl = document.getElementById('homeSections');
       sectionsEl.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
       try {
-        const res = await fetch(`${API_BASE}/api/home`);
-        const data = await res.json();
-        homeData = { mostWatched: data.mostWatched || [], topRated: data.topRated || [] };
+        const [homeRes, airingRes, upcomingRes] = await Promise.all([
+          fetch(`${API_BASE}/api/home`),
+          fetch(`${TMDB_BASE}/tv/airing_today?api_key=${TMDB_KEY}&language=ar`).catch(() => null),
+          fetch(`${TMDB_BASE}/movie/upcoming?api_key=${TMDB_KEY}&language=ar`).catch(() => null),
+        ]);
+        const data = await homeRes.json();
+        // New episodes + coming soon (stage H): TMDB direct, each
+        // failure degrades to an empty row instead of breaking home.
+        const airing = airingRes ? await airingRes.json().catch(() => null) : null;
+        const upcoming = upcomingRes ? await upcomingRes.json().catch(() => null) : null;
+        homeData = {
+          mostWatched: data.mostWatched || [],
+          topRated: data.topRated || [],
+          newEpisodes: ((airing?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'tv' })),
+          upcoming: ((upcoming?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'movie' })),
+        };
         homeYearFilter = 'all';
         renderHomeSections();
       } catch (e) {
@@ -371,12 +524,16 @@
         ? '<div class="text-center py-12 text-slate-400 text-sm font-bold">لا توجد أعمال في هذه السنة.</div>'
         : '';
       sectionsEl.innerHTML = `
+        ${continueSectionHtml(getContinueItems())}
+        ${myListSectionHtml(getMyListItems())}
         <div class="flex flex-wrap gap-2 items-center">
           <span class="text-xs font-bold text-slate-400">السنة:</span>
           ${chips}
         </div>
         ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched)}
         ${homeSectionHtml('⭐ الأعلى تقييمًا', topRated)}
+        ${homeSectionHtml('🆕 حلقات جديدة', homeData.newEpisodes || [])}
+        ${homeSectionHtml('📅 قريبًا', homeData.upcoming || [])}
         ${emptyNote}
       `;
       sectionsEl.querySelectorAll('.home-year-chip').forEach((btn) => {
@@ -424,27 +581,206 @@
       `;
     }
 
+    // Continue watching row (stage A): personal, so it is NOT filtered
+    // by the year chips. Cards carry a progress bar and "أكمل من M:SS";
+    // tapping one opens the title at the saved season/episode and plays
+    // from the saved position.
+    function continueSectionHtml(items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h3 class="text-base font-extrabold text-white mb-3">▶ أكمل المشاهدة</h3>
+          <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            ${items.map(continueCardHtml).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function continueCardHtml(entry) {
+      const pct = entry.d > 0 ? Math.min(100, Math.round((entry.t / entry.d) * 100)) : 0;
+      const poster = entry.poster || 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+      const epLabel = entry.type === 'tv' ? ` • حلقة ${entry.e}` : '';
+      const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
+      return `
+        <div class="group cursor-pointer shrink-0 w-36 sm:w-40 bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 shadow-lg" onclick="openContinueEntry('${entry.type}', ${entry.id}, ${entry.s}, ${entry.e})">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+            <span class="absolute bottom-0 right-0 left-0 h-1.5 bg-black/60"><span class="block h-full bg-red-600" style="width:${pct}%"></span></span>
+          </div>
+          <div class="p-2.5">
+            <h4 class="text-xs font-bold text-white truncate">${title}${epLabel}</h4>
+            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+              <span>أكمل من ${formatTime(entry.t)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function openContinueEntry(type, id, s, e) {
+      await openDetails(id, type);
+      if (type === 'tv' && currentItem) {
+        const seasons = (currentItem.seasons || []).filter((x) => x.season_number > 0);
+        if (seasons.some((x) => x.season_number === s)) {
+          selectedSeason = s;
+          seasonSelect.value = String(s);
+          const season = seasons.find((x) => x.season_number === s);
+          renderEpisodes(season?.episode_count || 10);
+        }
+        selectedEpisode = e;
+        document.querySelectorAll('.ep-btn').forEach((b, i) => {
+          const on = i + 1 === e;
+          b.classList.toggle('bg-red-600', on);
+          b.classList.toggle('text-white', on);
+          b.classList.toggle('bg-slate-800', !on);
+          b.classList.toggle('text-slate-300', !on);
+        });
+        updateResumeButton();
+      }
+      const entry = currentResumeEntry();
+      pendingResume = entry ? entry.t : null;
+      playActiveStream();
+    }
+
+    // My list row (stage B): tapping a card opens its details.
+    function myListSectionHtml(items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h3 class="text-base font-extrabold text-white mb-3">❤️ قائمتي</h3>
+          <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            ${items.map(myListCardHtml).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function myListCardHtml(entry) {
+      const poster = entry.poster || 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+      const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
+      return `
+        <div class="group cursor-pointer shrink-0 w-36 sm:w-40 bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 shadow-lg" onclick="openDetails(${entry.id}, '${entry.type}')">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+          </div>
+          <div class="p-2.5">
+            <h4 class="text-xs font-bold text-white truncate">${title}</h4>
+            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+              <span>${entry.type === 'tv' ? 'مسلسل' : 'فيلم'}</span>
+              <span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // The My list button in the details modal: toggles the current title.
+    function updateMyListButton() {
+      const btn = document.getElementById('btnMyList');
+      if (!btn || !currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      btn.innerHTML = isInMyList(type, currentItem.id) ? '❤️ في قائمتي — إزالة' : '🤍 أضف لقائمتي';
+    }
+
+    // Search suggestions + recent searches (stage E): as the user types,
+    // the top 6 live results appear under the search box; tapping one
+    // opens its details. Focusing an empty box shows recent searches
+    // (localStorage, newest first, max 8).
+    const RECENT_SEARCHES_KEY = 'filmaty:recent-searches:v1';
+    const searchSuggest = document.getElementById('searchSuggest');
+    let suggestTimer = null;
+    let suggestSeq = 0;
+    function readRecentSearches() {
+      try { return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function saveRecentSearch(q) {
+      q = q.trim();
+      if (!q) return;
+      const list = readRecentSearches().filter((x) => x !== q);
+      list.unshift(q);
+      try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list.slice(0, 8))); } catch (e) {}
+    }
+    function hideSuggest() {
+      searchSuggest.classList.add('hidden');
+      searchSuggest.innerHTML = '';
+    }
+    function renderSuggestItems(items, isRecent) {
+      if (!items.length) { hideSuggest(); return; }
+      const title = isRecent ? '🕘 بحثات أخيرة' : '💡 اقتراحات';
+      searchSuggest.innerHTML = `
+        <p class="px-4 pt-3 pb-1 text-[11px] font-extrabold text-slate-400">${title}</p>
+        ${items.map((it) => {
+          if (isRecent) {
+            const q = String(it).replace(/"/g, '&quot;');
+            return `<button class="suggest-item w-full text-right px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition flex items-center gap-2" data-query="${q}"><span>🕘</span><span class="truncate">${q}</span></button>`;
+          }
+          const name = (it.title || it.name || 'بدون عنوان').replace(/"/g, '&quot;');
+          const date = it.release_date || it.first_air_date || '';
+          const year = date ? date.slice(0, 4) : '';
+          const kind = (it.media_type || (it.name ? 'tv' : 'movie')) === 'tv' ? 'مسلسل' : 'فيلم';
+          return `<button class="suggest-item w-full text-right px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition flex items-center justify-between gap-2" data-id="${it.id}" data-type="${it.media_type || (it.name ? 'tv' : 'movie')}"><span class="truncate">${name}</span><span class="text-[11px] text-slate-400 shrink-0">${kind} ${year}</span></button>`;
+        }).join('')}
+      `;
+      searchSuggest.classList.remove('hidden');
+      searchSuggest.querySelectorAll('.suggest-item').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          hideSuggest();
+          if (btn.dataset.query) {
+            searchInput.value = btn.dataset.query;
+            clearSearch.classList.remove('hidden');
+            executeSearch(btn.dataset.query);
+            return;
+          }
+          openDetails(Number(btn.dataset.id), btn.dataset.type);
+        });
+      });
+    }
+    async function fetchSuggest(q) {
+      const seq = ++suggestSeq;
+      try {
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (seq !== suggestSeq) return;
+        if (searchInput.value.trim() !== q) return;
+        renderSuggestItems((data.results || []).filter((i) => !i.providerUrl).slice(0, 6), false);
+      } catch (e) {}
+    }
+    searchInput.addEventListener('focus', () => {
+      if (!searchInput.value.trim()) renderSuggestItems(readRecentSearches(), true);
+    });
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideSuggest(); });
+    document.addEventListener('click', (e) => {
+      if (!searchSuggest.contains(e.target) && e.target !== searchInput) hideSuggest();
+    });
+
     // Search function with Debounce
     searchInput.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       clearSearch.classList.toggle('hidden', !q);
       clearTimeout(debounceTimer);
+      clearTimeout(suggestTimer);
       if (!q) {
         loadHome();
+        hideSuggest();
         return;
       }
+      suggestTimer = setTimeout(() => fetchSuggest(q), 250);
       debounceTimer = setTimeout(() => executeSearch(q), 350);
     });
 
     clearSearch.addEventListener('click', () => {
       searchInput.value = '';
       clearSearch.classList.add('hidden');
+      hideSuggest();
       loadHome();
     });
 
     // Search via the Worker: TMDB in Arabic + English merged, with a
     // provider fallback when TMDB returns nothing.
     async function executeSearch(query) {
+      saveRecentSearch(query);
+      hideSuggest();
       renderLoading();
       try {
         const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
@@ -687,12 +1023,52 @@
           selectedSeason = 1;
           selectedEpisode = 1;
         }
+        document.getElementById('btnDownloadSeason').classList.toggle('hidden', mediaType !== 'tv');
+        document.getElementById('seasonDownloadPicker').classList.add('hidden');
+        document.getElementById('seasonDownloadProgress').classList.add('hidden');
 
         mediaModal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
+        updateResumeButton();
+        updateMyListButton();
+        loadTrailerAndSimilar(id, mediaType);
       } catch (err) {
         alert('تعذر فتح تفاصيل العمل.');
       }
+    }
+
+    // Trailer + similar titles (stage D): fetched from TMDB after the
+    // details open. The trailer plays in the same iframe (YouTube is
+    // trusted, so no sandbox — embedwave re-adds its sandbox on play).
+    // A sequence guard drops stale responses when the user opens
+    // another title before the fetch lands.
+    let trailerKey = null;
+    let trailerLoadSeq = 0;
+    async function loadTrailerAndSimilar(id, mediaType) {
+      const loadId = ++trailerLoadSeq;
+      trailerKey = null;
+      const btn = document.getElementById('btnTrailer');
+      const wrap = document.getElementById('similarWrap');
+      const row = document.getElementById('similarRow');
+      btn.classList.add('hidden');
+      wrap.classList.add('hidden');
+      row.innerHTML = '';
+      try {
+        const [videosRes, similarRes] = await Promise.all([
+          fetch(`${TMDB_BASE}/${mediaType}/${id}/videos?api_key=${TMDB_KEY}&language=en-US`),
+          fetch(`${TMDB_BASE}/${mediaType}/${id}/similar?api_key=${TMDB_KEY}&language=ar`),
+        ]);
+        if (loadId !== trailerLoadSeq) return;
+        const videos = await videosRes.json().catch(() => null);
+        const trailer = (videos?.results || []).find((v) => v.site === 'YouTube' && v.type === 'Trailer');
+        if (trailer) { trailerKey = trailer.key; btn.classList.remove('hidden'); }
+        const similar = await similarRes.json().catch(() => null);
+        const items = (similar?.results || []).slice(0, 10);
+        if (items.length) {
+          row.innerHTML = items.map(homeCardHtml).join('');
+          wrap.classList.remove('hidden');
+        }
+      } catch (e) {}
     }
 
     function setupSeriesSeasons(tv) {
@@ -713,24 +1089,35 @@
 
     function renderEpisodes(count) {
       selectedEpisode = 1;
-      episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => `
-        <button class="ep-btn ${epNum === 1 ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl py-1.5 text-xs font-bold border border-brand-border hover:bg-red-600 hover:text-white transition" onclick="selectEpisode(${epNum}, this)">
-          حلقة ${epNum}
+      currentSeasonEpisodeCount = count;
+      episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => {
+        const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
+        const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
+        const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
+        return `
+        <button class="ep-btn relative overflow-hidden ${epNum === 1 ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl py-1.5 text-xs font-bold border border-brand-border hover:bg-red-600 hover:text-white transition" onclick="selectEpisode(${epNum}, this)">
+          ${watched ? '✓ ' : ''}حلقة ${epNum}
+          ${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}
         </button>
-      `).join('');
+      `; }).join('');
+      updateResumeButton();
     }
 
     function selectEpisode(epNum, btn) {
       selectedEpisode = epNum;
+      clearAutoNext();
       document.querySelectorAll('.ep-btn').forEach(b => {
         b.classList.remove('bg-red-600', 'text-white');
         b.classList.add('bg-slate-800', 'text-slate-300');
       });
       btn.classList.remove('bg-slate-800', 'text-slate-300');
       btn.classList.add('bg-red-600', 'text-white');
+      updateResumeButton();
 
       // Update active stream player if already open
       if (!playerContainer.classList.contains('hidden')) {
+        const entry = currentResumeEntry();
+        pendingResume = entry ? entry.t : null;
         playActiveStream();
       }
     }
@@ -770,6 +1157,8 @@
     }
 
     function resetPlayer() {
+      trackProgress(true);
+      clearAutoNext();
       nativeActive = false;
       clearNativePlayTimeout();
       videoNative.pause();
@@ -814,6 +1203,99 @@
       tryNextQualityOrFallback();
     });
     videoNative.addEventListener('playing', clearNativePlayTimeout);
+
+    // Continue watching: save the position while playing (throttled to
+    // every 5s), on pause, and when the page hides; mark watched at the
+    // end (or past 90%). pendingResume is consumed once by the
+    // loadedmetadata listener — quality/server switches never re-seek.
+    let lastProgressSave = 0;
+    let pendingResume = null; // seconds to seek to once metadata loads
+    function currentProgressMeta() {
+      if (!currentItem) return null;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      return { type, s: type === 'tv' ? selectedSeason : 0, e: type === 'tv' ? selectedEpisode : 0, title: currentItem.title || currentItem.name || '', poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '', kind: type };
+    }
+    function trackProgress(force) {
+      const meta = currentProgressMeta();
+      if (!meta || !nativeActive) return;
+      const t = videoNative.currentTime;
+      const d = videoNative.duration;
+      if (!Number.isFinite(t) || t < 5) return;
+      const now = Date.now();
+      if (!force && now - lastProgressSave < 5000) return;
+      lastProgressSave = now;
+      if (Number.isFinite(d) && d > 0 && t >= d - 30) { markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e); updateResumeButton(); return; }
+      saveProgressEntry(meta.type, currentItem.id, meta.s, meta.e, t, d, meta);
+    }
+    videoNative.addEventListener('timeupdate', () => trackProgress(false));
+    videoNative.addEventListener('pause', () => trackProgress(true));
+    videoNative.addEventListener('ended', () => {
+      const meta = currentProgressMeta();
+      if (meta) markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e);
+      updateResumeButton();
+      armAutoNext();
+    });
+    document.addEventListener('pagehide', () => trackProgress(true));
+    videoNative.addEventListener('loadedmetadata', () => {
+      if (pendingResume != null && Number.isFinite(videoNative.duration) && videoNative.duration > 0) {
+        videoNative.currentTime = Math.min(pendingResume, Math.max(0, videoNative.duration - 10));
+        pendingResume = null;
+      }
+    });
+
+    // The Play button shows "أكمل من M:SS" when a saved position exists
+    // for this title/episode; the restart button appears alongside it.
+    function currentResumeEntry() {
+      if (!currentItem) return null;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      return getProgress(type, currentItem.id, type === 'tv' ? selectedSeason : 0, type === 'tv' ? selectedEpisode : 0);
+    }
+    function updateResumeButton() {
+      const label = document.getElementById('btnPlayInAppLabel');
+      const restart = document.getElementById('btnRestartPlay');
+      if (!label || !restart) return;
+      const entry = currentResumeEntry();
+      label.innerText = entry ? `أكمل من ${formatTime(entry.t)}` : 'مشاهدة فورية';
+      restart.classList.toggle('hidden', !entry);
+    }
+
+    // Auto-next episode (stage C): when a series episode ends on the
+    // native player, the next episode starts after a 5s countdown the
+    // user can cancel or skip. Embedwave cannot report "ended", so it
+    // never auto-advances.
+    let autoNextTimer = null;
+    let autoNextEpisode = null;
+    let currentSeasonEpisodeCount = 10;
+    function clearAutoNext() {
+      if (autoNextTimer) { clearTimeout(autoNextTimer); autoNextTimer = null; }
+      autoNextEpisode = null;
+      const bar = document.getElementById('autoNextBar');
+      if (bar) { bar.classList.add('hidden'); bar.classList.remove('flex'); }
+    }
+    function armAutoNext() {
+      clearAutoNext();
+      if (!currentItem || currentItem.media_type !== 'tv') return;
+      if (!nativeActive) return;
+      if (selectedEpisode >= currentSeasonEpisodeCount) return;
+      autoNextEpisode = selectedEpisode + 1;
+      let left = 5;
+      const bar = document.getElementById('autoNextBar');
+      const text = document.getElementById('autoNextText');
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      const tick = () => {
+        if (left <= 0) {
+          const nextBtn = document.querySelectorAll('.ep-btn')[autoNextEpisode - 1];
+          clearAutoNext();
+          if (nextBtn) nextBtn.click();
+          return;
+        }
+        text.innerText = `الحلقة التالية (حلقة ${autoNextEpisode}) خلال ${left} ثواني…`;
+        left--;
+        autoNextTimer = setTimeout(tick, 1000);
+      };
+      tick();
+    }
 
     // Server + quality selection. currentServers is the servers array from
     // the last /api/resolve (native server first, embedwave last).
@@ -890,6 +1372,7 @@
 
     // Play the currently selected server + quality.
     function playSelected() {
+      clearAutoNext();
       const server = selectedServer();
       const quality = selectedQuality();
       if (!server || !quality) { loadEmbedFallback(); return; }
@@ -988,8 +1471,78 @@
 
     // In-App Instant Player: ad-free native <video> first, then the
     // sandboxed embedwave embed. No unsandboxed fallback exists anymore,
-    // so no popup can open from the player.
-    btnPlayInApp.addEventListener('click', playActiveStream);
+    // so no popup can open from the player. The Play button resumes from
+    // the saved position when one exists; the restart button plays from
+    // the beginning.
+    btnPlayInApp.addEventListener('click', () => {
+      const entry = currentResumeEntry();
+      pendingResume = entry ? entry.t : null;
+      playActiveStream();
+    });
+    document.getElementById('btnRestartPlay').addEventListener('click', () => {
+      pendingResume = null;
+      playActiveStream();
+    });
+    document.getElementById('btnAutoNextNow').addEventListener('click', () => {
+      const nextBtn = autoNextEpisode ? document.querySelectorAll('.ep-btn')[autoNextEpisode - 1] : null;
+      clearAutoNext();
+      if (nextBtn) nextBtn.click();
+    });
+    document.getElementById('btnAutoNextCancel').addEventListener('click', clearAutoNext);
+    // Report a problem (stage F): no backend — the report text is
+    // prefilled (title, episode, server, quality, problem) and sent
+    // through Telegram's share sheet to @filmatibot.
+    function buildReportText(problem) {
+      const title = currentItem ? (currentItem.title || currentItem.name || '—') : '—';
+      const date = currentItem ? (currentItem.release_date || currentItem.first_air_date || '') : '';
+      const year = date ? date.slice(0, 4) : '';
+      const kind = currentItem ? (currentItem.media_type === 'tv' ? 'مسلسل' : 'فيلم') : '—';
+      const type = currentItem ? (currentItem.media_type === 'tv' ? 'tv' : 'movie') : 'movie';
+      const s = type === 'tv' ? selectedSeason : 0;
+      const e = type === 'tv' ? selectedEpisode : 0;
+      const server = selectedServer();
+      const quality = selectedQuality();
+      const lines = [
+        '⚠️ بلاغ مشكلة — فيلماتي',
+        `العمل: ${title} (${kind}${year ? ' ' + year : ''})`,
+      ];
+      if (type === 'tv') lines.push(`الموسم ${s} — الحلقة ${e}`);
+      lines.push(`السيرفر: ${server ? server.name : '—'} — الجودة: ${quality ? quality.quality : '—'}`);
+      lines.push(`المشكلة: ${problem}`);
+      return lines.join('\n');
+    }
+    function shareReport(problem) {
+      const text = buildReportText(problem);
+      const url = 'https://t.me/share/url?url=' + encodeURIComponent('https://mmody1334-gif.github.io/filmaty/') + '&text=' + encodeURIComponent(text);
+      window.open(url, '_blank');
+    }
+
+    document.getElementById('btnTrailer').addEventListener('click', () => {
+      if (!trailerKey) return;
+      resetPlayer();
+      playerContainer.classList.remove('hidden');
+      videoIframe.removeAttribute('sandbox');
+      videoIframe.classList.remove('hidden');
+      videoIframe.src = `https://www.youtube.com/embed/${trailerKey}?autoplay=1&rel=0`;
+      hidePlayerStatus();
+    });
+    document.getElementById('btnReport').addEventListener('click', () => {
+      document.getElementById('reportPicker').classList.toggle('hidden');
+    });
+    document.querySelectorAll('.report-problem-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.getElementById('reportPicker').classList.add('hidden');
+        shareReport(btn.dataset.problem);
+      });
+    });
+    document.getElementById('btnMyList').addEventListener('click', () => {
+      if (!currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const meta = { title: currentItem.title || currentItem.name || '', poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '', kind: type };
+      const added = toggleMyList(type, currentItem.id, meta);
+      updateMyListButton();
+      showToast(added ? 'تمت الإضافة لقائمتي ❤️' : 'تمت الإزالة من قائمتي');
+    });
 
     async function playActiveStream() {
       if (!currentItem) return;
@@ -1073,6 +1626,17 @@
     // Worker never serves an error body as a download), so the browser
     // either starts the real download or shows the error itself. The bot
     // fallback stays only when there is no download URL at all.
+    // Starts one browser download for a quality (anchor click). Used by
+    // the single download and by the whole-season download.
+    function startAnchorDownload(q, filename) {
+      const a = document.createElement('a');
+      a.href = q.download;
+      a.download = filename || '';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
     async function downloadQuality(q, key) {
       if (!q.download) {
         if (lastResolved && lastResolved.key === key) lastResolved = null;
@@ -1080,15 +1644,84 @@
         openBotRequest();
         return;
       }
-      const a = document.createElement('a');
-      a.href = q.download;
-      a.download = '';
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      startAnchorDownload(q);
       showToast('بدأ التحميل — هتلاقي الملف في التنزيلات');
     }
+
+    // Whole-season download (stage G): resolves every episode of the
+    // selected season and starts one browser download after another
+    // (1.5s apart). Browsers may ask once to allow multiple downloads;
+    // an episode with no direct copy is skipped and listed.
+    let seasonDownloadRunning = false;
+    function seasonFileName(ep) {
+      const title = (currentItem.title || currentItem.name || 'filmaty').replace(/[/\\:*?"<>|]/g, '-');
+      return `${title} S${String(selectedSeason).padStart(2, '0')}E${String(ep).padStart(2, '0')}.mp4`;
+    }
+    async function downloadSeason(qualityLabel) {
+      if (seasonDownloadRunning || !currentItem || currentItem.media_type !== 'tv') return;
+      seasonDownloadRunning = true;
+      const list = document.getElementById('seasonDownloadList');
+      const wrap = document.getElementById('seasonDownloadProgress');
+      list.innerHTML = '';
+      wrap.classList.remove('hidden');
+      const count = currentSeasonEpisodeCount;
+      let started = 0;
+      let skipped = 0;
+      for (let ep = 1; ep <= count; ep++) {
+        const li = document.createElement('div');
+        li.className = 'text-[11px] font-bold text-slate-300';
+        li.innerText = `حلقة ${ep}… ⏳`;
+        list.appendChild(li);
+        try {
+          const resolved = await fetchResolve('tv', currentItem.id, selectedSeason, ep);
+          const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
+            ? resolved.servers[0].qualities.filter((x) => x.download)
+            : [];
+          const q = qualities.find((x) => x.quality === qualityLabel) || qualities[0];
+          if (!q || !q.download) { li.innerText = `حلقة ${ep} — ⚠️ مش متاحة للتحميل`; skipped++; continue; }
+          startAnchorDownload(q, seasonFileName(ep));
+          li.innerText = `حلقة ${ep} — ✅ بدأ التحميل (${q.quality})`;
+          started++;
+        } catch (e) {
+          li.innerText = `حلقة ${ep} — ⚠️ تعذر التحميل`;
+          skipped++;
+        }
+        if (ep < count) await new Promise((r) => setTimeout(r, 1500));
+      }
+      showToast(`تحميل الموسم: بدأ ${started} حلقة${skipped ? ` — ${skipped} مش متاحة` : ''}`);
+      seasonDownloadRunning = false;
+    }
+    document.getElementById('btnDownloadSeason').addEventListener('click', async () => {
+      if (!currentItem || currentItem.media_type !== 'tv') return;
+      const picker = document.getElementById('seasonDownloadPicker');
+      const row = document.getElementById('seasonDownloadQualitiesRow');
+      const key = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
+      let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
+      if (!resolved) {
+        resolved = await fetchResolve('tv', currentItem.id, selectedSeason, selectedEpisode);
+        if (resolved && resolved.ok) lastResolved = { key, data: resolved };
+      }
+      const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
+        ? resolved.servers[0].qualities.filter((q) => q.download)
+        : [];
+      if (!qualities.length) {
+        showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
+        openBotRequest();
+        return;
+      }
+      row.innerHTML = '';
+      qualities.forEach((q) => {
+        const b = document.createElement('button');
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500 transition';
+        b.textContent = q.quality;
+        b.addEventListener('click', () => {
+          picker.classList.add('hidden');
+          downloadSeason(q.quality);
+        });
+        row.appendChild(b);
+      });
+      picker.classList.remove('hidden');
+    });
 
     // Short deep-link payload: m<tmdbId> for movies, t<tmdbId>[s..e..] for series.
     // (Telegram start parameters only allow A-Za-z0-9_-, max 64 chars.)
@@ -1206,7 +1839,13 @@
       playerContainer.classList.add('hidden');
       document.getElementById('serverControls').classList.add('hidden');
       document.getElementById('downloadPicker').classList.add('hidden');
+      document.getElementById('seasonDownloadPicker').classList.add('hidden');
+      document.getElementById('seasonDownloadProgress').classList.add('hidden');
       document.getElementById('botCodePanel').classList.add('hidden');
+      document.getElementById('reportPicker').classList.add('hidden');
+      // Refresh the home sections so the continue-watching row reflects
+      // what was just watched.
+      if (homeData) renderHomeSections();
     });
 
     // Start
