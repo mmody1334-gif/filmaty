@@ -84,6 +84,15 @@ test("TV page has a Netflix-cinematic look: hero banner + poster rows on a near-
   assert.ok(tv.includes("renderHero"), "TV page must fill the hero from the most-watched title");
 });
 
+test("TV page offers an explicit direct-vs-embedwave choice, direct first", () => {
+  const tv = readFileSync(tvPath, "utf-8");
+  assert.ok(tv.includes("مباشر"), "TV page must offer a direct (مباشر) choice");
+  assert.ok(tv.includes("EmbedWave"), "TV page must still offer EmbedWave");
+  assert.ok(tv.includes("المباشر هو الأساسي"), "TV page must say the direct player is the primary one");
+  assert.ok(tv.includes("30000"), "TV resolve must allow 30s for slow direct copies");
+  assert.ok(tv.includes("playEmbedwaveFallback"), "TV page must fall back to the embed when the resolve fails");
+});
+
 test("TV page seeks with number keys: 1 back 10s, 3 forward 10s (native player only)", () => {
   const tv = readFileSync(tvPath, "utf-8");
   assert.ok(tv.includes("e.key === '1'"), "TV page must handle the 1 key");
