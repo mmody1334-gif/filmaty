@@ -460,22 +460,7 @@ export interface ResolvedMulti {
   servers: ResolvedServer[];
 }
 
-// The vidlink embed fallback for a title (no direct download from it).
-// Unsandboxed: vidlink refuses sandboxed embeds ("Please Disable
-// Sandbox"), so its own ads/popups are not blocked there.
-export function vidlinkUrl(
-  type: "movie" | "tv",
-  tmdbId: number,
-  season?: number,
-  episode?: number,
-): string {
-  if (type === "tv") {
-    return `https://vidlink.pro/tv/${tmdbId}/${season || 1}/${episode || 1}`;
-  }
-  return `https://vidlink.pro/movie/${tmdbId}`;
-}
-
-// The EmbedWave embed fallback. Unlike vidlink/vidsrc, EmbedWave plays
+// The EmbedWave embed fallback. Unlike vidsrc, EmbedWave plays
 // inside a sandboxed iframe (verified live: Interstellar played with
 // no ads/popups), so its popups/redirects stay blocked (no
 // allow-popups / allow-top-navigation).
@@ -504,8 +489,8 @@ const SERVER_CACHE_FAILURE_TTL = 30 * 60; // 30 minutes
 
 // Like resolveByTmdb, but returns every validated quality of the first
 // working source (native server) instead of only the best stream. The
-// vidlink server is added by the /api/resolve handler, not cached here.
-// Null when nothing validates (callers fall back to vidlink).
+// embedwave server is added by the /api/resolve handler, not cached here.
+// Null when nothing validates (callers fall back to embedwave).
 export async function resolveServersByTmdb(
   env: Env,
   type: "movie" | "tv",
@@ -721,7 +706,7 @@ async function pickTargetUrl(
   // bare-title video page can be any episode (Laroza once returned an
   // episode-4 file for an episode-1 request this way). If the episode
   // cannot be verified, return null so the caller tries the next
-  // candidate (or falls back to vidlink).
+  // candidate (or falls back to embedwave).
   if (details.seasons.length > 0) {
     const seasonGroup = details.seasons.find((sg) => sg.season === (season || 1));
     if (!seasonGroup) return null;
