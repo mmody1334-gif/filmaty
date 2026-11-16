@@ -30,6 +30,22 @@ test("extracts season and episode from various formats", () => {
   assert.deepEqual(parseSeasonEpisode("الموسم الثاني الحلقة الخامسة"), { season: 2, episode: 5 });
   assert.deepEqual(parseSeasonEpisode("S03E14"), { season: 3, episode: 14 });
   assert.deepEqual(parseSeasonEpisode("الموسم الاول الحلقة 13 الثالثة عشر"), { season: 1, episode: 13 });
+  // Akwam episode links use bare "حلقة N" (no ال) with the season after
+  // the show name — the old pattern required "الحلقة" and dropped the
+  // episode, so a newest-first page resolved E1 to the last episode's file.
+  assert.deepEqual(
+    parseSeasonEpisode("حلقة 16 : مسلسل The 100 الموسم السابع The Last War الاخيرة"),
+    { season: 7, episode: 16 },
+  );
+  assert.deepEqual(
+    parseSeasonEpisode("حلقة 1 : مسلسل The 100 الموسم السابع From the Ashes"),
+    { season: 7, episode: 1 },
+  );
+  assert.deepEqual(parseSeasonEpisode("حلقة 1: مسلسل Dexter الموسم الاول"), {
+    season: 1,
+    episode: 1,
+  });
+  assert.deepEqual(parseSeasonEpisode("موسم 3 حلقة 5"), { season: 3, episode: 5 });
 });
 
 test("parses release years reliably", () => {

@@ -419,7 +419,10 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  const cacheKey = `srv:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv2: after the bare-"حلقة N" episode fix — the srv: entries
+  // cached before it can hold a wrong episode (e.g. The 100 S7E1 cached
+  // as the S07E16 file) and must not be reused.
+  const cacheKey = `srv2:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);

@@ -167,26 +167,37 @@ export function parseSeasonEpisode(text: string): { season?: number; episode?: n
     return { season: Number(seMatch[1]), episode: Number(seMatch[2]) };
   }
 
-  // Season number pattern (e.g., الموسم 2, الموسم الثاني)
-  const sNumMatch = norm.match(/الموسم\s+(\d{1,2})/);
+  // Season number pattern (e.g., الموسم 2, الموسم الثاني, موسم 7).
+  // The article ال is optional: Akwam link texts write "الموسم السابع"
+  // but other pages write bare "موسم 7". (No word-boundary anchor:
+  // the season word often follows punctuation such as "(الموسم 2)".)
+  const sNumMatch = norm.match(/(?:ال)?موسم\s+(\d{1,2})/);
   if (sNumMatch) {
     season = Number(sNumMatch[1]);
   } else {
     for (const [word, val] of Object.entries(ARABIC_NUM_WORDS)) {
-      if (norm.includes(`الموسم ${word}`)) {
+      if (norm.includes(`الموسم ${word}`) || norm.includes(`موسم ${word}`)) {
         season = val;
         break;
       }
     }
   }
 
-  // Episode number pattern (e.g., الحلقة 13, الحلقة الثالثة)
-  const epNumMatch = norm.match(/الحلق[هة]\s+(\d{1,3})/);
+  // Episode number pattern (e.g., الحلقة 13, حلقة 16, الحلقة الثالثة).
+  // The article ال is optional: Akwam episode links write bare "حلقة 16
+  // : مسلسل The 100 الموسم السابع ..." — the old pattern required "الحلقة"
+  // so it never matched, and the caller fell back to list order, which on
+  // newest-first pages labels the LAST episode as episode 1.
+  const epNumMatch = norm.match(/(?:ال)?حلقه\s+(\d{1,3})/);
   if (epNumMatch) {
     episode = Number(epNumMatch[1]);
   } else {
     for (const [word, val] of Object.entries(ARABIC_NUM_WORDS)) {
-      if (norm.includes(`الحلقه ${word}`) || norm.includes(`الحلقة ${word}`)) {
+      if (
+        norm.includes(`الحلقه ${word}`) ||
+        norm.includes(`الحلقة ${word}`) ||
+        norm.includes(`حلقه ${word}`)
+      ) {
         episode = val;
         break;
       }

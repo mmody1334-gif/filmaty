@@ -445,8 +445,17 @@ export class AkwamProvider implements Provider {
         if (seenEpisodes.has(epId)) continue;
         seenEpisodes.add(epId);
         const linkText = epMatch[3].replace(/<[^>]+>/g, " ");
+        // Episode number: link text first ("حلقة 16 : مسلسل The 100 ..."),
+        // then the URL slug ("/الحلقة-16"). NEVER fabricate a number from
+        // list order: Akwam lists newest first, so order numbering labels
+        // the last episode (E16) as episode 1 and an E1 request resolves
+        // to the wrong file. A link whose number cannot be determined is
+        // skipped — the caller then tries the next candidate or vidlink.
+        const fromText = parseSeasonEpisode(linkText).episode;
+        const slugMatch = epUrl.match(/الحلقة-(\d+)/);
         const epNumber =
-          parseSeasonEpisode(linkText).episode ?? episodes.length + 1;
+          fromText ?? (slugMatch ? Number(slugMatch[1]) : undefined);
+        if (epNumber === undefined) continue;
 
         episodes.push({
           id: epId,
