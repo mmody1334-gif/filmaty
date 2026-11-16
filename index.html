@@ -105,7 +105,7 @@
 
       <!-- Video Player Frame Area -->
       <div id="playerContainer" class="hidden relative aspect-video w-full bg-black">
-        <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" sandbox="allow-same-origin allow-scripts allow-presentation allow-forms" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
+        <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
         <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
         <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/70 text-white text-sm font-bold px-4 text-center"></div>
       </div>
@@ -612,9 +612,9 @@
     }
 
     // Native-player failure handling: a dead stream (e.g. the CDN host is
-    // down) must fall back to the sandboxed vidlink iframe instead of
-    // leaving a broken black player — and the dead link must not be reused
-    // by the download button.
+    // down) must fall back to the vidlink iframe instead of leaving a
+    // broken black player — and the dead link must not be reused by the
+    // download button.
     let nativeActive = false;
     let nativePlayTimer = null;
 
@@ -626,12 +626,16 @@
       clearNativePlayTimeout();
       nativePlayTimer = setTimeout(() => {
         if (!nativeActive) return;
-        // 15s with no playable data: the stream is dead, not just slow.
+        // 45s with no playable data: the stream is dead, not just slow.
+        // The CDN can take well over 15s to deliver the first bytes on a
+        // cold start (verified live: Interstellar 1080p needed over 15s
+        // before readyState 2, then played fine) — a 15s timeout kept
+        // declaring healthy streams dead and cycling away from them.
         if (videoNative.readyState < 2) {
           showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
           tryNextQualityOrFallback();
         }
-      }, 15000);
+      }, 45000);
     }
 
     videoNative.addEventListener('error', () => {
@@ -739,7 +743,10 @@
       loadVidlinkFallback();
     }
 
-    // Sandboxed vidlink fallback for the current item/season/episode.
+    // Vidlink fallback for the current item/season/episode. The iframe is
+    // unsandboxed: vidlink refuses to play inside a sandboxed iframe
+    // ("Please Disable Sandbox"), so its own ads/popups are no longer
+    // blocked there — the native server stays the ad-free default.
     // Also forgets a dead native resolve result for this key so the
     // download button re-resolves instead of reusing the dead link.
     function loadVidlinkFallback() {
@@ -793,7 +800,7 @@
       }).catch(() => {});
     }
 
-    // In-App Instant Player: ad-free native <video> first, sandboxed vidlink fallback
+    // In-App Instant Player: ad-free native <video> first, vidlink fallback
     btnPlayInApp.addEventListener('click', playActiveStream);
 
     async function playActiveStream() {
@@ -816,8 +823,8 @@
         playSelected();
         return;
       }
-      // No direct source: fall back to vidlink inside the sandboxed iframe
-      // (no allow-popups / allow-top-navigation, so its ads cannot open tabs).
+      // No direct source: fall back to vidlink in an unsandboxed iframe
+      // (vidlink refuses sandboxed embeds).
       loadVidlinkFallback();
     }
 

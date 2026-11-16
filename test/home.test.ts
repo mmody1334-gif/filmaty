@@ -236,3 +236,18 @@ test("built webapp has the home sections, year chips and view counting", () => {
   // Home (most-watched first) is the initial view, not the old trending grid.
   assert.ok(!FILMATY_WEBAPP_HTML.includes("loadTrending()"));
 });
+
+// The native player must tolerate a slow cold start (verified live:
+// Interstellar 1080p needed well over 15s before readyState 2, then
+// played fine) and vidlink must not be sandboxed (it refuses sandboxed
+// embeds with "Please Disable Sandbox").
+test("built webapp gives slow streams 45s and leaves the vidlink iframe unsandboxed", () => {
+  assert.ok(
+    FILMATY_WEBAPP_HTML.includes("}, 45000);"),
+    "built webapp must arm the no-data timeout at 45s",
+  );
+  assert.ok(
+    !FILMATY_WEBAPP_HTML.includes("sandbox="),
+    "built webapp must not sandbox the vidlink iframe",
+  );
+});

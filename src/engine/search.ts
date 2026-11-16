@@ -5,6 +5,7 @@
 
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
+import { cleanTitle } from "./normalize.ts";
 import { searchAllProviders } from "../providers/index.ts";
 import { titlesMatch } from "./resolve.ts";
 
@@ -76,12 +77,23 @@ function mergeTmdbResults(lists: any[][]): SearchResultItem[] {
 
 // Provider fallback: search the providers directly and attach a TMDB id
 // when the candidate title matches a TMDB search (bounded: top 5).
+// Only candidates that strictly match the query are shown: provider
+// search is loose (a substring match), so without this an Arabic query
+// TMDB does not know (e.g. "المئة" — TMDB itself returns 0 hits for it)
+// came back with junk like "ابو العروسة الجزء الثانى المئة". If nothing
+// matches strictly, keep the loose top results rather than returning
+// nothing at all.
 async function providerFallback(env: Env, query: string): Promise<SearchResultItem[]> {
   const disabled = parseList(env.PROVIDERS_DISABLED);
   const candidates = await searchAllProviders(query, undefined, disabled);
+  const cleanQ = cleanTitle(query) || query;
+  const strict = candidates.filter(
+    (c) => titlesMatch(c.title, cleanQ) || titlesMatch(c.title, query),
+  );
+  const pool = strict.length > 0 ? strict : candidates;
   const items: SearchResultItem[] = [];
   const seen = new Set<string>();
-  for (const c of candidates.slice(0, 5)) {
+  for (const c of pool.slice(0, 5)) {
     const hits = await tmdbSearch(env, c.title, "en-US");
     const match = hits.find(
       (h) =>

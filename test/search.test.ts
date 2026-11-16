@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.ts";
 import { searchTitles } from "../src/engine/search.ts";
+import { titlesMatch } from "../src/engine/resolve.ts";
 
 const BASE = "https://filmaty.hudhaifa-bio.workers.dev";
 
@@ -242,5 +243,40 @@ test("GET /api/search without q returns 400", async () => {
     assert.equal(body.ok, false);
   } finally {
     restore();
+  }
+});
+
+test("provider fallback drops loose substring matches for an Arabic query TMDB does not know", async () => {
+  const originalFetch = globalThis.fetch;
+  // TMDB itself returns 0 hits for "المئة" (verified live); the providers
+  // return an exact match plus a junk substring match — only the exact
+  // match may be shown.
+  const akwamHtml = `
+    <div class="entry-box"><h3 class="entry-title"><a href="https://akwam.ss/series/9001/abu-al-arousa">ابو العروسة الجزء الثانى المئة</a></h3></div>
+    <div class="entry-box"><h3 class="entry-title"><a href="https://akwam.ss/series/9002/al-mia">المئة</a></h3></div>
+  `;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes("api.themoviedb.org")) {
+      return jsonResponse({ results: [] });
+    }
+    if (url.includes("akwam.ss/search")) {
+      return new Response(akwamHtml, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
+    return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
+  };
+  const { env } = mockEnv();
+  try {
+    const { results, source } = await searchTitles(env, "المئة");
+    assert.equal(source, "providers");
+    assert.ok(results.length >= 1);
+    // The junk substring match must be gone; every remaining entry must
+    // strictly match the query (a season suffix like "(الموسم 1)" is fine).
+    assert.ok(
+      results.every((r) => titlesMatch(r.title || r.name || "", "المئة")),
+      `junk substring match leaked through: ${results.map((r) => r.title || r.name).join(" | ")}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
