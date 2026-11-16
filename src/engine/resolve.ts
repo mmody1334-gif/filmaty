@@ -355,11 +355,24 @@ export function matchesKnownTitles(candidateTitle: string, knownTitles: string[]
   return false;
 }
 
-async function fetchResolveCandidates(
+// Lazy candidate rounds: each nextRound() runs ONE query title's
+// provider search and returns its strict-matched candidates (or null
+// when the query titles are exhausted). Rounds are lazy because a
+// matched candidate is not a resolvable one — e.g. for "حب متنكر" the
+// English round matches Akwam's "Love in Disguise" copy (whose file
+// may be dead) while the working Laroza copy only appears in the
+// Arabic round. Stopping at the first round with any match would
+// declare the title unresolvable without ever trying the later round.
+// The resolver drives the rounds and stops as soon as one resolves.
+async function fetchResolveCandidateRounds(
   env: Env,
   type: "movie" | "tv",
   tmdbId: number,
-): Promise<{ enTitle: TmdbTitle; kind: MediaKind; candidates: Candidate[] } | null> {
+): Promise<{
+  enTitle: TmdbTitle;
+  kind: MediaKind;
+  nextRound: () => Promise<Candidate[] | null>;
+} | null> {
   const kind: MediaKind = type === "tv" ? "series" : "movie";
   const disabled = parseList(env.PROVIDERS_DISABLED);
 
@@ -368,34 +381,48 @@ async function fetchResolveCandidates(
   const enTitle = tmdbTitleOf(enData, type);
   if (!enTitle) return null;
 
-  const knownTitles = [enTitle.originalTitle, enTitle.title];
-  const tryQueries = async (queries: string[]): Promise<Candidate[]> => {
-    for (const q of [...new Set(queries.filter(Boolean))]) {
-      const found = await searchAllProviders(q, kind, disabled, true);
-      const matched = found.filter((c) => matchesKnownTitles(c.title, knownTitles));
-      if (matched.length > 0) return matched;
-    }
-    return [];
-  };
+  // Arabic display title, fetched up front (one extra TMDB call): the
+  // strict filter needs all known names before the first search round
+  // runs — a candidate titled "حب متنكر Love in Disguise" starts with
+  // the Arabic name, so the Arabic name must already be in the known
+  // set when the English query round runs, or the filter drops it.
+  const arData = await fetchTmdbDetails(env, type, tmdbId, "ar");
+  const arTitle = tmdbTitleOf(arData, type);
 
+  const knownTitles = [
+    ...new Set(
+      [enTitle.originalTitle, enTitle.title, arTitle?.title, arTitle?.originalTitle].filter(
+        Boolean,
+      ) as string[],
+    ),
+  ];
   // Query titles in order: original-language title, then the English
-  // display title. For non-Latin originals (e.g. Korean "나의 유죄인간"
-  // for "حب متنكر" / "Love in Disguise") providers list the show by its
-  // Arabic/English name, so the original title alone matches nothing —
-  // and the old Arabic fallback never ran, because it compared
-  // originalTitle (identical in both languages) instead of the display
-  // title. So fall back to the Arabic display title too.
-  let candidates = await tryQueries([enTitle.originalTitle, enTitle.title]);
-  if (candidates.length === 0) {
-    const arData = await fetchTmdbDetails(env, type, tmdbId, "ar");
-    const arTitle = tmdbTitleOf(arData, type);
-    if (arTitle) {
-      knownTitles.push(arTitle.title, arTitle.originalTitle);
-      candidates = await tryQueries([arTitle.title, arTitle.originalTitle]);
-    }
-  }
+  // and Arabic display titles. For non-Latin originals (e.g. Korean
+  // "나의 유죄인간" for "حب متنكر" / "Love in Disguise") providers list
+  // the show by its Arabic/English name, so the original title alone
+  // matches nothing.
+  const queries = [
+    ...new Set(
+      [enTitle.originalTitle, enTitle.title, arTitle?.title, arTitle?.originalTitle].filter(
+        Boolean,
+      ) as string[],
+    ),
+  ];
 
-  return { enTitle, kind, candidates };
+  let i = 0;
+  return {
+    enTitle,
+    kind,
+    nextRound: async (): Promise<Candidate[] | null> => {
+      while (i < queries.length) {
+        const q = queries[i++];
+        const found = await searchAllProviders(q, kind, disabled, true);
+        const matched = found.filter((c) => matchesKnownTitles(c.title, knownTitles));
+        if (matched.length > 0) return matched;
+      }
+      return null;
+    },
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -471,12 +498,13 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv6: after the multi-title resolve fix — the srv5:
-  // entries cached before it can hold a resolve that never tried the
-  // Arabic/English display title (e.g. حب متنكر cached as "no download"
-  // because only its Korean original title was ever searched) and must
-  // not be reused.
-  const cacheKey = `srv6:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv7: after the lazy-rounds resolve fix — the srv6:
+  // entries cached before it can hold a resolve that stopped at the
+  // first query round with any match (e.g. حب متنكر cached as "no
+  // download" because the English round's Akwam copy was dead and the
+  // Arabic round's working Laroza copy was never tried) and must not
+  // be reused.
+  const cacheKey = `srv7:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
@@ -519,11 +547,18 @@ async function resolveServersByTmdbUncached(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  const found = await fetchResolveCandidates(env, type, tmdbId);
+  const found = await fetchResolveCandidateRounds(env, type, tmdbId);
   if (!found) return null;
-  const { enTitle, kind, candidates } = found;
+  const { enTitle, kind, nextRound } = found;
+  // The same copy can surface in two rounds (e.g. Laroza's in both the
+  // English and the Arabic round) — try each URL once.
+  const tried = new Set<string>();
 
-  for (const candidate of candidates) {
+  let round: Candidate[] | null;
+  while ((round = await nextRound())) {
+    for (const candidate of round) {
+      if (tried.has(candidate.url)) continue;
+      tried.add(candidate.url);
     // Same declared season/episode guard as the single-result path: never
     // resolve from a page that declares a different season or episode.
     if (type === "tv") {
@@ -575,6 +610,7 @@ async function resolveServersByTmdbUncached(
     } catch {
       continue;
     }
+    }
   }
 
   return null;
@@ -588,11 +624,16 @@ async function resolveByTmdbUncached(
   episode?: number,
 ): Promise<ResolvedDirect | null> {
   const kind: MediaKind = type === "tv" ? "series" : "movie";
-  const found = await fetchResolveCandidates(env, type, tmdbId);
+  const found = await fetchResolveCandidateRounds(env, type, tmdbId);
   if (!found) return null;
-  const { enTitle, candidates } = found;
+  const { enTitle, nextRound } = found;
+  const tried = new Set<string>();
 
-  for (const candidate of candidates) {
+  let round: Candidate[] | null;
+  while ((round = await nextRound())) {
+    for (const candidate of round) {
+      if (tried.has(candidate.url)) continue;
+      tried.add(candidate.url);
     // Series: a candidate page is one season's page (Akwam titles carry
     // it — "Dexter (الموسم 2)"), and a video page can be one episode's
     // page ("...الحلقة 4"). Never resolve a request for season N /
@@ -641,6 +682,7 @@ async function resolveByTmdbUncached(
       }
     } catch {
       continue;
+    }
     }
   }
 
