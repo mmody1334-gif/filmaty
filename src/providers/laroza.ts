@@ -295,26 +295,48 @@ function extractHost(urlStr: string): string {
 
 function extractEpisodesFromHtml(html: string, seasonNum: number, base: string): Episode[] {
   const episodes: Episode[] = [];
-  const re = /<a\s+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let m;
   const seen = new Set<string>();
 
-  while ((m = re.exec(html))) {
-    const url = m[1];
-    const text = m[2].replace(/<[^>]+>/g, "").trim();
-
-    if (!url.includes("video.php?vid=") || seen.has(url)) continue;
-    seen.add(url);
-
+  const push = (rawUrl: string, text: string) => {
+    if (!rawUrl.includes("video.php?vid=")) return;
+    const url = rawUrl.startsWith("http")
+      ? rawUrl
+      : `${base}/${rawUrl.replace(/^\.?\//, "")}`;
+    if (seen.has(url)) return;
     const se = parseSeasonEpisode(text);
-    if (se.season && se.season !== seasonNum) continue;
-
+    if (se.season && se.season !== seasonNum) return;
+    // Never fabricate an episode number from list order: a wrong
+    // episode is worse than a missing one (same lesson as the Akwam
+    // round-3 fix). Prev/next links ("الحلقة السابقة 1") carry no
+    // parseable number and are skipped — the <select> below covers
+    // every episode with its real number.
+    if (se.episode === undefined) return;
+    seen.add(url);
     episodes.push({
       season: seasonNum,
-      episode: se.episode || episodes.length + 1,
-      title: text || `الحلقة ${episodes.length + 1}`,
-      url: url.startsWith("http") ? url : `${base}/${url.replace(/^\//, "")}`,
+      episode: se.episode,
+      title: text || `الحلقة ${se.episode}`,
+      url,
     });
+  };
+
+  // 1. The episode <select> (id MSeason{n}, aria-label="Episodes") lists
+  // every episode of the season with its number — authoritative. Before
+  // this, only prev/next <a> links were read, so a series page yielded
+  // just 2 (misnumbered) episodes and most episodes never resolved.
+  const optionRe =
+    /<option[^>]*value=["']([^"']*video\.php\?vid=[^"']*)["'][^>]*>([\s\S]*?)<\/option>/gi;
+  let o;
+  while ((o = optionRe.exec(html))) {
+    push(o[1], o[2].replace(/<[^>]+>/g, "").trim());
+  }
+
+  // 2. Episode <a> links (prev/next and any others), only when their
+  // episode number parses cleanly.
+  const anchorRe = /<a\s+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = anchorRe.exec(html))) {
+    push(m[1], m[2].replace(/<[^>]+>/g, "").trim());
   }
 
   return episodes.sort((a, b) => a.episode - b.episode);
