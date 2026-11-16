@@ -66,6 +66,13 @@ export class AppStore {
     AppStore.memStore.delete(key);
   }
 
+  async delete(key: string): Promise<void> {
+    if (this.env?.CACHE) {
+      await this.env.CACHE.delete(key).catch(() => undefined);
+    }
+    AppStore.memStore.delete(key);
+  }
+
   async put(key: string, value: string, ttlSeconds = 3600): Promise<void> {
     if (this.env?.CACHE) {
       try {
