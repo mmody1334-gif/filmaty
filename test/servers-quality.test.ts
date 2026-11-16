@@ -148,7 +148,7 @@ test("a dead quality is excluded and the next best becomes default", async () =>
   }
 });
 
-test("GET /api/resolve returns servers (native multi-quality + vidlink) and best as default", async () => {
+test("GET /api/resolve returns servers (native multi-quality + embedwave) and best as default", async () => {
   const restore = installQualityMock();
   const { env } = mockEnv();
   try {
@@ -168,22 +168,18 @@ test("GET /api/resolve returns servers (native multi-quality + vidlink) and best
     assert.ok(payload);
     assert.ok(payload!.u.includes("1080p"));
 
-    assert.equal(body.servers.length, 3);
+    assert.equal(body.servers.length, 2);
     assert.equal(body.servers[0].qualities.length, 3);
     for (const q of body.servers[0].qualities) {
       assert.ok(q.stream.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.endsWith("&dl=1"));
     }
-    // embedwave sits between the native server and vidlink, sandboxed.
+    // embedwave is the only embed server, sandboxed, after the native one.
     assert.equal(body.servers[1].name, "embedwave");
     assert.equal(body.servers[1].qualities.length, 1);
     assert.equal(body.servers[1].qualities[0].stream, "https://embedwave.cc/embed/movie/157336");
     assert.equal(body.servers[1].qualities[0].download, undefined);
-    assert.equal(body.servers[2].name, "vidlink");
-    assert.equal(body.servers[2].qualities.length, 1);
-    assert.equal(body.servers[2].qualities[0].stream, "https://vidlink.pro/movie/157336");
-    assert.equal(body.servers[2].qualities[0].download, undefined);
   } finally {
     restore();
   }
@@ -194,7 +190,7 @@ test("embedwaveUrl builds the TMDB-id embed URLs for movies and episodes", () =>
   assert.equal(embedwaveUrl("tv", 48866, 7, 1), "https://embedwave.cc/embed/tv/48866/7/1");
 });
 
-test("no validated native stream: ok:false with the embedwave + vidlink servers", async () => {
+test("no validated native stream: ok:false with the embedwave server only", async () => {
   const restore = installQualityMock({ allDead: true });
   const { env } = mockEnv();
   try {
@@ -206,11 +202,9 @@ test("no validated native stream: ok:false with the embedwave + vidlink servers"
     assert.equal(res.status, 404);
     const body = (await res.json()) as any;
     assert.equal(body.ok, false);
-    assert.equal(body.servers.length, 2);
+    assert.equal(body.servers.length, 1);
     assert.equal(body.servers[0].name, "embedwave");
     assert.equal(body.servers[0].qualities[0].stream, "https://embedwave.cc/embed/movie/157336");
-    assert.equal(body.servers[1].name, "vidlink");
-    assert.equal(body.servers[1].qualities[0].stream, "https://vidlink.pro/movie/157336");
   } finally {
     restore();
   }

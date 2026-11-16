@@ -287,10 +287,12 @@ test("built webapp has the hamburger drawer, browse categories and no direct dis
 
 // The native player must tolerate a slow cold start (verified live:
 // Interstellar 1080p needed well over 15s before readyState 2, then
-// played fine). The vidlink iframe tag itself carries no sandbox
-// attribute (vidlink refuses sandboxed embeds), while the embedwave
-// server is sandboxed from JS so its popups stay blocked.
-test("built webapp gives slow streams 45s and toggles the embed sandbox per server", () => {
+// played fine). The videoIframe tag itself carries no sandbox attribute
+// in the HTML (it is set from JS), and the embedwave server is always
+// sandboxed so its popups stay blocked — there is no unsandboxed
+// server anymore (vidlink was removed), so the sandbox is never
+// removed.
+test("built webapp gives slow streams 45s and always sandboxes the embed iframe", () => {
   assert.ok(
     FILMATY_WEBAPP_HTML.includes("}, 45000);"),
     "built webapp must arm the no-data timeout at 45s",
@@ -300,7 +302,6 @@ test("built webapp gives slow streams 45s and toggles the embed sandbox per serv
   assert.ok(!iframeTag.includes("sandbox"), "the videoIframe tag must not carry a sandbox attribute");
   for (const s of [
     "setAttribute('sandbox', EMBEDWAVE_SANDBOX)",
-    "removeAttribute('sandbox')",
     "loadEmbedFallback",
     // The embedwave server name (its embed URL is built server-side).
     "'embedwave'",
@@ -308,4 +309,6 @@ test("built webapp gives slow streams 45s and toggles the embed sandbox per serv
   ]) {
     assert.ok(FILMATY_WEBAPP_HTML.includes(s), `built webapp must contain: ${s}`);
   }
+  assert.ok(!FILMATY_WEBAPP_HTML.includes("removeAttribute('sandbox')"), "the embed sandbox must never be removed");
+  assert.ok(!FILMATY_WEBAPP_HTML.includes("vidlink"), "no vidlink fallback may remain in the player");
 });
