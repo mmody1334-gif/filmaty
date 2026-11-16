@@ -501,6 +501,17 @@ export class AkwamProvider implements Provider {
   }
 
   async resolveStream(watchUrl: string): Promise<ResolvedStream> {
+    const streams = await this.resolveStreams(watchUrl);
+    if (streams.length === 0) {
+      throw new Error("تعذر استخراج رابط الفيديو المباشر (.mp4) لهذا الخيار.");
+    }
+    return streams[0];
+  }
+
+  // Every direct mp4 variant on a watch page (Akwam lists 480p/720p/1080p
+  // files for the same watch link), best quality first, deduplicated by
+  // quality. resolveStream above keeps returning the first (best) one.
+  async resolveStreams(watchUrl: string): Promise<ResolvedStream[]> {
     let html: string;
     try {
       const res = await fetch(watchUrl, {
@@ -513,24 +524,11 @@ export class AkwamProvider implements Provider {
       throw new Error(`تعذر فتح صفحة البث في أكوام (${error.message})`);
     }
 
-    const sourceMatches = [
-      ...html.matchAll(/<source[^>]+src="([^"]+)"/gi),
-      ...html.matchAll(/<video[^>]+src="([^"]+)"/gi),
-      ...html.matchAll(/(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)/gi),
-    ];
+    let urls = collectDirectUrls(html);
 
-    let directVideoUrl: string | undefined;
-    for (const m of sourceMatches) {
-      if (m && m[1]) {
-        const clean = m[1].replace(/#Intent;.*$/i, "").trim();
-        if (clean.includes("downet.net") || clean.match(/\.(mp4|mkv|webm|mov|avi)($|\?)/i)) {
-          directVideoUrl = clean;
-          break;
-        }
-      }
-    }
-
-    if (!directVideoUrl) {
+    if (urls.length === 0) {
+      // No <source> on the watch page: try the download page, which lists
+      // the same files as plain links.
       const downloadUrl = watchUrl.replace("/watch/", "/download/");
       try {
         const dlRes = await fetch(downloadUrl, {
@@ -538,39 +536,70 @@ export class AkwamProvider implements Provider {
           signal: AbortSignal.timeout(10000),
         });
         if (dlRes.ok) {
-          const dlHtml = await dlRes.text();
-          const dlMatches = [
-            ...dlHtml.matchAll(/href="(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)"/gi),
-            ...dlHtml.matchAll(/(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)/gi),
-          ];
-          for (const dm of dlMatches) {
-            if (dm && dm[1]) {
-              directVideoUrl = dm[1].replace(/#Intent;.*$/i, "").trim();
-              break;
-            }
-          }
+          urls = collectDirectUrls(await dlRes.text());
         }
       } catch {
         /* ignore */
       }
     }
 
-    if (!directVideoUrl) {
+    if (urls.length === 0) {
       throw new Error("تعذر استخراج رابط الفيديو المباشر (.mp4) لهذا الخيار.");
     }
 
-    let fileName = "";
-    try {
-      fileName = decodeURIComponent(new URL(directVideoUrl).pathname.split("/").pop() || "");
-    } catch {}
-
-    const qualityMatch = fileName.match(/(1080p|720p|480p|360p|4K)/i);
-    const quality = qualityMatch ? qualityMatch[1].toUpperCase() : "HD";
-
-    return {
-      quality,
-      directVideoUrl,
-      fileName,
-    };
+    const byQuality = new Map<string, ResolvedStream>();
+    for (const directVideoUrl of urls) {
+      let fileName = "";
+      try {
+        fileName = decodeURIComponent(new URL(directVideoUrl).pathname.split("/").pop() || "");
+      } catch {}
+      const quality = qualityLabel(fileName);
+      if (!byQuality.has(quality)) {
+        byQuality.set(quality, { quality, directVideoUrl, fileName });
+      }
+    }
+    return [...byQuality.values()].sort(
+      (a, b) => qualityRank(b.quality) - qualityRank(a.quality),
+    );
   }
+}
+
+// All direct mp4 URLs on a page, in page order, deduplicated.
+function collectDirectUrls(html: string): string[] {
+  const matches = [
+    ...html.matchAll(/<source[^>]+src="([^"]+)"/gi),
+    ...html.matchAll(/<video[^>]+src="([^"]+)"/gi),
+    ...html.matchAll(/(https:\/\/[a-z0-9.]*downet\.net\/download\/[^\s"'<>#]+)/gi),
+  ];
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const m of matches) {
+    if (!m || !m[1]) continue;
+    const clean = m[1].replace(/#Intent;.*$/i, "").trim();
+    if (!clean) continue;
+    if (!(clean.includes("downet.net") || clean.match(/\.(mp4|mkv|webm|mov|avi)($|\?)/i))) {
+      continue;
+    }
+    if (seen.has(clean)) continue;
+    seen.add(clean);
+    urls.push(clean);
+  }
+  return urls;
+}
+
+// Display label for a file name ("...1080p..." -> "1080p FHD").
+function qualityLabel(fileName: string): string {
+  const m = fileName.match(/(1080p|720p|480p|360p|2160p|4K)/i);
+  if (!m) return "HD";
+  const q = m[1].toUpperCase();
+  if (q === "1080P") return "1080p FHD";
+  if (q === "720P") return "720p HD";
+  if (q === "480P") return "480p SD";
+  if (q === "360P") return "360p";
+  return "2160p 4K";
+}
+
+function qualityRank(quality: string): number {
+  const m = quality.match(/(\d{3,4})/);
+  return m ? Number(m[1]) : 0;
 }

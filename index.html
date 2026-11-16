@@ -76,7 +76,7 @@
   <!-- Main Content Grid -->
   <main class="flex-1 max-w-5xl mx-auto w-full px-4">
     <!-- Section Title -->
-    <div class="flex items-center justify-between mb-3">
+    <div id="gridHeader" class="flex items-center justify-between mb-3">
       <h2 id="sectionTitle" class="text-base font-extrabold text-white flex items-center gap-2">
         <span>🔥</span> <span>الأعمال الأكثر رواجاً اليوم</span>
       </h2>
@@ -92,6 +92,9 @@
       <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
       <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
     </div>
+
+    <!-- Home Sections (most-watched first, then top-rated; year filter chips) -->
+    <div id="homeSections" class="hidden space-y-8"></div>
   </main>
 
   <!-- Media Details & Player Modal -->
@@ -134,6 +137,18 @@
           </div>
         </div>
 
+        <!-- Server & Quality Picker -->
+        <div id="serverControls" class="hidden space-y-2 pt-2 border-t border-brand-border">
+          <div>
+            <label class="text-xs font-bold text-slate-300 block mb-1.5">السيرفر:</label>
+            <div id="serversRow" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div id="qualityWrap">
+            <label class="text-xs font-bold text-slate-300 block mb-1.5">الجودة:</label>
+            <div id="qualitiesRow" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
         <!-- Action Buttons -->
         <div class="pt-3 border-t border-brand-border space-y-2">
           <div class="grid grid-cols-2 gap-2">
@@ -144,9 +159,31 @@
               <span>⬇️</span> <span>تحميل مباشر (.mp4)</span>
             </button>
           </div>
+          <!-- Download quality picker (shown when more than one quality exists) -->
+          <div id="downloadPicker" class="hidden space-y-2 pt-1">
+            <label class="text-xs font-bold text-slate-300 block">اختر جودة التحميل:</label>
+            <div id="downloadQualitiesRow" class="flex flex-wrap gap-2"></div>
+          </div>
           <button id="btnOpenInBot" class="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition">
             <span>🚀</span> <span>طلب إرسال الفيديو عبر بوت التليجرام</span>
           </button>
+        </div>
+
+        <!-- Bot Code Panel (hidden until the bot button is tapped) -->
+        <div id="botCodePanel" class="hidden space-y-3 pt-3 border-t border-brand-border">
+          <div id="botCodeQualityWrap">
+            <label class="text-xs font-bold text-slate-300 block mb-1.5">اختر الجودة لإرسالها عبر البوت:</label>
+            <div id="botCodeQualitiesRow" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div id="botCodeResult" class="hidden text-center space-y-2">
+            <p class="text-xs text-slate-400">أرسل هذا الكود للبوت (صالح لمدة ساعة):</p>
+            <p id="botCodeValue" class="text-3xl font-black tracking-[0.3em] text-amber-400 select-all" dir="ltr">…</p>
+            <div class="flex gap-2 justify-center">
+              <button id="btnCopyBotCode" class="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold">📋 نسخ الكود</button>
+              <button id="btnOpenBotPlain" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold">🚀 فتح البوت</button>
+            </div>
+            <button id="btnBotDeepLink" class="text-[11px] text-slate-500 underline">أو: فتح البوت برابط مباشر للفيلم</button>
+          </div>
         </div>
       </div>
     </div>
@@ -165,6 +202,10 @@
     // Last successful /api/resolve result, reused by the download button
     // without a second request. { key: 'movie:550:0:0', data: {...} }
     let lastResolved = null;
+    // Server + quality selection for the last resolved title/episode.
+    let currentServers = null;
+    let selectedServerIdx = 0;
+    let selectedQualityIdx = 0;
 
     // Telegram Mini App initialization
     if (window.Telegram && window.Telegram.WebApp) {
@@ -200,16 +241,123 @@
     const btnDirectDownload = document.getElementById('btnDirectDownload');
     const btnOpenInBot = document.getElementById('btnOpenInBot');
 
-    // Fetch and render initial trending content
-    async function loadTrending() {
-      renderLoading();
+    // Home: most-watched first, then top-rated, with year filter chips.
+    // The grid view (search / discover / filters) hides these sections.
+    let homeData = null; // { mostWatched, topRated }
+    let homeYearFilter = 'all';
+
+    function showGridView() {
+      document.getElementById('homeSections').classList.add('hidden');
+      document.getElementById('gridHeader').classList.remove('hidden');
+      mediaGrid.classList.remove('hidden');
+    }
+
+    function showHomeView() {
+      mediaGrid.classList.add('hidden');
+      document.getElementById('gridHeader').classList.add('hidden');
+      document.getElementById('homeSections').classList.remove('hidden');
+    }
+
+    async function loadHome() {
+      showHomeView();
+      const sectionsEl = document.getElementById('homeSections');
+      sectionsEl.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
       try {
-        const res = await fetch(`${TMDB_BASE}/trending/all/day?api_key=${TMDB_KEY}&language=ar`);
+        const res = await fetch(`${API_BASE}/api/home`);
         const data = await res.json();
-        renderCards(data.results || [], '🔥 الأعمال الأكثر رواجاً اليوم');
+        homeData = { mostWatched: data.mostWatched || [], topRated: data.topRated || [] };
+        homeYearFilter = 'all';
+        renderHomeSections();
       } catch (e) {
-        showError('تعذر جلب البيانات. يرجى التحقق من اتصالك.');
+        sectionsEl.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>`;
       }
+    }
+
+    function homeYearOf(item) {
+      const date = item.release_date || item.first_air_date || '';
+      return date ? Number(date.slice(0, 4)) : null;
+    }
+
+    function filterHomeList(items) {
+      if (homeYearFilter === 'all') return items;
+      if (homeYearFilter === 'older') {
+        return items.filter((i) => { const y = homeYearOf(i); return y && y <= 2022; });
+      }
+      const year = Number(homeYearFilter);
+      return items.filter((i) => homeYearOf(i) === year);
+    }
+
+    function renderHomeSections() {
+      const sectionsEl = document.getElementById('homeSections');
+      if (!homeData) return;
+      const years = [
+        { value: 'all', label: 'الكل' },
+        { value: '2026', label: '2026' },
+        { value: '2025', label: '2025' },
+        { value: '2024', label: '2024' },
+        { value: '2023', label: '2023' },
+        { value: 'older', label: 'أقدم' },
+      ];
+      const chips = years.map((y) => `
+        <button data-year="${y.value}" class="home-year-chip whitespace-nowrap px-4 py-2 rounded-xl border transition text-xs font-bold ${homeYearFilter === y.value ? 'bg-red-600 border-red-600 text-white' : 'bg-brand-card border-brand-border text-slate-300 hover:border-slate-500'}">${y.label}</button>
+      `).join('');
+      const mostWatched = filterHomeList(homeData.mostWatched);
+      const topRated = filterHomeList(homeData.topRated);
+      const emptyNote = (!mostWatched.length && !topRated.length)
+        ? '<div class="text-center py-12 text-slate-400 text-sm font-bold">لا توجد أعمال في هذه السنة.</div>'
+        : '';
+      sectionsEl.innerHTML = `
+        <div class="flex flex-wrap gap-2 items-center">
+          <span class="text-xs font-bold text-slate-400">السنة:</span>
+          ${chips}
+        </div>
+        ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched)}
+        ${homeSectionHtml('⭐ الأعلى تقييمًا', topRated)}
+        ${emptyNote}
+      `;
+      sectionsEl.querySelectorAll('.home-year-chip').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          homeYearFilter = btn.dataset.year;
+          renderHomeSections();
+        });
+      });
+    }
+
+    function homeSectionHtml(title, items) {
+      if (!items.length) return '';
+      return `
+        <section>
+          <h3 class="text-base font-extrabold text-white mb-3">${title}</h3>
+          <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            ${items.map(homeCardHtml).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function homeCardHtml(item) {
+      const title = item.title || item.name || 'بدون عنوان';
+      const date = item.release_date || item.first_air_date || '';
+      const year = date ? date.slice(0, 4) : '';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
+      const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+      const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+      return `
+        <div class="group cursor-pointer shrink-0 w-36 sm:w-40 bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 shadow-lg" onclick="openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+            <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-amber-400 text-[11px] font-extrabold border border-amber-500/20">⭐ ${rating}</span>
+            <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-slate-300 text-[10px] font-bold border border-white/10">${kind}</span>
+          </div>
+          <div class="p-2.5">
+            <h4 class="text-xs font-bold text-white truncate">${title}</h4>
+            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+              <span>${year}</span>
+              <span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     // Search function with Debounce
@@ -218,7 +366,7 @@
       clearSearch.classList.toggle('hidden', !q);
       clearTimeout(debounceTimer);
       if (!q) {
-        loadTrending();
+        loadHome();
         return;
       }
       debounceTimer = setTimeout(() => executeSearch(q), 350);
@@ -227,16 +375,17 @@
     clearSearch.addEventListener('click', () => {
       searchInput.value = '';
       clearSearch.classList.add('hidden');
-      loadTrending();
+      loadHome();
     });
 
+    // Search via the Worker: TMDB in Arabic + English merged, with a
+    // provider fallback when TMDB returns nothing.
     async function executeSearch(query) {
       renderLoading();
       try {
-        const res = await fetch(`${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}&language=ar&include_adult=false`);
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
-        const valid = (data.results || []).filter(i => i.media_type === 'movie' || i.media_type === 'tv');
-        renderCards(valid, `🔍 نتائج البحث عن: "${query}"`);
+        renderCards(data.results || [], `🔍 نتائج البحث عن: "${query}"`);
       } catch (e) {
         showError('تعذر إتمام البحث. حاول مرة أخرى.');
       }
@@ -256,7 +405,7 @@
         searchInput.value = '';
         clearSearch.classList.add('hidden');
 
-        if (filter === 'trending') loadTrending();
+        if (filter === 'trending') loadHome();
         else if (filter === 'movie') loadDiscover('movie', '🎬 أحدث الأفلام');
         else if (filter === 'tv') loadDiscover('tv', '📺 أحدث المسلسلات');
         else if (filter === 'marvel') executeSearch('marvel');
@@ -277,12 +426,14 @@
     }
 
     function renderLoading() {
+      showGridView();
       mediaGrid.innerHTML = Array(10).fill(0).map(() => `
         <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
       `).join('');
     }
 
     function showError(msg) {
+      showGridView();
       mediaGrid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-sm font-semibold">${msg}</div>`;
     }
 
@@ -304,11 +455,19 @@
         const date = item.release_date || item.first_air_date || '';
         const year = date ? date.slice(0, 4) : '';
         const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
-        const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+        // Provider-only entries carry a full poster URL and a provider link
+        // (no TMDB id): prefer the full URL, and open the provider page.
+        const poster = item.poster || (item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster');
         const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+        const click = item.providerUrl
+          ? `window.open('${item.providerUrl}', '_blank')`
+          : `openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')`;
+        const action = item.provider
+          ? `<span class="text-blue-400 font-semibold">${item.provider} ↗</span>`
+          : '<span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>';
 
         return `
-          <div class="group cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 hover:-translate-y-1 shadow-lg" onclick="openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')">
+          <div class="group cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 hover:-translate-y-1 shadow-lg" onclick="${click}">
             <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
               <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
               <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-amber-400 text-[11px] font-extrabold border border-amber-500/20">⭐ ${rating}</span>
@@ -318,7 +477,7 @@
               <h4 class="text-xs font-bold text-white truncate">${title}</h4>
               <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
                 <span>${year}</span>
-                <span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>
+                ${action}
               </div>
             </div>
           </div>
@@ -410,8 +569,10 @@
       return `${type}:${id}:${s || 0}:${e || 0}`;
     }
 
-    // Ask the Worker for a direct mp4 stream. 12s timeout; null on any
-    // failure or timeout (caller falls back to sandboxed vidlink).
+    // Ask the Worker for the servers/qualities of a title. 12s timeout;
+    // null on network failure or timeout. A parsed body is returned even
+    // when ok:false (it still carries the vidlink server); the caller
+    // decides whether to play natively or fall back to vidlink.
     async function fetchResolve(type, id, s, e) {
       const params = new URLSearchParams({ type, id: String(id) });
       if (s) params.set('s', String(s));
@@ -420,9 +581,8 @@
       const timer = setTimeout(() => controller.abort(), 12000);
       try {
         const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data && data.ok ? data : null;
+        const data = await res.json().catch(() => null);
+        return data || null;
       } catch (err) {
         return null;
       } finally {
@@ -469,17 +629,115 @@
         // 15s with no playable data: the stream is dead, not just slow.
         if (videoNative.readyState < 2) {
           showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
-          loadVidlinkFallback();
+          tryNextQualityOrFallback();
         }
       }, 15000);
     }
 
     videoNative.addEventListener('error', () => {
       if (!nativeActive) return;
-      showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
-      loadVidlinkFallback();
+      showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري تجربة مصدر آخر...');
+      tryNextQualityOrFallback();
     });
     videoNative.addEventListener('playing', clearNativePlayTimeout);
+
+    // Server + quality selection. currentServers is the servers array from
+    // the last /api/resolve (native server first, vidlink last).
+    function selectedServer() {
+      return currentServers ? currentServers[selectedServerIdx] : null;
+    }
+
+    function selectedQuality() {
+      const server = selectedServer();
+      return server ? server.qualities[selectedQualityIdx] : null;
+    }
+
+    function isVidlinkServer(server) {
+      return server && server.name === 'vidlink';
+    }
+
+    function renderServerControls() {
+      const wrap = document.getElementById('serverControls');
+      const serversRow = document.getElementById('serversRow');
+      const qualitiesRow = document.getElementById('qualitiesRow');
+      const qualityWrap = document.getElementById('qualityWrap');
+      if (!currentServers || currentServers.length === 0) {
+        wrap.classList.add('hidden');
+        return;
+      }
+      wrap.classList.remove('hidden');
+      serversRow.innerHTML = '';
+      currentServers.forEach((server, idx) => {
+        const b = document.createElement('button');
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border transition ' + (idx === selectedServerIdx
+          ? 'bg-red-600 border-red-600 text-white'
+          : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500');
+        b.textContent = server.name;
+        b.addEventListener('click', () => {
+          selectedServerIdx = idx;
+          selectedQualityIdx = 0;
+          renderServerControls();
+          playSelected();
+        });
+        serversRow.appendChild(b);
+      });
+      const server = selectedServer();
+      qualitiesRow.innerHTML = '';
+      if (server && server.qualities.length > 1) {
+        qualityWrap.classList.remove('hidden');
+        server.qualities.forEach((q, idx) => {
+          const b = document.createElement('button');
+          b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border transition ' + (idx === selectedQualityIdx
+            ? 'bg-emerald-600 border-emerald-600 text-white'
+            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500');
+          b.textContent = q.quality;
+          b.addEventListener('click', () => {
+            selectedQualityIdx = idx;
+            renderServerControls();
+            playSelected();
+          });
+          qualitiesRow.appendChild(b);
+        });
+      } else {
+        qualityWrap.classList.add('hidden');
+      }
+    }
+
+    // Play the currently selected server + quality.
+    function playSelected() {
+      const server = selectedServer();
+      const quality = selectedQuality();
+      if (!server || !quality) { loadVidlinkFallback(); return; }
+      playerContainer.classList.remove('hidden');
+      if (isVidlinkServer(server)) {
+        resetPlayer();
+        videoIframe.src = quality.stream;
+        playerContainer.classList.remove('hidden');
+        return;
+      }
+      videoIframe.src = '';
+      videoIframe.classList.add('hidden');
+      nativeActive = true;
+      videoNative.src = quality.stream;
+      videoNative.classList.remove('hidden');
+      hidePlayerStatus();
+      armNativePlayTimeout();
+      videoNative.play().catch(() => {});
+    }
+
+    // Native player failure: try the next quality of the same server
+    // first; only when no quality is left, fall back to vidlink.
+    function tryNextQualityOrFallback() {
+      const server = selectedServer();
+      if (server && !isVidlinkServer(server) && selectedQualityIdx < server.qualities.length - 1) {
+        selectedQualityIdx++;
+        renderServerControls();
+        playSelected();
+        showToast('الجودة السابقة مش شغالة — جارٍ تجربة جودة أخرى…');
+        return;
+      }
+      loadVidlinkFallback();
+    }
 
     // Sandboxed vidlink fallback for the current item/season/episode.
     // Also forgets a dead native resolve result for this key so the
@@ -491,6 +749,11 @@
       const e = type === 'tv' ? selectedEpisode : undefined;
       const key = resolveKey(type, currentItem.id, s, e);
       if (lastResolved && lastResolved.key === key) lastResolved = null;
+      // Mark the vidlink server as selected in the server picker.
+      if (currentServers) {
+        const vidIdx = currentServers.findIndex((s) => s.name === 'vidlink');
+        if (vidIdx >= 0) { selectedServerIdx = vidIdx; selectedQualityIdx = 0; renderServerControls(); }
+      }
       resetPlayer();
       let streamUrl = '';
       if (type === 'tv') {
@@ -516,6 +779,20 @@
       showToast._t = setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
+    // Count one view per title/episode when playback starts (fire-and-
+    // forget; the same key is never counted twice in this session).
+    let lastViewKey = null;
+    function recordViewOnce(type, id, s, e) {
+      const key = resolveKey(type, id, s, e);
+      if (lastViewKey === key) return;
+      lastViewKey = key;
+      fetch(`${API_BASE}/api/view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, id }),
+      }).catch(() => {});
+    }
+
     // In-App Instant Player: ad-free native <video> first, sandboxed vidlink fallback
     btnPlayInApp.addEventListener('click', playActiveStream);
 
@@ -524,19 +801,19 @@
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
       const s = type === 'tv' ? selectedSeason : undefined;
       const e = type === 'tv' ? selectedEpisode : undefined;
+      recordViewOnce(type, currentItem.id, s, e);
       playerContainer.classList.remove('hidden');
       showPlayerStatus('⏳ جاري تجهيز مشغّل بدون إعلانات...');
       const resolved = await fetchResolve(type, currentItem.id, s, e);
-      if (resolved) {
+      selectedServerIdx = 0;
+      selectedQualityIdx = 0;
+      currentServers = resolved && resolved.servers ? resolved.servers : null;
+      document.getElementById('downloadPicker').classList.add('hidden');
+      document.getElementById('botCodePanel').classList.add('hidden');
+      renderServerControls();
+      if (resolved && resolved.ok) {
         lastResolved = { key: resolveKey(type, currentItem.id, s, e), data: resolved };
-        videoIframe.src = '';
-        videoIframe.classList.add('hidden');
-        nativeActive = true;
-        videoNative.src = resolved.stream;
-        videoNative.classList.remove('hidden');
-        hidePlayerStatus();
-        armNativePlayTimeout();
-        videoNative.play().catch(() => {});
+        playSelected();
         return;
       }
       // No direct source: fall back to vidlink inside the sandboxed iframe
@@ -571,6 +848,8 @@
       const s = type === 'tv' ? selectedSeason : undefined;
       const e = type === 'tv' ? selectedEpisode : undefined;
       const key = resolveKey(type, currentItem.id, s, e);
+      const picker = document.getElementById('downloadPicker');
+      const pickerRow = document.getElementById('downloadQualitiesRow');
       const originalHtml = btnDirectDownload.innerHTML;
       btnDirectDownload.disabled = true;
       btnDirectDownload.innerHTML = '<span>⏳</span> <span>جاري تجهيز الرابط...</span>';
@@ -578,22 +857,31 @@
         let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
         if (!resolved) {
           resolved = await fetchResolve(type, currentItem.id, s, e);
-          if (resolved) lastResolved = { key, data: resolved };
+          if (resolved && resolved.ok) lastResolved = { key, data: resolved };
         }
-        if (resolved) {
-          if (await isDownloadAlive(resolved.download)) {
-            const a = document.createElement('a');
-            a.href = resolved.download;
-            a.download = '';
-            a.rel = 'noopener';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            return;
-          }
-          // Dead link: forget it so the next attempt re-resolves instead
-          // of reusing it, then fall through to the toast + bot request.
-          if (lastResolved && lastResolved.key === key) lastResolved = null;
+        // Downloadable qualities live on the first (native) server.
+        const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
+          ? resolved.servers[0].qualities.filter((q) => q.download)
+          : [];
+        if (qualities.length > 1) {
+          // More than one quality: show the picker; tapping one downloads it.
+          pickerRow.innerHTML = '';
+          qualities.forEach((q) => {
+            const b = document.createElement('button');
+            b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500 transition';
+            b.textContent = q.quality;
+            b.addEventListener('click', () => {
+              picker.classList.add('hidden');
+              downloadQuality(q, key);
+            });
+            pickerRow.appendChild(b);
+          });
+          picker.classList.remove('hidden');
+          return;
+        }
+        if (qualities.length === 1) {
+          await downloadQuality(qualities[0], key);
+          return;
         }
         showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
         openBotRequest();
@@ -603,6 +891,25 @@
       }
     });
 
+    // Probe then trigger the browser download of one quality.
+    async function downloadQuality(q, key) {
+      if (await isDownloadAlive(q.download)) {
+        const a = document.createElement('a');
+        a.href = q.download;
+        a.download = '';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      }
+      // Dead link: forget it so the next attempt re-resolves instead
+      // of reusing it, then fall through to the toast + bot request.
+      if (lastResolved && lastResolved.key === key) lastResolved = null;
+      showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
+      openBotRequest();
+    }
+
     // Short deep-link payload: m<tmdbId> for movies, t<tmdbId>[s..e..] for series.
     // (Telegram start parameters only allow A-Za-z0-9_-, max 64 chars.)
     function botPayload(item, s, e) {
@@ -610,7 +917,72 @@
       return `m${item.id}`;
     }
 
-    function openBotRequest() {
+    // Bot send by code: ask quality first, then POST /api/bot-code and
+    // show the code big with copy + open-bot. No /start payload needed:
+    // the user just sends the code to @filmatibot.
+    async function openBotRequest() {
+      if (!currentItem) return;
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const s = type === 'tv' ? selectedSeason : undefined;
+      const e = type === 'tv' ? selectedEpisode : undefined;
+      const key = resolveKey(type, currentItem.id, s, e);
+      const panel = document.getElementById('botCodePanel');
+      const result = document.getElementById('botCodeResult');
+      const qWrap = document.getElementById('botCodeQualityWrap');
+      const qRow = document.getElementById('botCodeQualitiesRow');
+      result.classList.add('hidden');
+      qWrap.classList.remove('hidden');
+      panel.classList.remove('hidden');
+      let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
+      if (!resolved) {
+        resolved = await fetchResolve(type, currentItem.id, s, e);
+        if (resolved && resolved.ok) lastResolved = { key, data: resolved };
+      }
+      const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
+        ? resolved.servers[0].qualities
+        : [];
+      qRow.innerHTML = '';
+      if (qualities.length === 0) {
+        // No direct source: fall back to the old deep link.
+        panel.classList.add('hidden');
+        openBotDeepLink();
+        return;
+      }
+      qualities.forEach((q) => {
+        const b = document.createElement('button');
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-blue-500 transition';
+        b.textContent = q.quality;
+        b.addEventListener('click', () => requestBotCode(type, currentItem.id, s, e, q.quality));
+        qRow.appendChild(b);
+      });
+    }
+
+    // POST /api/bot-code, then show the code big with copy + open-bot.
+    async function requestBotCode(type, id, s, e, quality) {
+      const result = document.getElementById('botCodeResult');
+      const codeEl = document.getElementById('botCodeValue');
+      codeEl.textContent = '…';
+      result.classList.remove('hidden');
+      try {
+        const res = await fetch(`${API_BASE}/api/bot-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, id, s, e, quality }),
+        });
+        const data = await res.json();
+        if (!data || !data.ok || !data.code) {
+          showToast('تعذّر إنشاء الكود — جرّب الرابط المباشر');
+          return;
+        }
+        codeEl.textContent = data.code;
+        window._lastBotCode = data.code;
+      } catch (err) {
+        showToast('تعذّر إنشاء الكود — تحقق من اتصالك');
+      }
+    }
+
+    // Old deep-link behaviour, kept as a secondary option.
+    function openBotDeepLink() {
       if (!currentItem) return;
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
       const s = type === 'tv' ? selectedSeason : undefined;
@@ -622,6 +994,29 @@
       }
     }
 
+    document.getElementById('btnCopyBotCode').addEventListener('click', async () => {
+      const code = window._lastBotCode;
+      if (!code) return;
+      try {
+        await navigator.clipboard.writeText(code);
+        showToast('تم نسخ الكود ✅');
+      } catch (err) {
+        showToast(code);
+      }
+    });
+
+    document.getElementById('btnOpenBotPlain').addEventListener('click', () => {
+      const code = window._lastBotCode;
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData && window.Telegram.WebApp.sendData && code) {
+        // Inside the Telegram WebApp: deliver the code to the bot directly.
+        window.Telegram.WebApp.sendData(JSON.stringify({ code }));
+      } else {
+        window.open('https://t.me/filmatibot', '_blank');
+      }
+    });
+
+    document.getElementById('btnBotDeepLink').addEventListener('click', openBotDeepLink);
+
     btnOpenInBot.addEventListener('click', openBotRequest);
 
     closeModal.addEventListener('click', () => {
@@ -629,10 +1024,13 @@
       document.body.classList.remove('overflow-hidden');
       resetPlayer();
       playerContainer.classList.add('hidden');
+      document.getElementById('serverControls').classList.add('hidden');
+      document.getElementById('downloadPicker').classList.add('hidden');
+      document.getElementById('botCodePanel').classList.add('hidden');
     });
 
     // Start
-    loadTrending();
+    loadHome();
   </script>
 </body>
 </html>

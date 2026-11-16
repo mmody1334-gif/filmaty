@@ -1,6 +1,14 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { resolveByTmdb } from "./engine/resolve.ts";
+import { qualityMatches, resolveServersByTmdb, vidlinkUrl } from "./engine/resolve.ts";
+import {
+  BOT_CODE_TTL_SECONDS,
+  botCodeKey,
+  generateBotCode,
+  type BotCodePayload,
+} from "./engine/botcode.ts";
+import { searchTitles } from "./engine/search.ts";
+import { getHome, recordView } from "./engine/home.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
 import { renderPlayerHtml } from "./player/html.ts";
 import { FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
@@ -45,6 +53,22 @@ export default {
     // + direct download). GET /api/resolve?type=movie|tv&id=123&s=1&e=2
     if (url.pathname === "/api/resolve" && request.method === "GET") {
       return await handleApiResolve(request, env, url);
+    }
+
+    if (url.pathname === "/api/bot-code" && request.method === "POST") {
+      return handleApiBotCode(request, env);
+    }
+
+    if (url.pathname === "/api/search" && request.method === "GET") {
+      return handleApiSearch(request, env, url);
+    }
+
+    if (url.pathname === "/api/view" && request.method === "POST") {
+      return handleApiView(request, env);
+    }
+
+    if (url.pathname === "/api/home" && request.method === "GET") {
+      return handleApiHome(request, env);
     }
 
     // Telegram webhook handler
@@ -117,7 +141,7 @@ export default {
 function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "*",
   };
 }
@@ -129,12 +153,140 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
-// Simple KV rate limit for /api/resolve: max 30 requests per IP per 10 min.
+// POST /api/view { type, id } -> { ok, count }. Counts one view of a
+// title (no per-user tracking, no auth); maintains the cached top list.
+async function handleApiView(request: Request, env: Env): Promise<Response> {
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid json" }, 400);
+  }
+  const type = body?.type;
+  const id = Number(body?.id);
+  if (type !== "movie" && type !== "tv") {
+    return jsonResponse({ ok: false, error: "invalid type" }, 400);
+  }
+  if (!Number.isInteger(id) || id <= 0) {
+    return jsonResponse({ ok: false, error: "invalid id" }, 400);
+  }
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "view"))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+  const { count } = await recordView(env, type, id);
+  return jsonResponse({ ok: true, count }, 200);
+}
+
+// GET /api/home -> { ok, mostWatched, topRated } (KV-cached 10 min).
+async function handleApiHome(request: Request, env: Env): Promise<Response> {
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "home"))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+  const { mostWatched, topRated } = await getHome(env);
+  return jsonResponse({ ok: true, mostWatched, topRated }, 200);
+}
+
+// GET /api/search?q= — TMDB in ar + en-US merged/deduped, provider
+// fallback when TMDB returns nothing. { ok, results, source }.
+async function handleApiSearch(request: Request, env: Env, url: URL): Promise<Response> {
+  const q = (url.searchParams.get("q") || "").trim();
+  if (!q) {
+    return jsonResponse({ ok: false, error: "missing q" }, 400);
+  }
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "search"))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+  const { results, source } = await searchTitles(env, q);
+  return jsonResponse({ ok: true, results, source }, 200);
+}
+
+// POST /api/bot-code { type, id, s?, e?, quality? } -> { ok, code }.
+// Only issues a code for a title/episode/quality that actually resolves
+// (same resolver as /api/resolve). Code is valid for 1 hour.
+async function handleApiBotCode(request: Request, env: Env): Promise<Response> {
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid json" }, 400);
+  }
+
+  const type = body?.type;
+  const id = Number(body?.id);
+  if (type !== "movie" && type !== "tv") {
+    return jsonResponse({ ok: false, error: "invalid type" }, 400);
+  }
+  if (!Number.isInteger(id) || id <= 0) {
+    return jsonResponse({ ok: false, error: "invalid id" }, 400);
+  }
+  const s = Number(body?.s);
+  const e = Number(body?.e);
+  const seasonNum = Number.isInteger(s) && s > 0 ? s : undefined;
+  const episodeNum = Number.isInteger(e) && e > 0 ? e : undefined;
+
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "bot-code"))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+
+  const resolved = await resolveServersByTmdb(env, type, id, seasonNum, episodeNum);
+  if (!resolved || resolved.servers.length === 0) {
+    return jsonResponse({ ok: false, error: "not_found" }, 404);
+  }
+  const qualities = resolved.servers[0].qualities;
+  const requestedQuality = typeof body?.quality === "string" ? body.quality : undefined;
+  const quality = requestedQuality
+    ? qualities.find((q) => qualityMatches(q.quality, requestedQuality))
+    : qualities[0];
+  if (!quality) {
+    return jsonResponse({ ok: false, error: "quality_not_found" }, 404);
+  }
+
+  // Generate a unique code (collision-checked in KV, up to 5 attempts).
+  let code = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = generateBotCode();
+    try {
+      const existing = await env.CACHE?.get(botCodeKey(candidate));
+      if (!existing) {
+        code = candidate;
+        break;
+      }
+    } catch {
+      code = candidate;
+      break;
+    }
+  }
+  if (!code) {
+    return jsonResponse({ ok: false, error: "try_again" }, 503);
+  }
+
+  const payload: BotCodePayload = {
+    type,
+    tmdbId: id,
+    season: seasonNum,
+    episode: episodeNum,
+    quality: quality.quality,
+  };
+  try {
+    await env.CACHE?.put(botCodeKey(code), JSON.stringify(payload), {
+      expirationTtl: BOT_CODE_TTL_SECONDS,
+    });
+  } catch {
+    return jsonResponse({ ok: false, error: "try_again" }, 503);
+  }
+  return jsonResponse({ ok: true, code }, 200);
+}
+
+// Simple KV rate limit: max 30 requests per IP per 10 min per bucket.
 // Fails open (allows the request) if KV is unavailable.
-async function checkResolveRateLimit(env: Env, ip: string): Promise<boolean> {
+async function checkResolveRateLimit(env: Env, ip: string, bucket = "resolve"): Promise<boolean> {
   try {
     if (!env.CACHE) return true;
-    const key = `rl:resolve:${ip}`;
+    const key = `rl:${bucket}:${ip}`;
     const raw = await env.CACHE.get(key);
     const count = raw ? Number.parseInt(raw, 10) || 0 : 0;
     if (count >= 30) return false;
@@ -166,36 +318,65 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
   const eRaw = url.searchParams.get("e");
   const season = sRaw ? Number(sRaw) : undefined;
   const episode = eRaw ? Number(eRaw) : undefined;
-
-  const resolved = await resolveByTmdb(
-    env,
-    type,
-    id,
-    season !== undefined && Number.isInteger(season) && season > 0 ? season : undefined,
-    episode !== undefined && Number.isInteger(episode) && episode > 0 ? episode : undefined,
-  );
-  if (!resolved) {
-    return jsonResponse({ ok: false }, 404);
-  }
+  const seasonNum =
+    season !== undefined && Number.isInteger(season) && season > 0 ? season : undefined;
+  const episodeNum =
+    episode !== undefined && Number.isInteger(episode) && episode > 0 ? episode : undefined;
 
   const publicBase = env.PUBLIC_BASE || url.origin;
-  const token = await signToken(
-    {
-      u: resolved.directVideoUrl,
-      n: resolved.title,
-      k: "mp4",
-      e: Math.floor(Date.now() / 1000) + 3 * 3600,
-    },
-    env.SIGNING_SECRET,
-  );
-  const stream = `${publicBase}/stream?t=${encodeURIComponent(token)}`;
+  const vidlink = vidlinkUrl(type, id, seasonNum, episodeNum);
+  const vidlinkServer = {
+    name: "vidlink",
+    qualities: [{ quality: "HD", stream: vidlink }],
+  };
+
+  const resolved = await resolveServersByTmdb(env, type, id, seasonNum, episodeNum);
+  if (!resolved) {
+    // No validated native stream: top-level ok stays false (existing
+    // behaviour) so the frontend falls back to the sandboxed vidlink
+    // player, but the vidlink server is still listed.
+    return jsonResponse({ ok: false, servers: [vidlinkServer] }, 404);
+  }
+
+  // Sign one stream/download token per quality (tokens live 3h).
+  const servers: Array<{
+    name: string;
+    qualities: Array<{ quality: string; stream: string; download?: string; size?: string }>;
+  }> = [];
+  for (const server of resolved.servers) {
+    const qualities: Array<{ quality: string; stream: string; download?: string; size?: string }> = [];
+    for (const q of server.qualities) {
+      const token = await signToken(
+        {
+          u: q.directVideoUrl,
+          n: resolved.title,
+          k: "mp4",
+          e: Math.floor(Date.now() / 1000) + 3 * 3600,
+        },
+        env.SIGNING_SECRET,
+      );
+      const stream = `${publicBase}/stream?t=${encodeURIComponent(token)}`;
+      qualities.push({
+        quality: q.quality,
+        stream,
+        download: `${stream}&dl=1`,
+        ...(q.size ? { size: q.size } : {}),
+      });
+    }
+    servers.push({ name: server.name, qualities });
+  }
+  servers.push(vidlinkServer);
+
+  // Top-level fields stay the default: best quality of the first server.
+  const best = servers[0].qualities[0];
   return jsonResponse(
     {
       ok: true,
       title: resolved.title,
-      quality: resolved.quality,
-      stream,
-      download: `${stream}&dl=1`,
+      quality: best.quality,
+      stream: best.stream,
+      download: best.download,
+      servers,
     },
     200,
   );

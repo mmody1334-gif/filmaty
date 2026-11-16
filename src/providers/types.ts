@@ -65,4 +65,8 @@ export interface Provider {
   getDetails(candidate: Candidate): Promise<MediaDetails>;
   getEpisodeSources(episode: Episode): Promise<SourceLink[]>;
   resolveStream?(watchUrl: string): Promise<ResolvedStream>;
+  // All direct variants on a watch page (e.g. Akwam lists 480p/720p/1080p
+  // files). Optional: providers without it resolve a single stream via
+  // resolveStream. Best quality first, deduplicated by quality.
+  resolveStreams?(watchUrl: string): Promise<ResolvedStream[]>;
 }

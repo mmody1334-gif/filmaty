@@ -1,7 +1,8 @@
 import type { Env } from "../env.ts";
 import { parseOwnerIds } from "../env.ts";
 import { AppStore } from "../engine/store.ts";
-import { fetchTmdbDetails, resolveBestDirectStream, tmdbTitleOf } from "../engine/resolve.ts";
+import { fetchTmdbDetails, qualityMatches, resolveBestDirectStream, resolveServersByTmdb, tmdbTitleOf } from "../engine/resolve.ts";
+import { botCodeKey, isBotCode, type BotCodePayload } from "../engine/botcode.ts";
 import { ALL_PROVIDERS, findProvider, searchAllProviders } from "../providers/index.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, SourceLink } from "../providers/types.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
@@ -68,10 +69,12 @@ export function parseStartPayload(payload: string): StartPayload | null {
   return null;
 }
 
-// Convert a Telegram WebApp sendData payload {type, id, s, e} to the same
-// short string form used by /start deep links. Returns null if invalid.
+// Convert a Telegram WebApp sendData payload {type, id, s, e} (or {code})
+// to the same short string form used by /start deep links. Returns null if
+// invalid.
 export function webAppDataToPayload(data: any): string | null {
   if (!data || typeof data !== "object") return null;
+  if (typeof data.code === "string" && isBotCode(data.code)) return data.code;
   const id = Number(data.id);
   if (!Number.isInteger(id) || id <= 0) return null;
   if (data.type === "movie") return `m${id}`;
@@ -137,6 +140,12 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
     return;
   }
 
+  // 0. Bot code (6 chars): send the video directly, no /start needed.
+  if (isBotCode(text)) {
+    await handleBotCode(chatId, text, bot, store, env);
+    return;
+  }
+
   // 1. Social Media Links Auto-Detection
   const firstUrl = extractFirstUrl(text);
   if (firstUrl) {
@@ -167,6 +176,11 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
     const parsed = parseStartPayload(payload);
     if (parsed) {
       await handleStartPayload(chatId, parsed, bot, store, env);
+      return;
+    }
+    // A 6-char bot code as a /start payload (start=CODE): same direct send.
+    if (isBotCode(payload)) {
+      await handleBotCode(chatId, payload, bot, store, env);
       return;
     }
     // Payload that does not match m/t form: treat it as a plain search query.
@@ -390,6 +404,88 @@ async function handleStartPayload(
     store,
     env,
   );
+}
+
+// Handle a 6-char bot code: look it up in KV and send that exact
+// title/episode/quality directly with bot.sendVideo — same caption,
+// buttons, status message and >50MB fallback as the mov|send| flow.
+// No /start needed; an unknown/expired code gets the error reply only.
+async function handleBotCode(
+  chatId: number,
+  code: string,
+  bot: TelegramClient,
+  store: AppStore,
+  env: Env,
+): Promise<void> {
+  const raw = await store.get(botCodeKey(code));
+  if (!raw) {
+    await bot.sendMessage(chatId, "❌ الكود غير صحيح أو انتهت صلاحيته");
+    return;
+  }
+  const payload = JSON.parse(raw) as BotCodePayload;
+  const resolved = await resolveServersByTmdb(
+    env,
+    payload.type,
+    payload.tmdbId,
+    payload.season,
+    payload.episode,
+  );
+  const qualities = resolved?.servers?.[0]?.qualities || [];
+  const wantedQuality = payload.quality;
+  const quality = wantedQuality
+    ? qualities.find((q) => qualityMatches(q.quality, wantedQuality))
+    : qualities[0];
+  if (!resolved || !quality) {
+    await bot.sendMessage(chatId, "❌ تعذر العثور على هذا العمل — قد يكون الرابط غير متاح حاليًا.");
+    return;
+  }
+
+  const title =
+    resolved.title +
+    (payload.type === "tv" && payload.season && payload.episode
+      ? ` - S${payload.season}E${payload.episode}`
+      : "");
+  const statusMsg = await bot.sendMessage(
+    chatId,
+    `⏳ <b>جاري إرسال الفيديو مباشرة داخل شات التليجرام...</b>\n🎬 <b>${views.escapeHtml(title)}</b>\n🎯 الجودة: <b>${quality.quality}</b>\n<i>يرجى الانتظار بضع ثوانٍ بينما يقوم سيرفر التليجرام بالمعالجة...</i>`,
+  );
+  const statusMsgId = extractMsgId(statusMsg);
+
+  const caption = `🎬 <b>${views.escapeHtml(title)}</b>\n🎯 الجودة: <b>${quality.quality}</b>${quality.size ? ` • 📦 ${quality.size}` : ""}\n\n🍿 مشاهدة ممتعة عبر بوت فيلماتي!`;
+  const videoKeyboard = {
+    inline_keyboard: [
+      [{ text: "⬇️ رابط التحميل المباشر (.mp4)", url: quality.directVideoUrl }],
+    ],
+  };
+
+  try {
+    const res = await bot.sendVideo(chatId, quality.directVideoUrl, caption, {
+      reply_markup: videoKeyboard,
+    });
+
+    if (res && (res.ok || res.message_id)) {
+      if (statusMsgId) await bot.deleteMessage(chatId, statusMsgId).catch(() => undefined);
+      return;
+    }
+    throw new Error(res?.description || "Failed to send video directly");
+  } catch (err: any) {
+    if (statusMsgId) await bot.deleteMessage(chatId, statusMsgId).catch(() => undefined);
+    await bot.sendMessage(
+      chatId,
+      `⚠️ <b>تنبيه من سيرفرات التليجرام:</b>
+حجم الفيديو كبير (أكبر من 50MB) أو قيود سيرفر التليجرام تمنع استيراده تلقائياً في الشات.
+
+👇 <b>يمكنك تحميله فوراً وبأقصى سرعة (.mp4) أو تشغيله مباشرة:</b>`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "⬇️ تحميل مباشر (.mp4)", url: quality.directVideoUrl }],
+            [{ text: "▶️ مشاهدة مباشرة أونلاين", url: quality.directVideoUrl }],
+          ],
+        },
+      },
+    );
+  }
 }
 
 async function executeSearch(

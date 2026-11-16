@@ -3,7 +3,7 @@ import { parseList } from "../env.ts";
 import { normalizeArabic, parseSeasonEpisode } from "./normalize.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import { findProvider, searchAllProviders } from "../providers/index.ts";
-import type { MediaKind, Provider, ResolvedStream } from "../providers/types.ts";
+import type { Candidate, MediaKind, Provider, ResolvedStream } from "../providers/types.ts";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
@@ -113,23 +113,67 @@ export async function resolveBestDirectStream(
   seasonNum?: number,
   episodeNum?: number,
 ): Promise<ResolvedStream> {
-  // 1. Try provider's own resolver (only a validated direct URL counts).
-  if (provider.resolveStream) {
-    try {
-      const stream = await provider.resolveStream(targetUrl);
-      if (
-        stream &&
-        isDirectMediaUrl(stream.directVideoUrl) &&
-        (await validateDirectUrl(stream.directVideoUrl))
-      ) {
-        return stream;
-      }
-    } catch {
-      /* continue to lookup */
+  const streams = await resolveAllDirectStreams(
+    provider,
+    targetUrl,
+    title,
+    kind,
+    seasonNum,
+    episodeNum,
+  );
+  if (streams.length > 0) return streams[0];
+  throw new Error(
+    "تعذر التحقق من رابط الفيديو المباشر — قد يكون المصدر غير متاح حالياً.",
+  );
+}
+
+// Validate every stream in a list, keeping only the usable ones (in order).
+async function validateStreams(streams: ResolvedStream[]): Promise<ResolvedStream[]> {
+  const ok: ResolvedStream[] = [];
+  for (const s of streams) {
+    if (
+      s &&
+      isDirectMediaUrl(s.directVideoUrl) &&
+      (await validateDirectUrl(s.directVideoUrl))
+    ) {
+      ok.push(s);
     }
   }
+  return ok;
+}
 
-  // 2. Direct lookup on Akwam to obtain real direct .mp4 CDN URL.
+// All validated direct streams for one watch URL: every quality the
+// provider offers (Akwam watch pages list 480p/720p/1080p), best first;
+// a single stream otherwise. Empty when nothing is usable.
+async function tryAllFromWatch(provider: Provider, targetUrl: string): Promise<ResolvedStream[]> {
+  try {
+    const streams = provider.resolveStreams
+      ? await provider.resolveStreams(targetUrl)
+      : provider.resolveStream
+        ? [await provider.resolveStream(targetUrl)]
+        : [];
+    return await validateStreams(streams);
+  } catch {
+    return [];
+  }
+}
+
+// Same three steps as resolveBestDirectStream, but collecting every
+// validated variant instead of stopping at the first one. The first
+// stream returned is the same one resolveBestDirectStream returns.
+export async function resolveAllDirectStreams(
+  provider: Provider,
+  targetUrl: string,
+  title: string,
+  kind: MediaKind,
+  seasonNum?: number,
+  episodeNum?: number,
+): Promise<ResolvedStream[]> {
+  // 1. Try provider's own resolver (only validated direct URLs count).
+  const first = await tryAllFromWatch(provider, targetUrl);
+  if (first.length > 0) return first;
+
+  // 2. Direct lookup on Akwam to obtain real direct .mp4 CDN URLs.
   // Only candidates whose title strictly matches the requested title are
   // considered, and for series the matched show must actually contain the
   // requested season/episode — no falling back to season/episode [0].
@@ -143,14 +187,8 @@ export async function resolveBestDirectStream(
       try {
         if (kind === "movie" && details.sources.length > 0) {
           for (const src of details.sources) {
-            const stream = await akwam.resolveStream(src.url);
-            if (
-              stream &&
-              isDirectMediaUrl(stream.directVideoUrl) &&
-              (await validateDirectUrl(stream.directVideoUrl))
-            ) {
-              return stream;
-            }
+            const found = await tryAllFromWatch(akwam, src.url);
+            if (found.length > 0) return found;
           }
         }
         if (kind === "series" && details.seasons.length > 0) {
@@ -160,14 +198,8 @@ export async function resolveBestDirectStream(
           if (!ep) continue;
           const epSources = await akwam.getEpisodeSources(ep);
           for (const src of epSources) {
-            const stream = await akwam.resolveStream(src.url);
-            if (
-              stream &&
-              isDirectMediaUrl(stream.directVideoUrl) &&
-              (await validateDirectUrl(stream.directVideoUrl))
-            ) {
-              return stream;
-            }
+            const found = await tryAllFromWatch(akwam, src.url);
+            if (found.length > 0) return found;
           }
         }
       } catch {
@@ -182,41 +214,10 @@ export async function resolveBestDirectStream(
   // 3. Final fallback: one more attempt at the provider's own resolver
   // (a transient failure on the first try can succeed on retry), or —
   // when the provider cannot resolve at all (e.g. the embed provider) —
-  // scrape a direct mp4 out of the target page itself. Only a validated
-  // URL is returned; otherwise fail loudly instead of handing callers a
-  // dead link. Callers handle the throw: the bot shows "تعذر استخراج
-  // الرابط المباشر" and /api/resolve tries the next candidate (or returns
-  // { ok: false } so the frontend falls back).
-  if (provider.resolveStream) {
-    try {
-      const stream = await provider.resolveStream(targetUrl);
-      if (
-        stream &&
-        isDirectMediaUrl(stream.directVideoUrl) &&
-        (await validateDirectUrl(stream.directVideoUrl))
-      ) {
-        return stream;
-      }
-    } catch {
-      /* fall through to the throw */
-    }
-  } else {
-    try {
-      const stream = await new AkwamProvider().resolveStream(targetUrl);
-      if (
-        stream &&
-        isDirectMediaUrl(stream.directVideoUrl) &&
-        (await validateDirectUrl(stream.directVideoUrl))
-      ) {
-        return stream;
-      }
-    } catch {
-      /* fall through to the throw */
-    }
-  }
-  throw new Error(
-    "تعذر التحقق من رابط الفيديو المباشر — قد يكون المصدر غير متاح حالياً.",
-  );
+  // scrape a direct mp4 out of the target page itself via Akwam.
+  const retryProvider =
+    provider.resolveStreams || provider.resolveStream ? provider : new AkwamProvider();
+  return await tryAllFromWatch(retryProvider, targetUrl);
 }
 
 // -----------------------------------------------------------------------------
@@ -324,13 +325,15 @@ export async function resolveByTmdb(
   return result;
 }
 
-async function resolveByTmdbUncached(
+// Shared preamble for both resolve paths (single best stream for the
+// bot, all servers/qualities for /api/resolve): TMDB title (English
+// first) + provider search + strict title filter + Arabic fallback.
+// Identical behaviour on both paths — do not diverge them.
+async function fetchResolveCandidates(
   env: Env,
   type: "movie" | "tv",
   tmdbId: number,
-  season?: number,
-  episode?: number,
-): Promise<ResolvedDirect | null> {
+): Promise<{ enTitle: TmdbTitle; kind: MediaKind; candidates: Candidate[] } | null> {
   const kind: MediaKind = type === "tv" ? "series" : "movie";
   const disabled = parseList(env.PROVIDERS_DISABLED);
 
@@ -357,6 +360,180 @@ async function resolveByTmdbUncached(
       );
     }
   }
+
+  return { enTitle, kind, candidates };
+}
+
+// -----------------------------------------------------------------------------
+// Multi-server / multi-quality resolve (for /api/resolve + bot codes)
+// -----------------------------------------------------------------------------
+
+export interface ResolvedQuality {
+  quality: string;
+  directVideoUrl: string;
+  size?: string;
+}
+
+export interface ResolvedServer {
+  name: string;
+  qualities: ResolvedQuality[];
+}
+
+export interface ResolvedMulti {
+  title: string;
+  servers: ResolvedServer[];
+}
+
+// The sandboxed embed fallback for a title (no direct download from it).
+export function vidlinkUrl(
+  type: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): string {
+  if (type === "tv") {
+    return `https://vidlink.pro/tv/${tmdbId}/${season || 1}/${episode || 1}`;
+  }
+  return `https://vidlink.pro/movie/${tmdbId}`;
+}
+
+// Do two quality labels name the same resolution? ("720p HD" vs "720p")
+export function qualityMatches(a: string, b: string): boolean {
+  const ra = a.match(/(\d{3,4})/)?.[1];
+  const rb = b.match(/(\d{3,4})/)?.[1];
+  if (ra && rb) return ra === rb;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+const SERVER_CACHE_SUCCESS_TTL = 6 * 3600; // 6 hours
+const SERVER_CACHE_FAILURE_TTL = 30 * 60; // 30 minutes
+
+// Like resolveByTmdb, but returns every validated quality of the first
+// working source (native server) instead of only the best stream. The
+// vidlink server is added by the /api/resolve handler, not cached here.
+// Null when nothing validates (callers fall back to vidlink).
+export async function resolveServersByTmdb(
+  env: Env,
+  type: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): Promise<ResolvedMulti | null> {
+  const cacheKey = `srv:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+
+  try {
+    const cached = await env.CACHE?.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as { ok: boolean } & ResolvedMulti;
+      if (parsed && parsed.ok) {
+        return { title: parsed.title, servers: parsed.servers };
+      }
+      if (parsed && parsed.ok === false) return null;
+    }
+  } catch {
+    /* cache read failure: fall through to live resolve */
+  }
+
+  const result = await resolveServersByTmdbUncached(env, type, tmdbId, season, episode);
+
+  try {
+    if (result) {
+      await env.CACHE?.put(
+        cacheKey,
+        JSON.stringify({ ok: true, ...result }),
+        { expirationTtl: SERVER_CACHE_SUCCESS_TTL },
+      );
+    } else {
+      await env.CACHE?.put(cacheKey, JSON.stringify({ ok: false }), {
+        expirationTtl: SERVER_CACHE_FAILURE_TTL,
+      });
+    }
+  } catch {
+    /* cache write failure: ignore */
+  }
+
+  return result;
+}
+
+async function resolveServersByTmdbUncached(
+  env: Env,
+  type: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): Promise<ResolvedMulti | null> {
+  const found = await fetchResolveCandidates(env, type, tmdbId);
+  if (!found) return null;
+  const { enTitle, kind, candidates } = found;
+
+  for (const candidate of candidates) {
+    // Same declared season/episode guard as the single-result path: never
+    // resolve from a page that declares a different season or episode.
+    if (type === "tv") {
+      const declared = parseSeasonEpisode(candidate.title);
+      if (
+        season !== undefined &&
+        declared.season !== undefined &&
+        declared.season !== season
+      ) {
+        continue;
+      }
+      if (
+        episode !== undefined &&
+        declared.episode !== undefined &&
+        declared.episode !== episode
+      ) {
+        continue;
+      }
+    }
+    const provider = findProvider(candidate.site);
+    if (!provider) continue;
+    try {
+      const details = await provider.getDetails(candidate);
+      const targetUrl = await pickTargetUrl(provider, details, type, season, episode, candidate.url);
+      if (!targetUrl) continue;
+      const streams = await resolveAllDirectStreams(
+        provider,
+        targetUrl,
+        enTitle.originalTitle,
+        kind,
+        season,
+        episode,
+      );
+      if (streams.length > 0) {
+        return {
+          title: enTitle.title,
+          servers: [
+            {
+              name: provider.label || "مباشر",
+              qualities: streams.map((s) => ({
+                quality: s.quality,
+                directVideoUrl: s.directVideoUrl,
+                size: s.size,
+              })),
+            },
+          ],
+        };
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+async function resolveByTmdbUncached(
+  env: Env,
+  type: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): Promise<ResolvedDirect | null> {
+  const kind: MediaKind = type === "tv" ? "series" : "movie";
+  const found = await fetchResolveCandidates(env, type, tmdbId);
+  if (!found) return null;
+  const { enTitle, candidates } = found;
 
   for (const candidate of candidates) {
     // Series: a candidate page is one season's page (Akwam titles carry
