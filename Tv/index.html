@@ -141,7 +141,7 @@
       </div>
       <div id="tvGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
     </div>
-    <p class="text-center text-slate-500 text-xs font-semibold pt-2">التنقّل بالأسهم من الريموت • OK للاختيار • رجوع للخروج</p>
+    <p class="text-center text-slate-500 text-xs font-semibold pt-2">التنقّل بالأسهم من الريموت • OK للاختيار • ١ للرجوع ١٠ ثواني • ٣ للتقديم ١٠ ثواني • رجوع للخروج</p>
   </main>
 
   <!-- Details + player overlay: everything inline, same page, no pop-ups. -->
@@ -218,6 +218,7 @@
 
     let currentItem = null;
     let heroItem = null;
+    let seekFlashTimer = null;
     let selectedSeason = 1;
     let selectedEpisode = 1;
     let currentServers = null;
@@ -356,6 +357,25 @@
         const pairOverlay = document.getElementById('tvPairOverlay');
         if (!pairOverlay.classList.contains('hidden')) { e.preventDefault(); closePairOverlay(); return; }
         if (overlayOpen) { e.preventDefault(); closeOverlay(); }
+        return;
+      }
+      // Number keys: 1 = back 10s, 3 = forward 10s. Only the native
+      // player can be seeked — a cross-origin embed iframe cannot be
+      // controlled from outside, so on an embed the keys just say so.
+      if (e.key === '1' || e.key === '3') {
+        if (!overlayOpen) return;
+        e.preventDefault();
+        if (nativeActive && !tvVideo.classList.contains('hidden')) {
+          const delta = e.key === '1' ? -10 : 10;
+          const dur = tvVideo.duration;
+          const target = tvVideo.currentTime + delta;
+          tvVideo.currentTime = Number.isFinite(dur)
+            ? Math.max(0, Math.min(dur, target))
+            : Math.max(0, target);
+          flashPlayerStatus(delta < 0 ? '⏪ ‎-10 ثواني' : '‎+10 ثواني ⏩');
+        } else {
+          flashPlayerStatus('⏪ الترجيع متاح على المشغّل المباشر فقط', 2000);
+        }
         return;
       }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
@@ -693,6 +713,15 @@
     }
     function hidePlayerStatus() {
       tvPlayerStatus.classList.add('hidden');
+    }
+    // Brief status flash (e.g. a 10s seek jump): shows the message, then
+    // hides it again — unless another message replaced it meanwhile.
+    function flashPlayerStatus(msg, ms = 1200) {
+      showPlayerStatus(msg);
+      clearTimeout(seekFlashTimer);
+      seekFlashTimer = setTimeout(() => {
+        if (tvPlayerStatus.innerText === msg) hidePlayerStatus();
+      }, ms);
     }
     function resetPlayer() {
       nativeActive = false;
