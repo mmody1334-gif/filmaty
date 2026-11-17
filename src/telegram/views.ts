@@ -58,6 +58,12 @@ export function formatSearchResults(query: string, count: number): string {
 تم العثور على <b>${count}</b> عمل. اختر العمل المطلوب لعرض التفاصيل والجودات:`;
 }
 
+export function formatSearchError(): string {
+  return `⚠️ <b>تعذّر إكمال البحث</b>
+
+حصلت مشكلة أثناء البحث — جرّب تاني بعد شوية.`;
+}
+
 export function formatNoResults(query: string): string {
   return `❌ <b>عذرًا، لم يتم العثور على نتائج لـ:</b> <code>${escapeHtml(query)}</code>
 

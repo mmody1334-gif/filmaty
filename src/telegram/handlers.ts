@@ -444,7 +444,8 @@ async function handleStartPayload(
     );
   }
 
-  await bot.sendMessage(chatId, `⏳ جاري البحث عن: ${views.escapeHtml(tmdbTitle.title)}`);
+  // No status message here: executeSearch sends its own. The old code
+  // sent one too, so every /start deep link showed "جاري البحث" twice.
   await executeSearch(
     chatId,
     tmdbTitle.originalTitle,
@@ -546,35 +547,134 @@ async function handleBotCode(
 // caller drops such titles (the bot can only serve what providers have).
 // Display fields (title/year/poster) come from the TMDB item so the bot
 // shows the same titles the site shows.
+// Shape a provider candidate as a bot result for one engine title: the
+// display title/year/poster come from TMDB, the playable link from the
+// provider, and the TMDB id lets the pick flow resolve the title.
+function toAttachedCandidate(match: Candidate, item: SearchResultItem): Candidate {
+  const kind: MediaKind = item.media_type === "tv" ? "series" : "movie";
+  const arTitle = item.title || item.name || "";
+  const year =
+    Number((item.release_date || item.first_air_date || "").slice(0, 4)) || undefined;
+  return {
+    ...match,
+    title: arTitle,
+    year: year || match.year,
+    kind,
+    tmdbId: item.id ?? undefined,
+    poster: item.poster_path
+      ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+      : match.poster,
+  };
+}
+
+function attachTitles(item: SearchResultItem): string[] {
+  const enTitle = item.original_title || item.original_name || item.title || item.name || "";
+  const arTitle = item.title || item.name || "";
+  return enTitle && enTitle !== arTitle ? [enTitle, arTitle] : [enTitle || arTitle];
+}
+
+// Match one engine title against an already-fetched provider pool (no
+// network): the same English-first, then Arabic, strict titlesMatch the
+// per-title attach uses — so one provider sweep can attach many titles
+// instead of one sweep per title.
+function matchPoolCandidate(pool: Candidate[], item: SearchResultItem): Candidate | null {
+  const kind: MediaKind = item.media_type === "tv" ? "series" : "movie";
+  for (const t of attachTitles(item)) {
+    if (!t) continue;
+    const match = pool.find((c) => c.kind === kind && titlesMatch(c.title, t));
+    if (match) return toAttachedCandidate(match, item);
+  }
+  return null;
+}
+
 async function attachProviderCandidate(
   env: Env,
   item: SearchResultItem,
   disabled: string[],
+  onlySites?: string[],
+  searchOpts?: { pages?: number },
 ): Promise<Candidate | null> {
   const kind: MediaKind = item.media_type === "tv" ? "series" : "movie";
-  const enTitle = item.original_title || item.original_name || item.title || item.name || "";
-  const arTitle = item.title || item.name || "";
-  const tryTitles = enTitle && enTitle !== arTitle ? [enTitle, arTitle] : [enTitle || arTitle];
-  for (const t of tryTitles) {
+  for (const t of attachTitles(item)) {
     if (!t) continue;
-    const candidates = await searchAllProviders(t, kind, disabled);
+    const candidates = await searchAllProviders(t, kind, disabled, false, onlySites, searchOpts);
     const match = candidates.find((c) => titlesMatch(c.title, t));
-    if (match) {
-      const year =
-        Number((item.release_date || item.first_air_date || "").slice(0, 4)) || undefined;
-      return {
-        ...match,
-        title: arTitle,
-        year: year || match.year,
-        kind,
-        tmdbId: item.id ?? undefined,
-        poster: item.poster_path
-          ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
-          : match.poster,
-      };
-    }
+    if (match) return toAttachedCandidate(match, item);
   }
   return null;
+}
+
+// Bot search, budget-capped (Mohamed: the 10 closest results, Worker
+// requests ≤ 50). The old flow ran one full 9-provider sweep per engine
+// title, 8 of them in parallel — ~140 subrequests for "Spartacus" against
+// the Worker's ~50 cap, so the search died mid-flight and the bot never
+// answered at all. Now: the unified engine (augmentation off — the bot
+// runs its own sweep below), ONE shared provider sweep for the query,
+// local matching against the engine's top 10, then at most 6 per-title
+// top-ups on the direct providers only. Measured live for Spartacus:
+// ~13 fetches for the whole search (was ~140); Marvel ~33 (was ~140).
+// The pool itself is the last resort when nothing attaches, so the bot
+// never returns less than the raw provider search did.
+async function searchBotTitles(
+  env: Env,
+  query: string,
+  kind: MediaKind | undefined,
+): Promise<Candidate[]> {
+  const disabled = parseList(env.PROVIDERS_DISABLED);
+  const engine = await searchTitles(env, query, { augment: false });
+  // The engine fell back to the providers itself (TMDB empty): its
+  // results ARE the provider candidates — no second sweep needed.
+  if (engine.source === "providers") {
+    return (engine.results as unknown as Candidate[]).slice(0, 10);
+  }
+  const wanted = engine.results
+    .filter(
+      (r) =>
+        !kind || (kind === "movie" ? r.media_type === "movie" : r.media_type === "tv"),
+    )
+    .slice(0, 10);
+  if (wanted.length === 0) return [];
+
+  let pool: Candidate[] = [];
+  try {
+    // One shared sweep, page 1 only: Akwam's uncapped fan-out (smart
+    // queries × up to 9 pages) burns ~30 subrequests per call, so every
+    // bot provider search is capped to the first page — the exact title
+    // lives there, and the top-ups below re-try per title the same way.
+    pool = await searchAllProviders(query, kind, disabled, false, undefined, { pages: 1 });
+  } catch {
+    pool = [];
+  }
+  const attached: Candidate[] = [];
+  const done = new Set<SearchResultItem>();
+  for (const item of wanted) {
+    if (attached.length >= 10) break;
+    const m = matchPoolCandidate(pool, item);
+    if (m) {
+      attached.push(m);
+      done.add(item);
+    }
+  }
+  // Top-up for the titles the shared sweep missed (providers only list
+  // page 1 for the query): bounded to 6 attaches, direct providers only
+  // (Akwam, Laroza, embed — the only ones that ever yield a usable bot
+  // candidate), stopping at 10 attached. Worst case stays under the ~50
+  // cap (measured live: Marvel 25 fetches with 4 top-ups; 6 costs ~8
+  // more, and the sweep + engine are ~13).
+  const DIRECT_SITES = ["akwam", "laroza", "embed"];
+  let topUps = 0;
+  for (const item of wanted) {
+    if (attached.length >= 10 || topUps >= 6) break;
+    if (done.has(item)) continue;
+    topUps++;
+    const m = await attachProviderCandidate(env, item, disabled, DIRECT_SITES, { pages: 1 });
+    if (m) {
+      attached.push(m);
+      done.add(item);
+    }
+  }
+  if (attached.length > 0) return attached.slice(0, 10);
+  return pool.slice(0, 10);
 }
 
 async function executeSearch(
@@ -585,62 +685,48 @@ async function executeSearch(
   store: AppStore,
   env: Env,
 ): Promise<void> {
-  const statusMsg = await bot.sendMessage(chatId, views.formatSearching(query, kind || "all"));
-  const statusId = extractMsgId(statusMsg);
-
-  // Unified engine first (search rebuild, stage 2): the same
-  // searchTitles the site uses — brands, famous-titles index, TMDB, one
-  // ranking — so the bot and the site return the same titles in the same
-  // order. The top 8 engine titles are attached to provider candidates
-  // in parallel; the first 6 attached fill the bot's first page. Falls
-  // back to the raw provider search when the engine returns nothing
-  // usable, so the bot never returns less than it did before.
-  let results: Candidate[] = [];
+  // The bot must ALWAYS answer. The old flow could die mid-search and
+  // leave the "searching..." message hanging forever (Spartacus, 2026-11-17:
+  // three searches, no answer ever). Any failure below — including the
+  // status send itself — edits the status message (or sends a fresh one
+  // when there is no status to edit) instead of going silent.
+  let statusId: number | undefined;
   try {
-    const engine = await searchTitles(env, query);
-    if (engine.source === "tmdb" && engine.results.length > 0) {
-      const wanted = engine.results
-        .filter(
-          (r) =>
-            !kind || (kind === "movie" ? r.media_type === "movie" : r.media_type === "tv"),
-        )
-        .slice(0, 8);
-      const disabled = parseList(env.PROVIDERS_DISABLED);
-      const attached = await Promise.all(
-        wanted.map((r) => attachProviderCandidate(env, r, disabled)),
-      );
-      results = attached.filter((c): c is Candidate => c !== null).slice(0, 6);
-    }
-  } catch {
-    results = [];
-  }
-  if (results.length === 0) {
-    results = await searchAllProviders(query, kind);
-  }
+    const statusMsg = await bot.sendMessage(chatId, views.formatSearching(query, kind || "all"));
+    statusId = extractMsgId(statusMsg);
 
-  if (results.length === 0) {
-    await bot.safeEdit(chatId, statusId, views.formatNoResults(query), {
-      reply_markup: kb.buildMainMenuKeyboard(),
-    });
-    return;
-  }
+    const results = await searchBotTitles(env, query, kind);
 
-  const searchKey = shortKey();
-  await store.put(`mov_s:${searchKey}`, JSON.stringify({ query, results, kind }), 3600);
-
-  const text = views.formatSearchResults(query, results.length);
-  const keyboard = kb.buildSearchResultsKeyboard(results, searchKey, 0);
-
-  // If only 1 result and has poster, show directly
-  if (results.length === 1 && results[0]?.poster) {
-    try {
-      await bot.sendPhoto(chatId, results[0].poster, text, { reply_markup: keyboard });
-      if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
+    if (results.length === 0) {
+      await bot.safeEdit(chatId, statusId, views.formatNoResults(query), {
+        reply_markup: kb.buildMainMenuKeyboard(),
+      });
       return;
-    } catch {}
-  }
+    }
 
-  await bot.safeEdit(chatId, statusId, text, { reply_markup: keyboard });
+    const searchKey = shortKey();
+    await store.put(`mov_s:${searchKey}`, JSON.stringify({ query, results, kind }), 3600);
+
+    const text = views.formatSearchResults(query, results.length);
+    const keyboard = kb.buildSearchResultsKeyboard(results, searchKey, 0);
+
+    // If only 1 result and has poster, show directly
+    if (results.length === 1 && results[0]?.poster) {
+      try {
+        await bot.sendPhoto(chatId, results[0].poster, text, { reply_markup: keyboard });
+        if (statusId) await bot.deleteMessage(chatId, statusId).catch(() => undefined);
+        return;
+      } catch {}
+    }
+
+    await bot.safeEdit(chatId, statusId, text, { reply_markup: keyboard });
+  } catch {
+    await bot
+      .safeEdit(chatId, statusId, views.formatSearchError(), {
+        reply_markup: kb.buildMainMenuKeyboard(),
+      })
+      .catch(() => undefined);
+  }
 }
 
 // -----------------------------------------------------------------------------
