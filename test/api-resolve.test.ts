@@ -15,8 +15,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function mockEnv() {
   const map = new Map<string, string>();
+  const puts: Array<{ key: string; ttl?: number }> = [];
   return {
     map,
+    puts,
     env: {
       BOT_TOKEN: "test-bot-token",
       SIGNING_SECRET: SECRET,
@@ -24,8 +26,9 @@ function mockEnv() {
       PUBLIC_BASE: BASE,
       CACHE: {
         get: async (k: string) => map.get(k) ?? null,
-        put: async (k: string, v: string) => {
+        put: async (k: string, v: string, opts?: { expirationTtl?: number }) => {
           map.set(k, v);
+          puts.push({ key: k, ttl: opts?.expirationTtl });
         },
         delete: async (k: string) => {
           map.delete(k);
@@ -118,7 +121,7 @@ test("validation: bad type returns 400, non-numeric id returns 400", async () =>
 
 test("resolves Interstellar to a signed stream + download link", async () => {
   const restore = installFetchMock();
-  const { env, map } = mockEnv();
+  const { env, map, puts } = mockEnv();
   try {
     const res = await callResolve(env, "/api/resolve?type=movie&id=157336");
     assert.equal(res.status, 200);
@@ -139,10 +142,16 @@ test("resolves Interstellar to a signed stream + download link", async () => {
     assert.equal(payload!.k, "mp4");
     assert.equal(payload!.n, "Interstellar");
 
-    // Success is cached for 6h under srv8:<type>:<id>:<s>:<e>.
-    const cached = map.get("srv8:movie:157336:0:0");
+    // Success is cached for 6h under srv9:<type>:<id>:<s>:<e> — Akwam's
+    // downet links do not expire, so they keep the long TTL.
+    const cached = map.get("srv9:movie:157336:0:0");
     assert.ok(cached, "expected cached resolve result");
     assert.equal(JSON.parse(cached!).ok, true);
+    assert.equal(
+      puts.find((p) => p.key === "srv9:movie:157336:0:0")?.ttl,
+      6 * 3600,
+      "Akwam resolves cache for 6h",
+    );
   } finally {
     restore();
   }
@@ -156,7 +165,7 @@ test("unknown TMDB id returns {ok:false} with 404 (not 500)", async () => {
     assert.equal(res.status, 404);
     assert.equal((await res.json() as any).ok, false);
     // Failures are cached too (30 min) so the lookup is not repeated.
-    const cached = map.get("srv8:movie:999999999:0:0");
+    const cached = map.get("srv9:movie:999999999:0:0");
     assert.ok(cached, "expected cached failure");
     assert.equal(JSON.parse(cached!).ok, false);
   } finally {

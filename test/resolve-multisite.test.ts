@@ -12,14 +12,17 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function mockEnv() {
   const map = new Map<string, string>();
+  const puts: Array<{ key: string; ttl?: number }> = [];
   return {
+    puts,
     env: {
       TMDB_KEY: "test-tmdb-key",
       PUBLIC_BASE: "https://filmaty.hudhaifa-bio.workers.dev",
       CACHE: {
         get: async (k: string) => map.get(k) ?? null,
-        put: async (k: string, v: string) => {
+        put: async (k: string, v: string, opts?: { expirationTtl?: number }) => {
           map.set(k, v);
+          puts.push({ key: k, ttl: opts?.expirationTtl });
         },
         delete: async (k: string) => {
           map.delete(k);
@@ -176,7 +179,7 @@ test("searchAllProviders keeps one candidate per title by default, one per site 
 test("VisionQuest S1E1 resolves to Laroza when Akwam's only file is on a dead node", async () => {
   const restore = installMock();
   try {
-    const { env } = mockEnv();
+    const { env, puts } = mockEnv();
     const result = await resolveServersByTmdb(env, "tv", 213375, 1, 1);
     assert.ok(result, "resolve must succeed via the second provider");
     assert.equal(result!.servers.length, 1);
@@ -186,6 +189,14 @@ test("VisionQuest S1E1 resolves to Laroza when Akwam's only file is on a dead no
     assert.equal(
       result!.servers[0].qualities[0].directVideoUrl,
       "https://okprimeone.site/v/02/00029/r8n0acfs1dpj_n/VisionQuest.S01E01.mp4",
+    );
+    // Laroza's okprimeone links are signed and expire after 2h, so the
+    // resolve must cache for 1h only — a 6h cache kept serving dead
+    // links and downloads failed with "Upstream error: HTTP 403".
+    assert.equal(
+      puts.find((p) => p.key === "srv9:tv:213375:1:1")?.ttl,
+      1 * 3600,
+      "Laroza resolves cache for 1h",
     );
   } finally {
     restore();
