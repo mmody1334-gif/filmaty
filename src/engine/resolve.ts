@@ -487,6 +487,22 @@ export function qualityMatches(a: string, b: string): boolean {
 const SERVER_CACHE_SUCCESS_TTL = 6 * 3600; // 6 hours
 const SERVER_CACHE_FAILURE_TTL = 30 * 60; // 30 minutes
 
+// Laroza's okprimeone download links are signed and expire after 2h
+// (e=7200 in the URL). A resolve cached longer than that keeps serving
+// dead links, and the download fails with "Upstream error: HTTP 403"
+// (verified live 2026-11-17: a 5.7h-old cached VisionQuest link 403s,
+// a fresh link from the same page returns 206). Cache resolves that
+// carry such links for 1h only, so the link is always served fresh;
+// Akwam/downet links do not expire, so they keep the 6h TTL.
+const SIGNED_LINK_CACHE_TTL = 1 * 3600; // 1 hour
+
+export function resolveCacheTtl(result: ResolvedMulti): number {
+  const hasSignedLinks = result.servers.some((s) =>
+    s.qualities.some((q) => q.directVideoUrl?.includes("okprimeone.site")),
+  );
+  return hasSignedLinks ? SIGNED_LINK_CACHE_TTL : SERVER_CACHE_SUCCESS_TTL;
+}
+
 // Like resolveByTmdb, but returns every validated quality of the first
 // working source (native server) instead of only the best stream. The
 // embedwave server is added by the /api/resolve handler, not cached here.
@@ -498,12 +514,14 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv8: after the direct-providers resolve fix — the srv7:
-  // entries cached before it can hold a resolve that ran out of the
-  // Worker's subrequest budget mid-loop (e.g. حب متنكر cached as "no
-  // download" because Laroza's details came back empty and round 3
-  // never ran) and must not be reused.
-  const cacheKey = `srv8:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv9: after the signed-link cache fix — the srv8:
+  // entries cached before it can hold a Laroza resolve whose okprimeone
+  // link expired (links live 2h, the cache kept them 6h) and must not
+  // be reused. (srv8 itself was the direct-providers fix: srv7 entries
+  // could hold a resolve that ran out of the Worker's subrequest budget
+  // mid-loop, e.g. حب متنكر cached as "no download" because Laroza's
+  // details came back empty and round 3 never ran.)
+  const cacheKey = `srv9:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
@@ -525,7 +543,7 @@ export async function resolveServersByTmdb(
       await env.CACHE?.put(
         cacheKey,
         JSON.stringify({ ok: true, ...result }),
-        { expirationTtl: SERVER_CACHE_SUCCESS_TTL },
+        { expirationTtl: resolveCacheTtl(result) },
       );
     } else {
       await env.CACHE?.put(cacheKey, JSON.stringify({ ok: false }), {
