@@ -1644,8 +1644,22 @@
         openBotRequest();
         return;
       }
-      startAnchorDownload(q);
+      startAnchorDownload(q, downloadFileName(selectedEpisode));
       showToast('بدأ التحميل — هتلاقي الملف في التنزيلات');
+    }
+
+    // File name the browser saves: movies "Title.mp4", episodes
+    // "Title S01E01.mp4" — every episode gets its own name, so a season
+    // download never overwrites itself. (The anchor's download attribute
+    // alone can't do this cross-origin — the Worker sets the same name in
+    // its Content-Disposition — but it applies when the page is served
+    // from the Worker itself.)
+    function downloadFileName(ep) {
+      const title = (currentItem.title || currentItem.name || 'filmaty').replace(/[/\\:*?"<>|]/g, '-');
+      if (currentItem.media_type === 'tv' && ep) {
+        return `${title} S${String(selectedSeason).padStart(2, '0')}E${String(ep).padStart(2, '0')}.mp4`;
+      }
+      return `${title}.mp4`;
     }
 
     // Whole-season download (stage G): resolves every episode of the
@@ -1653,10 +1667,7 @@
     // (1.5s apart). Browsers may ask once to allow multiple downloads;
     // an episode with no direct copy is skipped and listed.
     let seasonDownloadRunning = false;
-    function seasonFileName(ep) {
-      const title = (currentItem.title || currentItem.name || 'filmaty').replace(/[/\\:*?"<>|]/g, '-');
-      return `${title} S${String(selectedSeason).padStart(2, '0')}E${String(ep).padStart(2, '0')}.mp4`;
-    }
+    function seasonFileName(ep) { return downloadFileName(ep); }
     async function downloadSeason(qualityLabel) {
       if (seasonDownloadRunning || !currentItem || currentItem.media_type !== 'tv') return;
       seasonDownloadRunning = true;
