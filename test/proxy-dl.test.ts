@@ -82,3 +82,27 @@ test("dl=1 sanitises characters that are illegal in filenames", async () => {
     restore();
   }
 });
+
+test("dl=1 saves an episode under its S01E01 name, not the bare title", async () => {
+  const restore = installUpstreamMock();
+  try {
+    const token = await tokenFor("VisionQuest S01E01");
+    const res = await handleStreamProxy(
+      new Request(`https://worker.test/stream?t=${encodeURIComponent(token)}&dl=1`),
+      SECRET,
+    );
+    assert.equal(res.status, 200);
+    const cd = res.headers.get("content-disposition") || "";
+    assert.ok(
+      cd.includes(encodeURIComponent("VisionQuest S01E01")),
+      `expected the episode name in filename*, got: ${cd}`,
+    );
+    assert.ok(
+      cd.includes('filename="VisionQuest S01E01.mp4"'),
+      `expected the ASCII fallback to carry the episode name, got: ${cd}`,
+    );
+    assert.ok(!cd.includes('filename="filmaty.mp4"'), `fallback must not be the constant name: ${cd}`);
+  } finally {
+    restore();
+  }
+});

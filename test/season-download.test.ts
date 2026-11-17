@@ -20,6 +20,12 @@ test("main site has a whole-season download flow", () => {
   assert.ok(main.includes("startAnchorDownload"), "downloads must go through one anchor helper");
   assert.ok(main.includes("setTimeout(r, 1500)"), "episodes must be spaced 1.5s apart");
   assert.ok(main.includes("seasonFileName"), "each episode must get its own file name");
+  assert.ok(main.includes("downloadFileName"), "single + season downloads share one file-name builder");
+  assert.ok(
+    main.includes("startAnchorDownload(q, downloadFileName"),
+    "the single-episode download must pass its file name (a bare anchor click saves the bare title)",
+  );
+  assert.ok(!main.includes("startAnchorDownload(q)"), "no download may start without a file name");
 });
 
 test("season download is series-only and skips missing episodes", () => {
