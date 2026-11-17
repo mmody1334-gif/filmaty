@@ -83,21 +83,17 @@ export class MyCimaProvider implements Provider {
       const sources: SourceLink[] = [];
 
       if (candidate.kind === "series") {
-        const epLinks = [...html.matchAll(/<a\s+href="([^"]*\/episode\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
-        const episodes: Episode[] = [];
-
-        for (const ep of epLinks) {
-          const epUrl = ep[1];
-          const text = ep[2].replace(/<[^>]+>/g, "").trim();
-          const se = parseSeasonEpisode(text);
-          episodes.push({
-            season: se.season || 1,
-            episode: se.episode || episodes.length + 1,
-            title: text,
-            url: epUrl,
-          });
+        const episodes = this.extractSeriesEpisodes(html, candidate);
+        const bySeason = new Map<number, Episode[]>();
+        for (const ep of episodes) {
+          const list = bySeason.get(ep.season) || [];
+          if (!list.some((e) => e.episode === ep.episode)) list.push(ep);
+          bySeason.set(ep.season, list);
         }
-        seasons.push({ season: 1, episodes });
+        for (const [season, eps] of [...bySeason.entries()].sort((a, b) => a[0] - b[0])) {
+          eps.sort((a, b) => a.episode - b.episode);
+          seasons.push({ season, episodes: eps });
+        }
       } else {
         // Find watch servers in WeCima
         const btnServers = [...html.matchAll(/<btn[^>]*data-url="([^"]+)"[^>]*>([^<]+)<\/btn>/gi)];
@@ -130,6 +126,82 @@ export class MyCimaProvider implements Provider {
         sources: [],
       };
     }
+  }
+
+  // Episode list for a series page. The current WeCima theme (v2.0.12,
+  // live 2026-11-17) renders episodes as <episodetitle>الحلقة N</episodetitle>
+  // anchors — NOT the old /episode/ URLs the previous code looked for,
+  // which is why getDetails used to return an empty season. Passes, in
+  // order: old-style /episode/ links, <episodetitle> anchors. If the page
+  // has no list at all but the candidate page itself is an episode page
+  // (search returns episode pages), synthesize that one episode from the
+  // candidate.
+  // Episode numbers always come from the text/URL — never from list order
+  // (the list is newest-first). The watch servers themselves are NOT in
+  // the static HTML (empty <ul id="watch">, no <btn>, servers load via JS),
+  // so getEpisodeSources still returns [] for these pages — the bot shows
+  // the real episode picker, and picking an episode hits the same
+  // no-direct-copy error as EgyBest (search-only provider).
+  private extractSeriesEpisodes(html: string, candidate: Candidate): Episode[] {
+    const episodes: Episode[] = [];
+    const seen = new Set<string>();
+
+    const pushEp = (rawUrl: string, text: string) => {
+      let url = rawUrl.trim();
+      if (!url) return;
+      if (url.startsWith("/")) url = `${this.currentBase}${url}`;
+      if (!url.startsWith("http") || !url.includes("wecima")) return;
+      if (seen.has(url)) return;
+      let decoded = url;
+      try {
+        decoded = decodeURIComponent(url);
+      } catch {}
+      const se = parseSeasonEpisode(text);
+      const seUrl = parseSeasonEpisode(decoded);
+      const episode = se.episode ?? seUrl.episode;
+      if (!episode) return;
+      seen.add(url);
+      episodes.push({
+        season: se.season ?? seUrl.season ?? 1,
+        episode,
+        title: text || `الحلقة ${episode}`,
+        url,
+      });
+    };
+
+    // 1. Old-style /episode/ links.
+    for (const m of html.matchAll(/<a\s+href="([^"]*\/episode\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+      pushEp(m[1], m[2].replace(/<[^>]+>/g, "").trim());
+    }
+    // 2. Current theme: <episodetitle>الحلقة N</episodetitle> anchors.
+    for (const m of html.matchAll(/<a\s+href="([^"]+)"[^>]*>[\s\S]*?<episodetitle>([^<]+)<\/episodetitle>/gi)) {
+      pushEp(m[1], m[2].trim());
+    }
+    // NOTE: no generic whole-page anchor scan here on purpose — the page
+    // also lists OTHER shows' episodes ("related" cards), and a generic
+    // scan pulls those in as phantom seasons/episodes of this show
+    // (verified live: 4 bogus seasons from one page).
+
+    // 4. The candidate page itself is an episode page.
+    if (episodes.length === 0) {
+      let decoded = candidate.url;
+      try {
+        decoded = decodeURIComponent(candidate.url);
+      } catch {}
+      const se = parseSeasonEpisode(candidate.title);
+      const seUrl = parseSeasonEpisode(decoded);
+      const episode = se.episode ?? seUrl.episode;
+      if (episode) {
+        episodes.push({
+          season: se.season ?? seUrl.season ?? 1,
+          episode,
+          title: candidate.title,
+          url: candidate.url,
+        });
+      }
+    }
+
+    return episodes;
   }
 
   async getEpisodeSources(episode: Episode): Promise<SourceLink[]> {
