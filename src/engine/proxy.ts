@@ -98,9 +98,13 @@ export async function handleStreamProxy(request: Request, secret: string): Promi
     // untouched, so interrupted downloads can still resume.
     if (url.searchParams.get("dl") === "1") {
       const safe = (payload.n || "filmaty").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 120);
+      // The ASCII fallback used to be the constant "filmaty.mp4" for
+      // every file; now it carries the real name when it is ASCII-safe
+      // (Latin titles), while filename* carries the full Unicode name.
+      const ascii = safe.replace(/[^\x20-\x7E]/g, "").trim() || "filmaty";
       responseHeaders.set(
         "content-disposition",
-        `attachment; filename="filmaty.mp4"; filename*=UTF-8''${encodeURIComponent(safe)}.mp4`,
+        `attachment; filename="${ascii}.mp4"; filename*=UTF-8''${encodeURIComponent(safe)}.mp4`,
       );
     }
 
