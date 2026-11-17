@@ -205,6 +205,14 @@ async function handleMessage(msg: any, bot: TelegramClient, store: AppStore, env
     return;
   }
 
+  // /app: open the Filmaty web app (or TV mode) inside Telegram.
+  if (text === "/app" || text.startsWith("/app ") || text.startsWith("/app@")) {
+    await bot.sendMessage(chatId, views.formatAppMessage(), {
+      reply_markup: kb.buildAppKeyboard(),
+    });
+    return;
+  }
+
   // /film or /movie command
   if (text.startsWith("/film") || text.startsWith("/movie")) {
     const query = text.replace(/^\/(?:film|movie)\s*/i, "").trim();

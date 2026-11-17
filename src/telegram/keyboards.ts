@@ -1,6 +1,8 @@
 import type { Candidate, Episode, SeasonGroup, SourceLink } from "../providers/types.ts";
 import type { InlineKeyboardButton, InlineKeyboardMarkup } from "./client.ts";
 
+export const FILMATY_APP_URL = "https://mmody1334-gif.github.io/filmaty/";
+
 export function buildMainMenuKeyboard(): InlineKeyboardMarkup {
   return {
     inline_keyboard: [
@@ -11,13 +13,23 @@ export function buildMainMenuKeyboard(): InlineKeyboardMarkup {
       [
         {
           text: "🌐 تصفح المكتبة بالويب (Web App)",
-          web_app: { url: "https://mmody1334-gif.github.io/filmaty/" },
+          web_app: { url: FILMATY_APP_URL },
         },
       ],
       [
         { text: "📁 أرشيفي وسجل المشاهدة", callback_data: "cmd:archive" },
         { text: "⚡️ حالة السيرفرات والمصادر", callback_data: "cmd:status" },
       ],
+    ],
+  };
+}
+
+// /app reply: open the web app (or TV mode) inside Telegram.
+export function buildAppKeyboard(): InlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [{ text: "🌐 فتح تطبيق فيلماتي", web_app: { url: FILMATY_APP_URL } }],
+      [{ text: "📺 وضع التلفزيون", web_app: { url: `${FILMATY_APP_URL}Tv/` } }],
     ],
   };
 }

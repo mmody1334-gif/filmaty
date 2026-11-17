@@ -22,6 +22,7 @@ export function formatWelcome(): string {
 • تحميل فيديوهات وبلاي ليستات YouTube الفردية والكاملة
 
 <b>📌 الأوامر الأساسية:</b>
+• <code>/app</code> - فتح تطبيق فيلماتي (الويب آب) مباشرة
 • <code>/film اسم الفيلم</code> - بحث مخصص عن الأفلام (مثال: <code>/film marvel</code>)
 • <code>/series اسم المسلسل</code> - بحث عن المسلسلات مقسمة لمواسم وحلقات
 • يمكنك أيضاً إرسال اسم أي عمل مباشرة بدون أوامر!
@@ -34,6 +35,16 @@ export function formatWelcome(): string {
 ✅ <b>أرشيف شخصي:</b> <code>/archive</code> لحفظ أعمالك المفضلة
 
 <i>اختر من القائمة أدناه للبدء:</i>`;
+}
+
+export function formatAppMessage(): string {
+  return `<b>🎬 تطبيق فيلماتي</b>
+
+🌐 <code>https://mmody1334-gif.github.io/filmaty/</code>
+
+افتح التطبيق من الزرار اللي تحت — بيشتغل جوه التليجرام. وتقدر كمان تثبّته على موبايلك: افتح الرابط من المتصفح ← «أضف للشاشة الرئيسية».
+
+📺 وضع التلفزيون: <code>https://mmody1334-gif.github.io/filmaty/Tv/</code>`;
 }
 
 export function formatSearching(query: string, kind: string): string {
