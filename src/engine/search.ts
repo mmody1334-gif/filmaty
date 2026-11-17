@@ -353,7 +353,11 @@ function rerankResults(items: SearchResultItem[], queryNorm: string): SearchResu
     .slice(0, 20);
 }
 
-export async function searchTitles(env: Env, query: string): Promise<SearchOutcome> {
+export async function searchTitles(
+  env: Env,
+  query: string,
+  opts?: { augment?: boolean },
+): Promise<SearchOutcome> {
   // Search TMDB with the normalized query in both languages: "ڤيجن"
   // becomes "فيجن", so TMDB can match "واندافيجن".
   const normalizedQuery = normalizeArabicQuery(query);
@@ -368,11 +372,14 @@ export async function searchTitles(env: Env, query: string): Promise<SearchOutco
   // Single-token queries also get provider augmentation in parallel:
   // TMDB's word index handles multi-word queries, but a lone partial
   // word ("vision", "فيجن") misses compound titles like WandaVision.
+  // The bot passes augment:false: it runs its own single provider sweep
+  // and matches against it, so the augmentation sweep would only burn
+  // the Worker's subrequest budget twice for the same candidates.
   const singleToken = normalizedQuery.length > 0 && !/\s/.test(normalizedQuery);
   const [ar, en, augmented] = await Promise.all([
     tmdbSearch(env, normalizedQuery, "ar"),
     tmdbSearch(env, normalizedQuery, "en-US"),
-    singleToken ? providerAugment(env, normalizedQuery) : Promise.resolve([]),
+    singleToken && opts?.augment !== false ? providerAugment(env, normalizedQuery) : Promise.resolve([]),
   ]);
   const merged = mergeTmdbResults([ar, en, augmented, searchPopularIndex(query)]);
   if (merged.length > 0) return { results: rerankResults(merged, normalizedQuery), source: "tmdb" };
