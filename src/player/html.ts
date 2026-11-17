@@ -2,6 +2,7 @@ export interface PlayerOptions {
   title: string;
   streamUrl: string;
   downloadUrl?: string;
+  directUrl?: string;
   kind: "mp4" | "hls" | "embed";
   quality?: string;
   season?: number;
@@ -14,12 +15,13 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
   const safeTitle = escapeHtml(opts.title);
   const isEmbed = opts.kind === "embed";
   const isHls = opts.kind === "hls";
+  const initialVideoSrc = !isHls && opts.directUrl ? opts.directUrl : opts.streamUrl;
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${safeTitle} - Filmaty Player</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
@@ -143,6 +145,7 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
       align-items: center;
       justify-content: center;
       gap: 8px;
+      min-height: 44px;
       padding: 12px 18px;
       border-radius: 8px;
       font-size: 0.92rem;
@@ -192,10 +195,15 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
       background: #0d111a;
       color: #fff;
       border: 1px solid var(--border);
+      min-height: 44px;
       padding: 6px 12px;
       border-radius: 6px;
       outline: none;
       cursor: pointer;
+    }
+    :focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
     footer {
       margin-top: auto;
@@ -212,15 +220,15 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
     <div class="brand">
       🎬 <span>Filmaty</span> مشغل فيلماتي
     </div>
-    <div class="badge">${opts.serverTag || "⚡️ تشغيل فائق"}</div>
+    <div class="badge">${escapeHtml(opts.serverTag || "⚡️ تشغيل فائق")}</div>
   </header>
 
   <div class="player-container">
     ${
       isEmbed
-        ? `<iframe src="${opts.streamUrl}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`
-        : `<video id="videoPlayer" controls playsinline preload="metadata" poster="${opts.poster || ""}">
-             <source src="${opts.streamUrl}" type="${isHls ? "application/x-mpegURL" : "video/mp4"}">
+        ? `<iframe src="${escapeHtml(opts.streamUrl)}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>`
+        : `<video id="videoPlayer" controls playsinline preload="metadata" poster="${escapeHtml(opts.poster || "")}">
+             <source src="${escapeHtml(initialVideoSrc)}" type="${isHls ? "application/x-mpegURL" : "video/mp4"}">
            </video>`
     }
   </div>
@@ -229,7 +237,7 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
     <div class="title-row">
       <h1>${safeTitle}</h1>
       <div class="tag-row">
-        ${opts.quality ? `<span class="tag highlight">⚡️ ${opts.quality}</span>` : ""}
+        ${opts.quality ? `<span class="tag highlight">⚡️ ${escapeHtml(opts.quality)}</span>` : ""}
         ${opts.season ? `<span class="tag">الموسم ${opts.season}</span>` : ""}
         ${opts.episode ? `<span class="tag">الحلقة ${opts.episode}</span>` : ""}
         <span class="tag highlight">🟢 مباشر ومفحوص</span>
@@ -251,9 +259,12 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
           <option value="2">2.0x</option>
         </select>
       </div>
-      <div class="control-group">
-        <button class="btn btn-secondary" onclick="togglePip()">📺 صورة داخل صورة (PiP)</button>
-        <button class="btn btn-secondary" onclick="toggleFullscreen()">⛶ شاشة كاملة</button>
+      <div class="control-group" style="flex-wrap: wrap;">
+        <button id="watchSeekBack" type="button" class="btn btn-secondary" onclick="seekBy(-10)">⏪ -10 ث</button>
+        <button id="watchSeekFwd" type="button" class="btn btn-secondary" onclick="seekBy(10)">+10 ث ⏩</button>
+        <button id="watchMuteBtn" type="button" class="btn btn-secondary" onclick="toggleMute()">🔇 كتم</button>
+        <button class="btn btn-secondary" type="button" onclick="togglePip()">📺 صورة داخل صورة (PiP)</button>
+        <button class="btn btn-secondary" type="button" onclick="toggleFullscreen()">⛶ شاشة كاملة</button>
       </div>
     </div>
     `
@@ -263,10 +274,10 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
     <div class="actions-grid">
       ${
         opts.downloadUrl
-          ? `<a href="${opts.downloadUrl}" class="btn btn-primary" download target="_blank">📥 تحميل مباشر فائق السرعة</a>`
-          : `<a href="${opts.streamUrl}" class="btn btn-primary" download target="_blank">📥 تحميل الملف</a>`
+          ? `<a href="${escapeHtml(opts.downloadUrl)}" class="btn btn-primary" download target="_blank">📥 تحميل مباشر فائق السرعة</a>`
+          : `<a href="${escapeHtml(opts.streamUrl)}" class="btn btn-primary" download target="_blank">📥 تحميل الملف</a>`
       }
-      <button class="btn btn-secondary" onclick="closeTelegram()">↩️ رجوع للتليجرام</button>
+      <button class="btn btn-secondary" type="button" onclick="closeTelegram()">↩️ رجوع للتليجرام</button>
     </div>
   </div>
 
@@ -275,6 +286,12 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
   </footer>
 
   <script>
+    const STREAM_FALLBACK_URL = ${jsonForScript(opts.streamUrl)};
+    const WATCH_POS_KEY = ${jsonForScript(`filmaty:watch-pos:${opts.title || ""}:${opts.season || 0}:${opts.episode || 0}`)};
+    let usingDirectCdn = ${Boolean(!isHls && opts.directUrl)};
+    let savedPosApplied = false;
+    let lastPosSave = 0;
+
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.expand();
       window.Telegram.WebApp.ready();
@@ -285,16 +302,77 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
       ${
         isHls
           ? `
-      if (Hls.isSupported()) {
+      if (typeof Hls !== 'undefined' && Hls.isSupported()) {
         const hls = new Hls({ capLevelToPlayerSize: true });
-        hls.loadSource('${opts.streamUrl}');
+        hls.loadSource(STREAM_FALLBACK_URL);
         hls.attachMedia(video);
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = '${opts.streamUrl}';
+        video.src = STREAM_FALLBACK_URL;
       }
       `
           : ""
       }
+
+      video.addEventListener('error', () => {
+        if (usingDirectCdn && STREAM_FALLBACK_URL) {
+          usingDirectCdn = false;
+          const prevTime = Number.isFinite(video.currentTime) && video.currentTime > 3 ? video.currentTime : 0;
+          video.src = STREAM_FALLBACK_URL;
+          if (prevTime > 0) {
+            video.addEventListener('loadedmetadata', () => {
+              if (Number.isFinite(video.duration) && video.duration > prevTime + 2) {
+                video.currentTime = prevTime;
+              }
+            }, { once: true });
+          }
+          video.play().catch(() => {});
+        }
+      });
+
+      video.addEventListener('loadedmetadata', () => {
+        if (savedPosApplied) return;
+        savedPosApplied = true;
+        try {
+          const raw = localStorage.getItem(WATCH_POS_KEY);
+          const pos = raw ? Number(raw) : 0;
+          if (Number.isFinite(pos) && pos > 5 && Number.isFinite(video.duration) && pos < video.duration - 15) {
+            video.currentTime = pos;
+          }
+        } catch (e) {}
+      });
+
+      function persistWatchPos(force) {
+        if (!Number.isFinite(video.currentTime) || video.currentTime < 5) return;
+        const now = Date.now();
+        if (!force && now - lastPosSave < 5000) return;
+        lastPosSave = now;
+        try { localStorage.setItem(WATCH_POS_KEY, String(Math.floor(video.currentTime))); } catch (e) {}
+      }
+      video.addEventListener('timeupdate', () => persistWatchPos(false));
+      video.addEventListener('pause', () => persistWatchPos(true));
+      video.addEventListener('ended', () => {
+        try { localStorage.removeItem(WATCH_POS_KEY); } catch (e) {}
+      });
+      video.addEventListener('volumechange', updateMuteLabel);
+    }
+
+    function seekBy(delta) {
+      if (!video) return;
+      const dur = video.duration;
+      const next = (Number.isFinite(video.currentTime) ? video.currentTime : 0) + delta;
+      video.currentTime = Number.isFinite(dur) ? Math.max(0, Math.min(dur, next)) : Math.max(0, next);
+    }
+
+    function updateMuteLabel() {
+      const btn = document.getElementById('watchMuteBtn');
+      if (!btn || !video) return;
+      btn.textContent = video.muted ? '🔊 إلغاء الكتم' : '🔇 كتم';
+    }
+
+    function toggleMute() {
+      if (!video) return;
+      video.muted = !video.muted;
+      updateMuteLabel();
     }
 
     function changeSpeed(val) {
@@ -304,17 +382,45 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
     function togglePip() {
       if (!video) return;
       if (document.pictureInPictureElement) {
-        document.exitPictureInPicture();
+        document.exitPictureInPicture().catch(() => {});
       } else if (video.requestPictureInPicture) {
-        video.requestPictureInPicture();
+        video.requestPictureInPicture().catch(() => {});
       }
     }
 
     function toggleFullscreen() {
       if (!video) return;
-      if (video.requestFullscreen) video.requestFullscreen();
-      else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+      const req = video.requestFullscreen
+        ? video.requestFullscreen()
+        : (video.webkitRequestFullscreen ? video.webkitRequestFullscreen() : null);
+      if (req && req.then) {
+        req.then(() => {
+          try {
+            if (screen.orientation && screen.orientation.lock) {
+              screen.orientation.lock('landscape').catch(() => {});
+            }
+          } catch (e) {}
+        }).catch(() => {});
+      }
     }
+
+    document.addEventListener('keydown', (e) => {
+      if (!video) return;
+      const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); seekBy(-10); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); seekBy(10); }
+      else if (e.key === ' ' || e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        if (video.paused) video.play().catch(() => {}); else video.pause();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        toggleMute();
+      }
+    });
 
     function closeTelegram() {
       if (window.Telegram && window.Telegram.WebApp) {
@@ -326,6 +432,10 @@ export function renderPlayerHtml(opts: PlayerOptions): string {
   </script>
 </body>
 </html>`;
+}
+
+function jsonForScript(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
 function escapeHtml(str: string): string {

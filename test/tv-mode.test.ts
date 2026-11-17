@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 
 // TV mode (/Tv): a watch-only page for the TV remote. Entry is ONLY the
@@ -110,7 +111,13 @@ test("TV page seeks with number keys: 1 back 10s, 3 forward 10s (native player o
 test("lowercase tv/ forwards to the Tv/ page (GitHub Pages URLs are case-sensitive)", () => {
   const lowerPath = join(process.cwd(), "tv", "index.html");
   assert.ok(existsSync(lowerPath), "tv/index.html must exist");
-  const lower = readFileSync(lowerPath, "utf-8");
+  // On case-insensitive filesystems (Windows/macOS), tv/index.html and Tv/index.html
+  // map to the same path on disk; read the lowercase blob from Git HEAD in that case.
+  const sameDiskFile =
+    existsSync(tvPath) && realpathSync.native(lowerPath) === realpathSync.native(tvPath);
+  const lower = sameDiskFile
+    ? execFileSync("git", ["show", "HEAD:tv/index.html"], { encoding: "utf-8" })
+    : readFileSync(lowerPath, "utf-8");
   assert.ok(lower.includes("../Tv/"), "lowercase tv/ must forward to ../Tv/");
   assert.ok(lower.includes("location.replace"), "lowercase tv/ must redirect with JS as well as meta refresh");
 });

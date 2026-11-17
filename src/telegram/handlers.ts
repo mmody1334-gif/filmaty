@@ -1,6 +1,7 @@
 import type { Env } from "../env.ts";
 import { parseList, parseOwnerIds } from "../env.ts";
 import { AppStore } from "../engine/store.ts";
+import { signToken } from "../engine/token.ts";
 import { fetchTmdbDetails, qualityMatches, resolveBestDirectStream, resolveServersByTmdb, titlesMatch, tmdbTitleOf } from "../engine/resolve.ts";
 import { searchTitles, type SearchResultItem } from "../engine/search.ts";
 import { botCodeKey, isBotCode, type BotCodePayload } from "../engine/botcode.ts";
@@ -520,6 +521,7 @@ async function handleBotCode(
     throw new Error(res?.description || "Failed to send video directly");
   } catch (err: any) {
     if (statusMsgId) await bot.deleteMessage(chatId, statusMsgId).catch(() => undefined);
+    const watchUrl = await buildWatchPlayerUrl(env, quality.directVideoUrl, title);
     await bot.sendMessage(
       chatId,
       `⚠️ <b>تنبيه من سيرفرات التليجرام:</b>
@@ -530,12 +532,31 @@ async function handleBotCode(
         reply_markup: {
           inline_keyboard: [
             [{ text: "⬇️ تحميل مباشر (.mp4)", url: quality.directVideoUrl }],
-            [{ text: "▶️ مشاهدة مباشرة أونلاين", url: quality.directVideoUrl }],
+            [{ text: "▶️ مشاهدة مباشرة أونلاين", url: watchUrl || quality.directVideoUrl }],
           ],
         },
       },
     );
   }
+}
+
+async function buildWatchPlayerUrl(
+  env: Env,
+  directVideoUrl: string,
+  title: string,
+): Promise<string | undefined> {
+  if (!env.SIGNING_SECRET) return undefined;
+  const publicBase = (env.PUBLIC_BASE || "https://filmaty.hudhaifa-bio.workers.dev").replace(/\/+$/, "");
+  const token = await signToken(
+    {
+      u: directVideoUrl,
+      n: title,
+      k: directVideoUrl.includes(".m3u8") ? "hls" : "mp4",
+      e: Math.floor(Date.now() / 1000) + 14400,
+    },
+    env.SIGNING_SECRET,
+  );
+  return `${publicBase}/watch?t=${encodeURIComponent(token)}`;
 }
 
 // Attach a provider candidate to one unified-engine title (search
@@ -1143,11 +1164,13 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
       const quality = chosenSource?.quality || stream.quality || "720p HD";
       const size = chosenSource?.fileSize || stream.size;
 
+      const watchUrl = await buildWatchPlayerUrl(env, stream.directVideoUrl, title);
       const streamKey = shortKey();
       await store.put(
         `mov_str:${streamKey}`,
         JSON.stringify({
           directVideoUrl: stream.directVideoUrl,
+          watchUrl,
           title,
           quality,
           size,
@@ -1162,6 +1185,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
         streamKey,
         `mov|d|${itemKey}`,
         stored.searchKey || "",
+        watchUrl,
       );
 
       await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
@@ -1213,11 +1237,13 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
       const quality = chosenSource?.quality || stream.quality || "720p HD";
       const size = chosenSource?.fileSize || stream.size;
 
+      const watchUrl = await buildWatchPlayerUrl(env, stream.directVideoUrl, title);
       const streamKey = shortKey();
       await store.put(
         `mov_str:${streamKey}`,
         JSON.stringify({
           directVideoUrl: stream.directVideoUrl,
+          watchUrl,
           title,
           quality,
           size,
@@ -1232,6 +1258,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
         streamKey,
         `mov|be|${stored.itemKey}|${stored.seasonIdx || 0}`,
         stored.searchKey || "",
+        watchUrl,
       );
 
       await bot.safeEdit(chatId, messageId, text, { reply_markup: keyboard });
@@ -1286,6 +1313,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
       throw new Error(res?.description || "Failed to send video directly");
     } catch (err: any) {
       if (statusMsgId) await bot.deleteMessage(chatId, statusMsgId).catch(() => undefined);
+      const watchUrl = item.watchUrl || (await buildWatchPlayerUrl(env, item.directVideoUrl, item.title));
       await bot.sendMessage(
         chatId,
         `⚠️ <b>تنبيه من سيرفرات التليجرام:</b>
@@ -1296,7 +1324,7 @@ async function handleCallbackQuery(cb: any, bot: TelegramClient, store: AppStore
           reply_markup: {
             inline_keyboard: [
               [{ text: "⬇️ تحميل مباشر (.mp4)", url: item.directVideoUrl }],
-              [{ text: "▶️ مشاهدة مباشرة أونلاين", url: item.directVideoUrl }],
+              [{ text: "▶️ مشاهدة مباشرة أونلاين", url: watchUrl || item.directVideoUrl }],
             ],
           },
         },

@@ -127,19 +127,16 @@ export async function resolveBestDirectStream(
   );
 }
 
-// Validate every stream in a list, keeping only the usable ones (in order).
+// Validate every stream in a list in parallel, keeping usable ones in order.
 async function validateStreams(streams: ResolvedStream[]): Promise<ResolvedStream[]> {
-  const ok: ResolvedStream[] = [];
-  for (const s of streams) {
-    if (
-      s &&
-      isDirectMediaUrl(s.directVideoUrl) &&
-      (await validateDirectUrl(s.directVideoUrl))
-    ) {
-      ok.push(s);
-    }
-  }
-  return ok;
+  const checks = await Promise.all(
+    streams.map(async (s) =>
+      s && isDirectMediaUrl(s.directVideoUrl) && (await validateDirectUrl(s.directVideoUrl))
+        ? s
+        : null,
+    ),
+  );
+  return checks.filter((s): s is ResolvedStream => s !== null);
 }
 
 // All validated direct streams for one watch URL: every quality the
@@ -168,6 +165,7 @@ export async function resolveAllDirectStreams(
   kind: MediaKind,
   seasonNum?: number,
   episodeNum?: number,
+  allowAkwamFallback = true,
 ): Promise<ResolvedStream[]> {
   // 1. Try provider's own resolver (only validated direct URLs count).
   const first = await tryAllFromWatch(provider, targetUrl);
@@ -177,44 +175,49 @@ export async function resolveAllDirectStreams(
   // Only candidates whose title strictly matches the requested title are
   // considered, and for series the matched show must actually contain the
   // requested season/episode — no falling back to season/episode [0].
-  try {
-    const akwam = new AkwamProvider();
-    const cleanQ = title.replace(/\([^)]*\)/g, "").trim();
-    const results = await akwam.search(cleanQ, kind);
-    const matched = results.filter((c) => titlesMatch(c.title, cleanQ));
-    for (const cand of matched) {
-      const details = await akwam.getDetails(cand);
-      try {
-        if (kind === "movie" && details.sources.length > 0) {
-          for (const src of details.sources) {
-            const found = await tryAllFromWatch(akwam, src.url);
-            if (found.length > 0) return found;
+  if (allowAkwamFallback) {
+    try {
+      const akwam = new AkwamProvider();
+      const cleanQ = title.replace(/\([^)]*\)/g, "").trim();
+      const results = await akwam.search(cleanQ, kind);
+      const matched = results.filter((c) => titlesMatch(c.title, cleanQ));
+      for (const cand of matched) {
+        const details = await akwam.getDetails(cand);
+        try {
+          if (kind === "movie" && details.sources.length > 0) {
+            for (const src of details.sources) {
+              const found = await tryAllFromWatch(akwam, src.url);
+              if (found.length > 0) return found;
+            }
           }
-        }
-        if (kind === "series" && details.seasons.length > 0) {
-          const s = details.seasons.find((sg) => sg.season === (seasonNum || 1));
-          if (!s) continue;
-          const ep = s.episodes.find((e) => e.episode === (episodeNum || 1));
-          if (!ep) continue;
-          const epSources = await akwam.getEpisodeSources(ep);
-          for (const src of epSources) {
-            const found = await tryAllFromWatch(akwam, src.url);
-            if (found.length > 0) return found;
+          if (kind === "series" && details.seasons.length > 0) {
+            const s = details.seasons.find((sg) => sg.season === (seasonNum || 1));
+            if (!s) continue;
+            const ep = s.episodes.find((e) => e.episode === (episodeNum || 1));
+            if (!ep) continue;
+            const epSources = await akwam.getEpisodeSources(ep);
+            for (const src of epSources) {
+              const found = await tryAllFromWatch(akwam, src.url);
+              if (found.length > 0) return found;
+            }
           }
+        } catch {
+          /* this candidate failed: try the next matched one */
+          continue;
         }
-      } catch {
-        /* this candidate failed: try the next matched one */
-        continue;
       }
+    } catch {
+      /* ignore and continue */
     }
-  } catch {
-    /* ignore and continue */
   }
 
   // 3. Final fallback: one more attempt at the provider's own resolver
   // (a transient failure on the first try can succeed on retry), or —
   // when the provider cannot resolve at all (e.g. the embed provider) —
   // scrape a direct mp4 out of the target page itself via Akwam.
+  if (!allowAkwamFallback && !provider.resolveStreams && !provider.resolveStream) {
+    return [];
+  }
   const retryProvider =
     provider.resolveStreams || provider.resolveStream ? provider : new AkwamProvider();
   return await tryAllFromWatch(retryProvider, targetUrl);
@@ -557,6 +560,8 @@ export async function resolveServersByTmdb(
   return result;
 }
 
+const MAX_DIRECT_SERVERS = 2;
+
 async function resolveServersByTmdbUncached(
   env: Env,
   type: "movie" | "tv",
@@ -570,63 +575,72 @@ async function resolveServersByTmdbUncached(
   // The same copy can surface in two rounds (e.g. Laroza's in both the
   // English and the Arabic round) — try each URL once.
   const tried = new Set<string>();
+  const servers: ResolvedServer[] = [];
+  const usedSites = new Set<string>();
+  const seenDirectUrls = new Set<string>();
 
   let round: Candidate[] | null;
   while ((round = await nextRound())) {
     for (const candidate of round) {
       if (tried.has(candidate.url)) continue;
       tried.add(candidate.url);
-    // Same declared season/episode guard as the single-result path: never
-    // resolve from a page that declares a different season or episode.
-    if (type === "tv") {
-      const declared = parseSeasonEpisode(candidate.title);
-      if (
-        season !== undefined &&
-        declared.season !== undefined &&
-        declared.season !== season
-      ) {
-        continue;
+      if (usedSites.has(candidate.site)) continue;
+      // Same declared season/episode guard as the single-result path: never
+      // resolve from a page that declares a different season or episode.
+      if (type === "tv") {
+        const declared = parseSeasonEpisode(candidate.title);
+        if (
+          season !== undefined &&
+          declared.season !== undefined &&
+          declared.season !== season
+        ) {
+          continue;
+        }
+        if (
+          episode !== undefined &&
+          declared.episode !== undefined &&
+          declared.episode !== episode
+        ) {
+          continue;
+        }
       }
-      if (
-        episode !== undefined &&
-        declared.episode !== undefined &&
-        declared.episode !== episode
-      ) {
+      const provider = findProvider(candidate.site);
+      if (!provider) continue;
+      try {
+        const details = await provider.getDetails(candidate);
+        const targetUrl = await pickTargetUrl(provider, details, type, season, episode, candidate.url);
+        if (!targetUrl) continue;
+        // Skip the secondary Akwam title lookup once a native server already succeeded
+        // so secondary providers only contribute their own distinct streams.
+        const streams = await resolveAllDirectStreams(
+          provider,
+          targetUrl,
+          enTitle.originalTitle,
+          kind,
+          season,
+          episode,
+          servers.length === 0,
+        );
+        const uniqueStreams = streams.filter((s) => !seenDirectUrls.has(s.directVideoUrl));
+        if (uniqueStreams.length > 0) {
+          usedSites.add(candidate.site);
+          for (const s of uniqueStreams) seenDirectUrls.add(s.directVideoUrl);
+          servers.push({
+            name: provider.label || "مباشر",
+            qualities: uniqueStreams.map((s) => ({
+              quality: s.quality,
+              directVideoUrl: s.directVideoUrl,
+              size: s.size,
+            })),
+          });
+          if (servers.length >= MAX_DIRECT_SERVERS) break;
+        }
+      } catch {
         continue;
       }
     }
-    const provider = findProvider(candidate.site);
-    if (!provider) continue;
-    try {
-      const details = await provider.getDetails(candidate);
-      const targetUrl = await pickTargetUrl(provider, details, type, season, episode, candidate.url);
-      if (!targetUrl) continue;
-      const streams = await resolveAllDirectStreams(
-        provider,
-        targetUrl,
-        enTitle.originalTitle,
-        kind,
-        season,
-        episode,
-      );
-      if (streams.length > 0) {
-        return {
-          title: enTitle.title,
-          servers: [
-            {
-              name: provider.label || "مباشر",
-              qualities: streams.map((s) => ({
-                quality: s.quality,
-                directVideoUrl: s.directVideoUrl,
-                size: s.size,
-              })),
-            },
-          ],
-        };
-      }
-    } catch {
-      continue;
-    }
+    if (servers.length > 0) {
+      return { title: enTitle.title, servers };
     }
   }
 

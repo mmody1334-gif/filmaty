@@ -101,3 +101,35 @@ test("a newer command overwrites the previous one for the same session", async (
   assert.equal(got.json.command.season, 1);
   assert.equal(got.json.command.episode, 2);
 });
+
+test("POST /api/tv-command accepts seek with valid delta, mute, and next", async () => {
+  const { env } = mockEnv();
+  const seekFwd = await call(env, "POST", "/api/tv-command", { session: "Ab3dEf", action: "seek", delta: 10, cmdId: "cmd-s1" });
+  assert.equal(seekFwd.status, 200);
+  let got = await call(env, "GET", "/api/tv-command?session=Ab3dEf");
+  assert.equal(got.json.command.action, "seek");
+  assert.equal(got.json.command.delta, 10);
+
+  const seekBack = await call(env, "POST", "/api/tv-command", { session: "Ab3dEf", action: "seek", delta: -15, cmdId: "cmd-s2" });
+  assert.equal(seekBack.status, 200);
+  got = await call(env, "GET", "/api/tv-command?session=Ab3dEf");
+  assert.equal(got.json.command.delta, -15);
+
+  const mute = await call(env, "POST", "/api/tv-command", { session: "Ab3dEf", action: "mute", cmdId: "cmd-m1" });
+  assert.equal(mute.status, 200);
+  got = await call(env, "GET", "/api/tv-command?session=Ab3dEf");
+  assert.equal(got.json.command.action, "mute");
+
+  const next = await call(env, "POST", "/api/tv-command", { session: "Ab3dEf", action: "next", cmdId: "cmd-n1" });
+  assert.equal(next.status, 200);
+  got = await call(env, "GET", "/api/tv-command?session=Ab3dEf");
+  assert.equal(got.json.command.action, "next");
+});
+
+test("POST /api/tv-command rejects seek when delta is missing, zero, or out of [-600, 600]", async () => {
+  const { env } = mockEnv();
+  for (const badDelta of [undefined, 0, 9999, -601, "abc"]) {
+    const res = await call(env, "POST", "/api/tv-command", { session: "Ab3dEf", action: "seek", delta: badDelta });
+    assert.equal(res.status, 400, `expected 400 for delta=${String(badDelta)}`);
+  }
+});

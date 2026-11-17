@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0f19">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -36,6 +36,13 @@
     .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    button:not(:disabled), a[href], select, [role="button"] { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.6; }
+    :focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+    #modalCard.theater-mode { max-width: 64rem; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col pb-12">
@@ -168,15 +175,44 @@
 
   <!-- Media Details & Player Modal -->
   <div id="mediaModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
-    <div class="bg-brand-card border border-brand-border rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative">
+    <div id="modalCard" class="bg-brand-card border border-brand-border rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative">
       <!-- Close button -->
-      <button id="closeModal" class="absolute top-3 left-3 z-20 w-8 h-8 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-red-600 transition">✕</button>
+      <button id="closeModal" type="button" aria-label="إغلاق" class="absolute top-3 left-3 z-20 w-10 h-10 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-red-600 transition">✕</button>
 
       <!-- Video Player Frame Area -->
-      <div id="playerContainer" class="hidden relative aspect-video w-full bg-black">
+      <div id="playerContainer" class="hidden relative aspect-video w-full bg-black select-none">
         <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
         <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
+        <div id="iframeSpinner" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-white text-sm font-bold pointer-events-none">
+          <span class="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
+          <span>⏳ جاري تحميل المشغّل...</span>
+        </div>
+        <div id="seekIndicator" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-sm font-black border border-white/20 pointer-events-none"></div>
         <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/70 text-white text-sm font-bold px-4 text-center"></div>
+      </div>
+
+      <!-- Player Controls Bar -->
+      <div id="playerToolbar" class="hidden flex-wrap items-center justify-between gap-2 px-4 py-2 bg-slate-900/95 border-b border-brand-border text-xs font-bold">
+        <div id="nativeToolbarGroup" class="flex flex-wrap items-center gap-2">
+          <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-red-500 transition">-10 ث ⏪</button>
+          <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-red-500 transition">⏩ +10 ث</button>
+          <div class="flex items-center gap-1.5">
+            <label for="playerSpeedSelect" class="text-slate-300">السرعة:</label>
+            <select id="playerSpeedSelect" class="min-h-[44px] bg-slate-800 text-white rounded-xl px-2.5 py-1.5 border border-slate-700">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
+          <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-red-500 transition">صورة داخل صورة</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnTheater" type="button" aria-label="وضع المسرح" aria-pressed="false" class="hidden sm:inline-flex items-center min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-amber-500 transition">وضع المسرح</button>
+          <button id="btnFullscreen" type="button" aria-label="ملء الشاشة" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600 hover:text-white transition">⛶ ملء الشاشة</button>
+        </div>
       </div>
 
       <!-- Modal Content Body -->
@@ -205,7 +241,7 @@
         <!-- Series Seasons & Episodes Picker (Visible if TV show) -->
         <div id="seriesControls" class="hidden space-y-3 pt-2 border-t border-brand-border">
           <div class="flex items-center justify-between">
-            <label class="text-xs font-bold text-slate-300">الموسم:</label>
+            <label for="seasonSelect" class="text-xs font-bold text-slate-300">الموسم:</label>
             <select id="seasonSelect" class="bg-slate-800 text-white text-xs rounded-xl px-3 py-1.5 border border-brand-border focus:outline-none"></select>
           </div>
           <div>
@@ -1014,6 +1050,7 @@
         // Player reset
         resetPlayer();
         playerContainer.classList.add('hidden');
+        updatePlayerToolbarVisibility(false);
 
         if (mediaType === 'tv') {
           seriesControls.classList.remove('hidden');
@@ -1126,16 +1163,14 @@
       return `${type}:${id}:${s || 0}:${e || 0}`;
     }
 
-    // Ask the Worker for the servers/qualities of a title. 12s timeout;
-    // null on network failure or timeout. A parsed body is returned even
-    // when ok:false (it still carries the embedwave server); the caller
-    // decides whether to play natively or fall back to embedwave.
+    // Ask the Worker for the servers/qualities of a title. 25s timeout
+    // allows initial uncached provider sweep without dropping prematurely to EmbedWave.
     async function fetchResolve(type, id, s, e) {
       const params = new URLSearchParams({ type, id: String(id) });
       if (s) params.set('s', String(s));
       if (e) params.set('e', String(e));
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
+      const timer = setTimeout(() => controller.abort(), 25000);
       try {
         const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
         const data = await res.json().catch(() => null);
@@ -1156,10 +1191,21 @@
       playerStatus.classList.add('hidden');
     }
 
+    function showIframeSpinner() {
+      const sp = document.getElementById('iframeSpinner');
+      if (sp) sp.classList.remove('hidden');
+    }
+
+    function hideIframeSpinner() {
+      const sp = document.getElementById('iframeSpinner');
+      if (sp) sp.classList.add('hidden');
+    }
+
     function resetPlayer() {
       trackProgress(true);
       clearAutoNext();
       nativeActive = false;
+      usingDirectCdn = false;
       clearNativePlayTimeout();
       videoNative.pause();
       videoNative.removeAttribute('src');
@@ -1167,6 +1213,7 @@
       videoNative.classList.add('hidden');
       videoIframe.src = '';
       videoIframe.classList.remove('hidden');
+      hideIframeSpinner();
       hidePlayerStatus();
     }
 
@@ -1176,6 +1223,67 @@
     // reused by the download button.
     let nativeActive = false;
     let nativePlayTimer = null;
+    let currentPlaybackRate = 1;
+    let usingDirectCdn = false;
+    let seekBadgeTimer = null;
+
+    function captureCurrentPlaybackTime() {
+      if (nativeActive && Number.isFinite(videoNative.currentTime) && videoNative.currentTime > 2) {
+        pendingResume = videoNative.currentTime;
+      }
+    }
+
+    function flashSeekIndicator(msg) {
+      const el = document.getElementById('seekIndicator');
+      if (!el) return;
+      el.innerText = msg;
+      el.classList.remove('hidden');
+      clearTimeout(seekBadgeTimer);
+      seekBadgeTimer = setTimeout(() => el.classList.add('hidden'), 900);
+    }
+
+    function seekNativeBy(delta) {
+      if (!nativeActive || videoNative.classList.contains('hidden')) return;
+      const dur = videoNative.duration;
+      const target = (videoNative.currentTime || 0) + delta;
+      videoNative.currentTime = Number.isFinite(dur) ? Math.max(0, Math.min(dur, target)) : Math.max(0, target);
+      flashSeekIndicator(delta < 0 ? `${delta} ث` : `+${delta} ث`);
+    }
+
+    function updatePlayerToolbarVisibility(isEmbed) {
+      const bar = document.getElementById('playerToolbar');
+      const nativeGroup = document.getElementById('nativeToolbarGroup');
+      const fsBtn = document.getElementById('btnFullscreen');
+      if (!bar || !nativeGroup) return;
+      if (playerContainer.classList.contains('hidden')) {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+        return;
+      }
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      nativeGroup.classList.toggle('hidden', !!isEmbed);
+      nativeGroup.classList.toggle('flex', !isEmbed);
+      if (fsBtn) fsBtn.classList.toggle('hidden', !!isEmbed);
+    }
+
+    function fallbackFromDirectToProxyOrNext(isTimeout) {
+      const server = selectedServer();
+      const quality = selectedQuality();
+      if (usingDirectCdn && server && !isEmbedServer(server) && quality && quality.stream && !quality._directFailed) {
+        quality._directFailed = true;
+        captureCurrentPlaybackTime();
+        usingDirectCdn = false;
+        playSelected();
+        return;
+      }
+      showPlayerStatus(
+        isTimeout
+          ? '⚠️ المصدر المباشر مش شغال - جاري التبديل لمشغّل بديل...'
+          : '⚠️ المصدر المباشر مش شغال - جاري تجربة مصدر آخر...'
+      );
+      tryNextQualityOrFallback();
+    }
 
     function clearNativePlayTimeout() {
       if (nativePlayTimer) { clearTimeout(nativePlayTimer); nativePlayTimer = null; }
@@ -1191,18 +1299,17 @@
         // before readyState 2, then played fine) — a 15s timeout kept
         // declaring healthy streams dead and cycling away from them.
         if (videoNative.readyState < 2) {
-          showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
-          tryNextQualityOrFallback();
+          fallbackFromDirectToProxyOrNext(true);
         }
       }, 45000);
     }
 
     videoNative.addEventListener('error', () => {
       if (!nativeActive) return;
-      showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري تجربة مصدر آخر...');
-      tryNextQualityOrFallback();
+      fallbackFromDirectToProxyOrNext(false);
     });
     videoNative.addEventListener('playing', clearNativePlayTimeout);
+    videoIframe.addEventListener('load', hideIframeSpinner);
 
     // Continue watching: save the position while playing (throttled to
     // every 5s), on pause, and when the page hides; mark watched at the
@@ -1237,6 +1344,7 @@
     });
     document.addEventListener('pagehide', () => trackProgress(true));
     videoNative.addEventListener('loadedmetadata', () => {
+      videoNative.playbackRate = currentPlaybackRate;
       if (pendingResume != null && Number.isFinite(videoNative.duration) && videoNative.duration > 0) {
         videoNative.currentTime = Math.min(pendingResume, Math.max(0, videoNative.duration - 10));
         pendingResume = null;
@@ -1341,6 +1449,7 @@
           : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500');
         b.textContent = server.name;
         b.addEventListener('click', () => {
+          captureCurrentPlaybackTime();
           selectedServerIdx = idx;
           selectedQualityIdx = 0;
           renderServerControls();
@@ -1359,6 +1468,7 @@
             : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500');
           b.textContent = q.quality;
           b.addEventListener('click', () => {
+            captureCurrentPlaybackTime();
             selectedQualityIdx = idx;
             renderServerControls();
             playSelected();
@@ -1383,16 +1493,27 @@
         // same-origin so the player can run, but no popups or
         // top-navigation.
         videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
+        showIframeSpinner();
         videoIframe.src = quality.stream;
         playerContainer.classList.remove('hidden');
+        updatePlayerToolbarVisibility(true);
         return;
       }
+      hideIframeSpinner();
       videoIframe.src = '';
       videoIframe.classList.add('hidden');
       nativeActive = true;
-      videoNative.src = quality.stream;
+      if (quality.direct && !quality._directFailed) {
+        usingDirectCdn = true;
+        videoNative.src = quality.direct;
+      } else {
+        usingDirectCdn = false;
+        videoNative.src = quality.stream;
+      }
+      videoNative.playbackRate = currentPlaybackRate;
       videoNative.classList.remove('hidden');
       hidePlayerStatus();
+      updatePlayerToolbarVisibility(false);
       armNativePlayTimeout();
       videoNative.play().catch(() => {});
     }
@@ -1403,6 +1524,7 @@
     function tryNextQualityOrFallback() {
       const server = selectedServer();
       if (server && !isEmbedServer(server) && selectedQualityIdx < server.qualities.length - 1) {
+        captureCurrentPlaybackTime();
         selectedQualityIdx++;
         renderServerControls();
         playSelected();
@@ -1523,8 +1645,112 @@
       playerContainer.classList.remove('hidden');
       videoIframe.removeAttribute('sandbox');
       videoIframe.classList.remove('hidden');
+      showIframeSpinner();
       videoIframe.src = `https://www.youtube.com/embed/${trailerKey}?autoplay=1&rel=0`;
       hidePlayerStatus();
+      updatePlayerToolbarVisibility(true);
+    });
+
+    // Cinema toolbar controls: speed, PiP, theater, fullscreen, seek buttons, shortcuts, double-tap.
+    document.getElementById('btnSeekBack').addEventListener('click', () => seekNativeBy(-10));
+    document.getElementById('btnSeekFwd').addEventListener('click', () => seekNativeBy(10));
+    document.getElementById('playerSpeedSelect').addEventListener('change', (e) => {
+      currentPlaybackRate = parseFloat(e.target.value) || 1;
+      videoNative.playbackRate = currentPlaybackRate;
+    });
+    document.getElementById('btnPip').addEventListener('click', async () => {
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else if (document.pictureInPictureEnabled && videoNative.requestPictureInPicture) {
+          await videoNative.requestPictureInPicture();
+        } else {
+          showToast('المتصفح لا يدعم صورة داخل صورة');
+        }
+      } catch (e) {
+        showToast('شغّل الفيديو أولاً لتفعيل صورة داخل صورة');
+      }
+    });
+    document.getElementById('btnTheater').addEventListener('click', (e) => {
+      const card = document.getElementById('modalCard');
+      if (!card) return;
+      const active = card.classList.toggle('theater-mode');
+      e.currentTarget.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    function toggleModalFullscreen() {
+      const target = playerContainer;
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+        return;
+      }
+      if (target.requestFullscreen) {
+        target.requestFullscreen().then(() => {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {});
+      } else if (videoNative.webkitEnterFullscreen) {
+        videoNative.webkitEnterFullscreen();
+      }
+    }
+    document.getElementById('btnFullscreen').addEventListener('click', toggleModalFullscreen);
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (e) {}
+      }
+    });
+
+    // Double-tap seek on mobile touchscreens without blocking native controls.
+    let lastTapTime = 0;
+    let lastTapSide = null;
+    videoNative.addEventListener('touchend', (e) => {
+      if (!nativeActive || !e.changedTouches || !e.changedTouches.length) return;
+      const touch = e.changedTouches[0];
+      const rect = videoNative.getBoundingClientRect();
+      if (!rect.width) return;
+      // Ignore taps on the bottom 48px native control bar.
+      if (touch.clientY > rect.bottom - 48) return;
+      const relX = (touch.clientX - rect.left) / rect.width;
+      const side = relX < 0.35 ? 'left' : relX > 0.65 ? 'right' : null;
+      if (!side) return;
+      const now = Date.now();
+      if (lastTapSide === side && now - lastTapTime < 280) {
+        seekNativeBy(side === 'left' ? -10 : 10);
+        lastTapTime = 0;
+        lastTapSide = null;
+      } else {
+        lastTapTime = now;
+        lastTapSide = side;
+      }
+    }, { passive: true });
+
+    // Keyboard shortcuts when the player modal is open.
+    document.addEventListener('keydown', (e) => {
+      if (mediaModal.classList.contains('hidden')) return;
+      const active = document.activeElement;
+      const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+      if (typing) return;
+      if (e.key === 'Escape') {
+        closeModal.click();
+        return;
+      }
+      if (!nativeActive || videoNative.classList.contains('hidden')) return;
+      if (e.key === 'ArrowLeft' || e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        seekNativeBy(-10);
+      } else if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        seekNativeBy(10);
+      } else if (e.key === 'k' || e.key === 'K' || (e.key === ' ' && (!active || active.tagName !== 'BUTTON'))) {
+        e.preventDefault();
+        if (videoNative.paused) { videoNative.play().catch(() => {}); } else { videoNative.pause(); }
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        toggleModalFullscreen();
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        videoNative.muted = !videoNative.muted;
+      }
     });
     document.getElementById('btnReport').addEventListener('click', () => {
       document.getElementById('reportPicker').classList.toggle('hidden');
@@ -1844,10 +2070,12 @@
     btnOpenInBot.addEventListener('click', openBotRequest);
 
     closeModal.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       mediaModal.classList.add('hidden');
       document.body.classList.remove('overflow-hidden');
       resetPlayer();
       playerContainer.classList.add('hidden');
+      updatePlayerToolbarVisibility(false);
       document.getElementById('serverControls').classList.add('hidden');
       document.getElementById('downloadPicker').classList.add('hidden');
       document.getElementById('seasonDownloadPicker').classList.add('hidden');

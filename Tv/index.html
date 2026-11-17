@@ -41,7 +41,7 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     /* Remote (D-pad) focus: a thick gold ring the user can see from the couch. */
-    .tv-focus { outline: none; }
+    .tv-focus { outline: none; cursor: pointer; }
     .tv-focus:focus {
       outline: 4px solid #f59e0b !important;
       outline-offset: 3px;
@@ -50,6 +50,10 @@
     }
     .tv-card:focus { transform: scale(1.06); }
     .tv-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      .tv-card, .tv-row { transition: none !important; scroll-behavior: auto !important; }
+      .tv-card:focus { transform: none; }
+    }
     /* Netflix-style rows: one horizontal strip per section. */
     .tv-row { scroll-behavior: smooth; }
   </style>
@@ -222,22 +226,35 @@
         </div>
       </div>
 
-      <!-- Player -->
-      <div id="tvPlayerWrap" class="hidden">
-        <p id="tvPlayerStatus" class="hidden text-center py-3 text-amber-300 text-sm font-bold"></p>
-        <div class="relative aspect-video bg-black rounded-2xl overflow-hidden border border-brand-border">
+      <!-- Player (full-viewport cinema overlay when active) -->
+      <div id="tvPlayerWrap" class="hidden fixed inset-0 z-[65] bg-black/95 flex-col justify-center p-4 gap-3">
+        <div id="tvHudBar" class="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 bg-brand-card/90 border border-brand-border rounded-2xl px-4 py-2.5">
+          <div class="flex items-center gap-3 min-w-0">
+            <button id="tvExitPlayer" type="button" class="tv-focus px-4 py-2 rounded-xl bg-slate-800 hover:bg-red-600 text-white text-sm font-bold border border-slate-700 transition">رجوع للتفاصيل</button>
+            <span id="tvHudTitle" class="text-sm md:text-base font-extrabold text-white truncate"></span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="tvSeekBack" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">-10 ث</button>
+            <button id="tvTogglePlay" type="button" class="tv-focus px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition">إيقاف / تشغيل</button>
+            <button id="tvSeekFwd" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">+10 ث</button>
+            <button id="tvMuteBtn" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">كتم</button>
+            <button id="tvNextEpBtn" type="button" class="tv-focus hidden px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-extrabold transition">الحلقة التالية</button>
+            <button id="tvQuickServersBtn" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">السيرفر والجودة</button>
+          </div>
+        </div>
+        <p id="tvPlayerStatus" class="hidden text-center py-2 text-amber-300 text-sm font-bold"></p>
+        <div class="relative w-full max-w-6xl mx-auto aspect-video bg-black rounded-2xl overflow-hidden border border-brand-border">
           <video id="tvVideo" class="w-full h-full hidden" controls playsinline preload="none"></video>
           <iframe id="tvFrame" class="w-full h-full hidden" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>
         </div>
-      </div>
-
-      <!-- Auto-next episode countdown (series only, native player) -->
-      <div id="tvAutoNextBar" class="hidden items-center justify-between gap-3 rounded-2xl bg-red-600/15 border border-red-500/30 px-4 py-3 mt-3">
-        <span id="tvAutoNextText" class="text-base font-bold text-white">الحلقة التالية خلال 5 ثواني…</span>
-        <span class="flex gap-2 shrink-0">
-          <button id="tvAutoNextNow" class="tv-focus px-5 py-2.5 rounded-xl bg-red-600 text-white text-base font-bold">تشغيل الآن</button>
-          <button id="tvAutoNextCancel" class="tv-focus px-5 py-2.5 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-slate-700">إلغاء</button>
-        </span>
+        <!-- Auto-next episode countdown (series only, native player) -->
+        <div id="tvAutoNextBar" class="hidden w-full max-w-6xl mx-auto items-center justify-between gap-3 rounded-2xl bg-red-600/20 border border-red-500/40 px-4 py-3">
+          <span id="tvAutoNextText" class="text-base font-bold text-white">الحلقة التالية خلال 5 ثواني…</span>
+          <span class="flex gap-2 shrink-0">
+            <button id="tvAutoNextNow" type="button" class="tv-focus px-5 py-2.5 rounded-xl bg-red-600 text-white text-base font-bold">تشغيل الآن</button>
+            <button id="tvAutoNextCancel" type="button" class="tv-focus px-5 py-2.5 rounded-xl bg-slate-800 text-slate-200 text-base font-bold border border-slate-700">إلغاء</button>
+          </span>
+        </div>
       </div>
 
       <!-- Similar titles (stage D) -->
@@ -267,7 +284,10 @@
     let selectedServerIdx = 0;
     let selectedQualityIdx = 0;
     let nativeActive = false;
+    let tvUsingDirectCdn = false;
     let nativePlayTimer = null;
+    let fastPollTimer = null;
+    let fastPollUntil = 0;
     let overlayOpen = false;
 
     // Continue watching (stage A): resume positions + watched marks,
@@ -449,6 +469,28 @@
       if (first) focusEl(first);
     }
 
+    function scheduleFastPoll(extend = true) {
+      if (extend) fastPollUntil = Date.now() + 120000;
+      const wrap = document.getElementById('tvPlayerWrap');
+      const playerVisible = Boolean(wrap && !wrap.classList.contains('hidden'));
+      const shouldRun = playerVisible || Date.now() < fastPollUntil;
+      if (shouldRun && !fastPollTimer) {
+        fastPollTimer = setInterval(() => {
+          const w = document.getElementById('tvPlayerWrap');
+          const active = Boolean(w && !w.classList.contains('hidden'));
+          if (!active && Date.now() >= fastPollUntil) {
+            clearInterval(fastPollTimer);
+            fastPollTimer = null;
+            return;
+          }
+          pollRemoteCommands();
+        }, 2500);
+      } else if (!shouldRun && fastPollTimer) {
+        clearInterval(fastPollTimer);
+        fastPollTimer = null;
+      }
+    }
+
     async function pollRemoteCommands() {
       try {
         const res = await fetch(`${API_BASE}/api/tv-command?session=${tvSession}`);
@@ -456,17 +498,83 @@
         if (!data || !data.ok || !data.command) return;
         if (data.command.id === lastAppliedCmdId) return;
         lastAppliedCmdId = data.command.id;
+        scheduleFastPoll(true);
         applyRemoteCommand(data.command);
       } catch (e) {
         // Poll failure is not fatal: the next tick retries.
       }
     }
 
+    function seekTvNativeBy(delta) {
+      if (nativeActive && !tvVideo.classList.contains('hidden')) {
+        const dur = tvVideo.duration;
+        const target = tvVideo.currentTime + delta;
+        tvVideo.currentTime = Number.isFinite(dur)
+          ? Math.max(0, Math.min(dur, target))
+          : Math.max(0, target);
+        flashPlayerStatus(delta < 0 ? `⏪ ${delta} ثواني` : `+${delta} ثواني ⏩`);
+      } else {
+        flashPlayerStatus('⏪ الترجيع متاح على المشغّل المباشر فقط', 2000);
+      }
+    }
+
+    function toggleTvNativePlay() {
+      if (!tvVideo.classList.contains('hidden')) {
+        if (tvVideo.paused) { tvVideo.play().catch(() => {}); } else { tvVideo.pause(); }
+        updateTvHudState();
+      }
+    }
+
+    function toggleTvNativeMute() {
+      if (!tvVideo.classList.contains('hidden')) {
+        tvVideo.muted = !tvVideo.muted;
+        updateTvHudState();
+        flashPlayerStatus(tvVideo.muted ? '🔇 تم كتم الصوت' : '🔊 تم تشغيل الصوت');
+      }
+    }
+
+    function triggerTvNextEpisode() {
+      if (!currentItem || currentItem.media_type !== 'tv') return;
+      const targetEp = tvAutoNextEpisode || (selectedEpisode < currentSeasonEpisodeCount ? selectedEpisode + 1 : 0);
+      if (!targetEp) return;
+      const nextBtn = document.querySelectorAll('.tv-ep')[targetEp - 1];
+      clearTvAutoNext();
+      if (nextBtn) nextBtn.click();
+    }
+
+    function updateTvHudState() {
+      const playBtn = document.getElementById('tvTogglePlay');
+      const muteBtn = document.getElementById('tvMuteBtn');
+      const seekBackBtn = document.getElementById('tvSeekBack');
+      const seekFwdBtn = document.getElementById('tvSeekFwd');
+      const isNative = nativeActive && !tvVideo.classList.contains('hidden');
+      if (playBtn) {
+        playBtn.classList.toggle('hidden', !isNative);
+        if (isNative) playBtn.innerText = tvVideo.paused ? '▶ تشغيل' : '⏸ إيقاف مؤقت';
+      }
+      if (muteBtn) {
+        muteBtn.classList.toggle('hidden', !isNative);
+        if (isNative) muteBtn.innerText = tvVideo.muted ? '🔊 إلغاء الكتم' : '🔇 كتم';
+      }
+      if (seekBackBtn) seekBackBtn.classList.toggle('hidden', !isNative);
+      if (seekFwdBtn) seekFwdBtn.classList.toggle('hidden', !isNative);
+    }
+
     async function applyRemoteCommand(cmd) {
       if (cmd.action === 'toggle') {
-        if (!tvVideo.classList.contains('hidden')) {
-          if (tvVideo.paused) { tvVideo.play().catch(() => {}); } else { tvVideo.pause(); }
-        }
+        toggleTvNativePlay();
+        return;
+      }
+      if (cmd.action === 'seek') {
+        seekTvNativeBy(Number(cmd.delta) || 0);
+        return;
+      }
+      if (cmd.action === 'mute') {
+        toggleTvNativeMute();
+        return;
+      }
+      if (cmd.action === 'next') {
+        triggerTvNextEpisode();
         return;
       }
       if (cmd.action === 'close') {
@@ -483,9 +591,12 @@
       // While an overlay is open, the remote only moves inside it —
       // never to the cards hidden behind it.
       const pairOverlay = document.getElementById('tvPairOverlay');
+      const wrap = document.getElementById('tvPlayerWrap');
       const scope = !pairOverlay.classList.contains('hidden')
         ? pairOverlay
-        : overlayOpen ? overlay : document;
+        : (wrap && !wrap.classList.contains('hidden'))
+          ? wrap
+          : overlayOpen ? overlay : document;
       return [...scope.querySelectorAll('.tv-focus')].filter((el) => el.offsetParent !== null && !el.disabled);
     }
     function focusEl(el) {
@@ -508,7 +619,14 @@
       if (e.key === 'Escape' || e.key === 'Backspace') {
         const pairOverlay = document.getElementById('tvPairOverlay');
         if (!pairOverlay.classList.contains('hidden')) { e.preventDefault(); closePairOverlay(); return; }
+        const wrap = document.getElementById('tvPlayerWrap');
+        if (wrap && !wrap.classList.contains('hidden')) { e.preventDefault(); closeTvPlayerWrap(false); return; }
         if (overlayOpen) { e.preventDefault(); closeOverlay(); }
+        return;
+      }
+      if (overlayOpen && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        toggleTvNativeMute();
         return;
       }
       // Number keys: 1 = back 10s, 3 = forward 10s. Only the native
@@ -517,17 +635,7 @@
       if (e.key === '1' || e.key === '3') {
         if (!overlayOpen) return;
         e.preventDefault();
-        if (nativeActive && !tvVideo.classList.contains('hidden')) {
-          const delta = e.key === '1' ? -10 : 10;
-          const dur = tvVideo.duration;
-          const target = tvVideo.currentTime + delta;
-          tvVideo.currentTime = Number.isFinite(dur)
-            ? Math.max(0, Math.min(dur, target))
-            : Math.max(0, target);
-          flashPlayerStatus(delta < 0 ? '⏪ ‎-10 ثواني' : '‎+10 ثواني ⏩');
-        } else {
-          flashPlayerStatus('⏪ الترجيع متاح على المشغّل المباشر فقط', 2000);
-        }
+        seekTvNativeBy(e.key === '1' ? -10 : 10);
         return;
       }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
@@ -904,8 +1012,7 @@
         } else {
           backdropWrap.classList.add('hidden');
         }
-        resetPlayer();
-        document.getElementById('tvPlayerWrap').classList.add('hidden');
+        closeTvPlayerWrap(false);
         document.getElementById('tvServerWrap').classList.add('hidden');
         if (mediaType === 'tv') {
           document.getElementById('tvSeriesControls').classList.remove('hidden');
@@ -986,8 +1093,7 @@
           selectedSeason = Number(btn.dataset.season);
           const s = seasons.find((x) => x.season_number === selectedSeason);
           renderEpisodes(s?.episode_count || 10);
-          resetPlayer();
-          document.getElementById('tvPlayerWrap').classList.add('hidden');
+          closeTvPlayerWrap(false);
           document.getElementById('tvServerWrap').classList.add('hidden');
         });
       });
@@ -1022,7 +1128,7 @@
     }
 
     function closeOverlay() {
-      resetPlayer();
+      closeTvPlayerWrap(false);
       overlay.classList.add('hidden');
       overlayOpen = false;
       document.body.classList.remove('overflow-hidden');
@@ -1065,10 +1171,51 @@
         if (tvPlayerStatus.innerText === msg) hidePlayerStatus();
       }, ms);
     }
+    function openTvPlayerWrap() {
+      const wrap = document.getElementById('tvPlayerWrap');
+      wrap.classList.remove('hidden');
+      wrap.classList.add('flex');
+      const hudTitle = document.getElementById('tvHudTitle');
+      if (hudTitle && currentItem) {
+        const name = currentItem.title || currentItem.name || '';
+        hudTitle.innerText = currentItem.media_type === 'tv' ? `${name} - م${selectedSeason} ح${selectedEpisode}` : name;
+      }
+      const nextBtn = document.getElementById('tvNextEpBtn');
+      if (nextBtn) {
+        const hasNext = Boolean(currentItem && currentItem.media_type === 'tv' && selectedEpisode < currentSeasonEpisodeCount);
+        nextBtn.classList.toggle('hidden', !hasNext);
+      }
+      updateTvHudState();
+      scheduleFastPoll(true);
+      const toggleBtn = document.getElementById('tvTogglePlay');
+      focusEl(toggleBtn && !toggleBtn.classList.contains('hidden') ? toggleBtn : document.getElementById('tvExitPlayer'));
+    }
+    function closeTvPlayerWrap(keepResume = false) {
+      if (keepResume) captureTvResume();
+      resetPlayer();
+      const wrap = document.getElementById('tvPlayerWrap');
+      if (wrap) {
+        wrap.classList.add('hidden');
+        wrap.classList.remove('flex');
+      }
+      scheduleFastPoll(false);
+      if (overlayOpen) {
+        const target = keepResume
+          ? (document.querySelector('.tv-server') || document.getElementById('tvPlay'))
+          : document.getElementById('tvPlay');
+        focusEl(target);
+      }
+    }
+    function captureTvResume() {
+      if (nativeActive && !tvVideo.classList.contains('hidden') && Number.isFinite(tvVideo.currentTime) && tvVideo.currentTime > 3) {
+        pendingResume = tvVideo.currentTime;
+      }
+    }
     function resetPlayer() {
       trackProgress(true);
       clearTvAutoNext();
       nativeActive = false;
+      tvUsingDirectCdn = false;
       clearNativePlayTimeout();
       tvVideo.pause();
       tvVideo.removeAttribute('src');
@@ -1077,6 +1224,7 @@
       tvFrame.src = '';
       tvFrame.classList.remove('hidden');
       hidePlayerStatus();
+      updateTvHudState();
     }
     function clearNativePlayTimeout() {
       if (nativePlayTimer) { clearTimeout(nativePlayTimer); nativePlayTimer = null; }
@@ -1086,17 +1234,35 @@
       nativePlayTimer = setTimeout(() => {
         if (!nativeActive) return;
         if (tvVideo.readyState < 2) {
-          showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري التبديل لمشغّل بديل...');
-          tryNextQualityOrFallback();
+          fallbackTvDirectOrNext('⚠️ المصدر المباشر مش شغال - جاري التبديل لمشغّل بديل...');
         }
       }, 45000);
     }
+    function fallbackTvDirectOrNext(statusMsg) {
+      const quality = selectedQuality();
+      if (tvUsingDirectCdn && quality && quality.stream) {
+        tvUsingDirectCdn = false;
+        captureTvResume();
+        tvVideo.src = quality.stream;
+        tvVideo.play().catch(() => {});
+        armNativePlayTimeout();
+        return;
+      }
+      showPlayerStatus(statusMsg);
+      captureTvResume();
+      tryNextQualityOrFallback();
+    }
     tvVideo.addEventListener('error', () => {
       if (!nativeActive) return;
-      showPlayerStatus('⚠️ المصدر المباشر مش شغال — جاري تجربة مصدر آخر...');
-      tryNextQualityOrFallback();
+      fallbackTvDirectOrNext('⚠️ المصدر المباشر مش شغال - جاري تجربة مصدر آخر...');
     });
     tvVideo.addEventListener('playing', clearNativePlayTimeout);
+    tvVideo.addEventListener('play', updateTvHudState);
+    tvVideo.addEventListener('pause', updateTvHudState);
+    tvVideo.addEventListener('volumechange', updateTvHudState);
+    tvFrame.addEventListener('load', () => {
+      if (!tvFrame.classList.contains('hidden')) hidePlayerStatus();
+    });
 
     // Continue watching: save the position while playing (throttled to
     // every 5s), on pause, and when the page hides; mark watched at the
@@ -1219,6 +1385,7 @@
       `).join('');
       serversRow.querySelectorAll('.tv-server').forEach((btn) => {
         btn.addEventListener('click', () => {
+          captureTvResume();
           selectedServerIdx = Number(btn.dataset.server);
           selectedQualityIdx = 0;
           renderServerControls();
@@ -1227,6 +1394,7 @@
       });
       qualitiesRow.querySelectorAll('.tv-quality').forEach((btn) => {
         btn.addEventListener('click', () => {
+          captureTvResume();
           selectedQualityIdx = Number(btn.dataset.quality);
           renderServerControls();
           playActiveStream();
@@ -1235,6 +1403,7 @@
     }
 
     function tryNextQualityOrFallback() {
+      captureTvResume();
       const server = selectedServer();
       if (server && selectedQualityIdx + 1 < server.qualities.length) {
         selectedQualityIdx++;
@@ -1257,19 +1426,21 @@
       const quality = selectedQuality();
       if (!server || !quality) return;
       resetPlayer();
-      document.getElementById('tvPlayerWrap').classList.remove('hidden');
       hidePlayerStatus();
       if (isEmbedServer(server)) {
         tvFrame.setAttribute('sandbox', EMBED_SANDBOX);
         tvFrame.src = quality.stream;
         tvFrame.classList.remove('hidden');
+        showPlayerStatus('جاري تحميل المشغّل...');
       } else {
         nativeActive = true;
-        tvVideo.src = quality.stream;
+        tvUsingDirectCdn = Boolean(quality.direct);
+        tvVideo.src = quality.direct || quality.stream;
         tvVideo.classList.remove('hidden');
         tvVideo.play().catch(() => {});
         armNativePlayTimeout();
       }
+      openTvPlayerWrap();
     }
 
     // Fullscreen: only a real tap may open it (browser rule), so the
@@ -1398,13 +1569,20 @@
     document.getElementById('tvTrailer').addEventListener('click', () => {
       if (!tvTrailerKey) return;
       resetPlayer();
-      document.getElementById('tvPlayerWrap').classList.remove('hidden');
       tvFrame.removeAttribute('sandbox');
       tvFrame.classList.remove('hidden');
       tvFrame.src = `https://www.youtube.com/embed/${tvTrailerKey}?autoplay=1&rel=0`;
-      hidePlayerStatus();
+      openTvPlayerWrap();
+      showPlayerStatus('جاري تحميل الإعلان...');
       enterFullscreen();
     });
+    document.getElementById('tvExitPlayer').addEventListener('click', () => closeTvPlayerWrap(false));
+    document.getElementById('tvSeekBack').addEventListener('click', () => seekTvNativeBy(-10));
+    document.getElementById('tvTogglePlay').addEventListener('click', toggleTvNativePlay);
+    document.getElementById('tvSeekFwd').addEventListener('click', () => seekTvNativeBy(10));
+    document.getElementById('tvMuteBtn').addEventListener('click', toggleTvNativeMute);
+    document.getElementById('tvNextEpBtn').addEventListener('click', triggerTvNextEpisode);
+    document.getElementById('tvQuickServersBtn').addEventListener('click', () => closeTvPlayerWrap(true));
     document.getElementById('tvAutoNextNow').addEventListener('click', () => {
       const nextBtn = tvAutoNextEpisode ? document.querySelectorAll('.tv-ep')[tvAutoNextEpisode - 1] : null;
       clearTvAutoNext();
