@@ -1,4 +1,5 @@
 import { AkwamProvider } from "./akwam.ts";
+import { EgyDeadProvider } from "./egydead.ts";
 import { EgyBestProvider } from "./egybest.ts";
 import { UniversalEmbedProvider } from "./embed.ts";
 import { FaselHdProvider } from "./faselhd.ts";
@@ -19,6 +20,7 @@ export const ALL_PROVIDERS: Provider[] = [
   new MyCimaProvider(),
   new LarozaProvider(),
   new FaselHdProvider(),
+  new EgyDeadProvider(),
   new UniversalEmbedProvider(),
 ];
 
