@@ -438,3 +438,36 @@ test("Stage 4: Telegram mov|q| action card uses signed /watch?t=... URL for Watc
     globalThis.fetch = originalFetch;
   }
 });
+
+// Netflix redesign & EmbedWave-only download UX fix.
+
+test("Netflix redesign: index.html ships Netflix hero, backdrop modal, high-contrast palette, and honest EmbedWave-only download state", () => {
+  const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
+
+  for (const id of [
+    "heroBanner",
+    "heroImg",
+    "heroPlayBtn",
+    "heroInfoBtn",
+    "modalBackdropWrap",
+    "modalBackdropImg",
+    "btnDirectDownloadLabel",
+    "btnDirectDownloadIcon",
+    "brandHomeBtn",
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `expected #${id} in index.html`);
+  }
+
+  const heroImgTag = html.match(/<img\s+[^>]*id="heroImg"[^>]*>/i)?.[0] || "";
+  assert.ok(heroImgTag.includes('fetchpriority="high"'), "hero image must use fetchpriority=high");
+  assert.equal(heroImgTag.includes('loading="lazy"'), false, "hero image must never lazy-load");
+
+  assert.ok(html.includes("#141414"), "expected Netflix dark canvas #141414");
+  assert.ok(html.includes("#181818"), "expected Netflix surface #181818");
+  assert.ok(html.includes("#e50914"), "expected Netflix accent #e50914");
+  assert.ok(html.includes('<meta name="theme-color" content="#0b0f19">'), "keep PWA theme-color intact");
+  assert.ok(html.includes("syncDownloadButtonState"), "expected download button state sync");
+  assert.ok(html.includes("getDownloadQualities"), "expected direct quality filter helper");
+  assert.ok(html.includes("متاح مشاهدة أونلاين فقط"), "expected online-only download button state");
+  assert.ok(html.includes("renderHeroBanner"), "expected Netflix hero renderer");
+});

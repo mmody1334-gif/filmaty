@@ -19,9 +19,9 @@
             brand: {
               red: '#e50914',
               gold: '#f59e0b',
-              dark: '#0b0f19',
-              card: '#161e2e',
-              border: '#26334d'
+              dark: '#141414',
+              card: '#181818',
+              border: '#2e2e2e'
             }
           }
         }
@@ -31,15 +31,18 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
     * { font-family: 'Cairo', system-ui, -apple-system, sans-serif; }
-    body { background-color: #0b0f19; color: #f8fafc; }
-    .glass { background: rgba(22, 30, 46, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    body { background-color: #141414; color: #ffffff; }
+    .glass { background: rgba(20, 20, 20, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .hero-scrim { background: linear-gradient(to top, #141414 4%, rgba(20, 20, 20, 0.78) 45%, rgba(20, 20, 20, 0.25) 100%), linear-gradient(to left, rgba(20, 20, 20, 0.88) 0%, rgba(20, 20, 20, 0.45) 55%, rgba(20, 20, 20, 0.1) 100%); }
+    .modal-backdrop-scrim { background: linear-gradient(to top, #181818 6%, rgba(24, 24, 24, 0.65) 55%, rgba(24, 24, 24, 0.2) 100%); }
     .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     button:not(:disabled), a[href], select, [role="button"] { cursor: pointer; }
     button:disabled { cursor: not-allowed; opacity: 0.6; }
     :focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
-    #modalCard.theater-mode { max-width: 64rem; }
+    #modalCard.theater-mode { max-width: 68rem; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
     }
@@ -48,30 +51,36 @@
 <body class="min-h-screen flex flex-col pb-12">
 
   <!-- Header -->
-  <header class="sticky top-0 z-40 glass border-b border-brand-border px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <button id="menuBtn" aria-label="القائمة" class="w-9 h-9 rounded-xl bg-brand-card border border-brand-border text-white text-lg font-bold flex items-center justify-center hover:border-red-500 transition">☰</button>
-      <span class="text-2xl">🎬</span>
-      <h1 class="text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300">
-        فيلماتي <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-600/30 text-red-400 border border-red-500/40">VIP</span>
-      </h1>
-    </div>
-    <div class="flex items-center gap-2">
-      <a href="Tv/" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500 hover:text-white transition">
-        <span>📺 وضع التلفزيون</span>
-      </a>
-      <a href="https://t.me/filmatibot" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 text-xs font-bold hover:bg-blue-600 hover:text-white transition">
-        <span>🤖 البوت في التليجرام</span>
-      </a>
+  <header class="sticky top-0 z-40 glass px-4 sm:px-6 py-2.5">
+    <div class="max-w-7xl mx-auto w-full flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="menuBtn" type="button" aria-label="القائمة" class="min-w-[44px] min-h-[44px] rounded-md bg-[#232323] border border-[#737373] text-white text-lg font-bold flex items-center justify-center hover:border-white transition">☰</button>
+        <h1 id="brandHomeBtn" role="button" tabindex="0" class="text-2xl sm:text-3xl font-black tracking-tight text-[#e50914] select-none shrink-0">فيلماتي</h1>
+        <nav aria-label="التصفح السريع" class="hidden md:flex items-center gap-1 mr-3 text-xs">
+          <button type="button" data-nav-filter="trending" class="nav-filter-link px-3 py-2 rounded-md text-white font-black hover:text-white transition">الرئيسية</button>
+          <button type="button" data-nav-filter="movie" class="nav-filter-link px-3 py-2 rounded-md text-neutral-300 font-semibold hover:text-white transition">أفلام</button>
+          <button type="button" data-nav-filter="tv" class="nav-filter-link px-3 py-2 rounded-md text-neutral-300 font-semibold hover:text-white transition">مسلسلات</button>
+          <button type="button" data-nav-filter="netflix" class="nav-filter-link px-3 py-2 rounded-md text-neutral-300 font-semibold hover:text-white transition">نتفليكس</button>
+          <button type="button" data-nav-filter="marvel" class="nav-filter-link px-3 py-2 rounded-md text-neutral-300 font-semibold hover:text-white transition">مارفل</button>
+        </nav>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <a href="Tv/" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
+          <span>📺 وضع التلفزيون</span>
+        </a>
+        <a href="https://t.me/filmatibot" target="_blank" rel="noopener" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white text-xs font-bold transition">
+          <span>البوت</span>
+        </a>
+      </div>
     </div>
   </header>
 
   <!-- Side drawer (hamburger menu): categories by language, top-rated, collections -->
-  <div id="drawerOverlay" class="fixed inset-0 z-[55] bg-black/70 hidden"></div>
-  <aside id="sideDrawer" class="fixed inset-y-0 right-0 z-[60] w-72 max-w-[85vw] bg-brand-card border-l border-brand-border shadow-2xl overflow-y-auto transition-transform duration-300 translate-x-full" aria-label="قائمة التصنيفات">
-    <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-brand-card border-b border-brand-border">
+  <div id="drawerOverlay" class="fixed inset-0 z-[55] bg-black/75 hidden"></div>
+  <aside id="sideDrawer" class="fixed inset-y-0 right-0 z-[60] w-72 max-w-[85vw] bg-[#181818] border-l border-neutral-800 shadow-2xl overflow-y-auto transition-transform duration-300 translate-x-full" aria-label="قائمة التصنيفات">
+    <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[#181818] border-b border-neutral-800">
       <span class="text-base font-extrabold text-white">☰ القائمة</span>
-      <button id="drawerClose" aria-label="إغلاق القائمة" class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-red-600 transition">✕</button>
+      <button id="drawerClose" type="button" aria-label="إغلاق القائمة" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition">✕</button>
     </div>
     <nav class="p-3 space-y-1 text-sm font-bold">
       <div>
@@ -124,63 +133,91 @@
     </nav>
   </aside>
 
-  <!-- Hero / Search Section -->
-  <section class="p-4 max-w-4xl mx-auto w-full">
+  <!-- Search & Category Filters -->
+  <section class="px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
     <div class="relative">
+      <label for="searchInput" class="sr-only">ابحث عن فيلم أو مسلسل</label>
       <input
         id="searchInput"
         type="text"
         placeholder="ابحث عن فيلم، مسلسل، Marvel، Netflix..."
-        class="w-full bg-brand-card/90 text-white placeholder-slate-400 rounded-2xl py-3.5 pr-12 pl-10 border border-brand-border focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 transition text-sm"
+        class="w-full bg-[#1f1f1f] text-white placeholder-neutral-400 rounded-md min-h-[46px] py-2.5 pr-11 pl-12 border border-[#737373] focus:border-white focus:outline-none transition text-sm"
       />
-      <span class="absolute right-4 top-3.5 text-slate-400 text-lg">🔍</span>
-      <button id="clearSearch" class="hidden absolute left-3 top-3 text-slate-400 hover:text-white text-sm bg-slate-800 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
+      <span class="absolute right-3.5 top-3 text-neutral-400 text-base pointer-events-none" aria-hidden="true">🔍</span>
+      <button id="clearSearch" type="button" aria-label="مسح البحث" class="hidden absolute left-2 top-1.5 text-neutral-300 hover:text-white text-sm bg-[#2a2a2a] rounded-full w-8 h-8 flex items-center justify-center">✕</button>
       <!-- Search suggestions dropdown (stage E) -->
-      <div id="searchSuggest" class="hidden absolute right-0 left-0 top-full mt-2 bg-brand-card border border-brand-border rounded-2xl shadow-2xl z-40 overflow-hidden"></div>
+      <div id="searchSuggest" class="hidden absolute right-0 left-0 top-full mt-2 bg-[#181818] border border-neutral-700 rounded-md shadow-2xl z-40 overflow-hidden"></div>
     </div>
 
     <!-- Quick Filters -->
     <div class="flex gap-2 overflow-x-auto scrollbar-hide py-3 mt-1 text-xs font-bold">
-      <button class="filter-btn active whitespace-nowrap px-4 py-2 rounded-xl bg-red-600 text-white transition" data-filter="trending">🔥 الأكثر رواجاً</button>
-      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="movie">🎬 أفلام</button>
-      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="tv">📺 مسلسلات</button>
-      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="marvel">🦸‍♂️ مارفل</button>
-      <button class="filter-btn whitespace-nowrap px-4 py-2 rounded-xl bg-brand-card text-slate-300 border border-brand-border hover:border-slate-500 transition" data-filter="netflix">🔴 نتفليكس</button>
+      <button type="button" class="filter-btn active min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#e50914] border border-[#e50914] text-white transition" data-filter="trending">🔥 الأكثر رواجاً</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="movie">🎬 أفلام</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="tv">📺 مسلسلات</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="marvel">🦸‍♂️ مارفل</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="netflix">🔴 نتفليكس</button>
     </div>
   </section>
 
   <!-- Main Content Grid -->
-  <main class="flex-1 max-w-5xl mx-auto w-full px-4">
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6">
+    <!-- Netflix Featured Hero Billboard -->
+    <section id="heroBanner" class="hidden relative w-full aspect-[16/11] sm:aspect-[21/9] max-h-[460px] rounded-xl overflow-hidden bg-[#181818] border border-neutral-800 mb-8">
+      <img id="heroImg" src="" alt="" fetchpriority="high" class="w-full h-full object-cover object-center" />
+      <div class="hero-scrim absolute inset-0"></div>
+      <div class="absolute inset-x-0 bottom-0 p-5 sm:p-8 md:p-10 max-w-2xl space-y-2.5">
+        <div class="flex flex-wrap items-center gap-2.5 text-xs font-bold text-neutral-200">
+          <span class="px-2 py-0.5 rounded bg-[#e50914] text-white font-extrabold">مختارات فيلماتي</span>
+          <span id="heroKind"></span>
+          <span id="heroYear"></span>
+          <span id="heroRating" class="text-amber-400 font-extrabold"></span>
+        </div>
+        <h2 id="heroTitle" class="font-black text-white leading-tight" style="font-size: clamp(1.5rem, 3.8vw, 2.75rem);"></h2>
+        <p id="heroOverview" class="text-neutral-200 text-xs sm:text-sm line-clamp-2 leading-relaxed max-w-xl"></p>
+        <div class="flex flex-wrap items-center gap-3 pt-1">
+          <button id="heroPlayBtn" type="button" class="min-h-[44px] px-6 py-2.5 rounded-md bg-white hover:bg-neutral-200 text-black font-black text-sm flex items-center gap-2 transition">▶ تشغيل الآن</button>
+          <button id="heroInfoBtn" type="button" class="min-h-[44px] px-5 py-2.5 rounded-md bg-neutral-800/90 hover:bg-neutral-700 text-white border border-[#737373] font-bold text-sm flex items-center gap-2 transition">تفاصيل العمل</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Section Title -->
     <div id="gridHeader" class="flex items-center justify-between mb-3">
-      <h2 id="sectionTitle" class="text-base font-extrabold text-white flex items-center gap-2">
+      <h2 id="sectionTitle" class="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
         <span>🔥</span> <span>الأعمال الأكثر رواجاً اليوم</span>
       </h2>
-      <span id="itemsCount" class="text-xs text-slate-400 font-semibold"></span>
+      <span id="itemsCount" class="text-xs text-[#a3a3a3] font-semibold"></span>
     </div>
 
     <!-- Media Cards Grid -->
-    <div id="mediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+    <div id="mediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
       <!-- Loading placeholders -->
-      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
-      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
-      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
-      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
-      <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
+      <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
+      <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
+      <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
+      <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
+      <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800 hidden lg:block"></div>
     </div>
 
     <!-- Home Sections (most-watched first, then top-rated; year filter chips) -->
-    <div id="homeSections" class="hidden space-y-8"></div>
+    <div id="homeSections" class="hidden space-y-9"></div>
   </main>
 
   <!-- Media Details & Player Modal -->
-  <div id="mediaModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
-    <div id="modalCard" class="bg-brand-card border border-brand-border rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative">
+  <div id="mediaModal" class="fixed inset-0 z-50 bg-black/85 hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+    <div id="modalCard" class="bg-[#181818] border border-neutral-800 rounded-t-2xl sm:rounded-xl max-w-3xl w-full max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl relative">
       <!-- Close button -->
-      <button id="closeModal" type="button" aria-label="إغلاق" class="absolute top-3 left-3 z-20 w-10 h-10 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-red-600 transition">✕</button>
+      <button id="closeModal" type="button" aria-label="إغلاق" class="absolute top-3 left-3 z-20 w-11 h-11 rounded-full bg-[#181818]/90 border border-[#737373] text-white flex items-center justify-center hover:border-white hover:bg-[#e50914] transition">✕</button>
+
+      <!-- Modal Backdrop Banner (hidden once player opens) -->
+      <div id="modalBackdropWrap" class="hidden relative aspect-video max-h-64 sm:max-h-80 w-full bg-neutral-900 overflow-hidden shrink-0">
+        <img id="modalBackdropImg" src="" alt="" class="w-full h-full object-cover" />
+        <div class="modal-backdrop-scrim absolute inset-0"></div>
+      </div>
 
       <!-- Video Player Frame Area -->
-      <div id="playerContainer" class="hidden relative aspect-video w-full bg-black select-none">
+      <div id="playerContainer" class="hidden relative aspect-video w-full bg-black select-none shrink-0">
         <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
         <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
         <div id="iframeSpinner" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-white text-sm font-bold pointer-events-none">
@@ -188,17 +225,17 @@
           <span>⏳ جاري تحميل المشغّل...</span>
         </div>
         <div id="seekIndicator" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-sm font-black border border-white/20 pointer-events-none"></div>
-        <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/70 text-white text-sm font-bold px-4 text-center"></div>
+        <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/75 text-white text-sm font-bold px-4 text-center"></div>
       </div>
 
       <!-- Player Controls Bar -->
-      <div id="playerToolbar" class="hidden flex-wrap items-center justify-between gap-2 px-4 py-2 bg-slate-900/95 border-b border-brand-border text-xs font-bold">
+      <div id="playerToolbar" class="hidden flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#141414] border-b border-neutral-800 text-xs font-bold shrink-0">
         <div id="nativeToolbarGroup" class="flex flex-wrap items-center gap-2">
-          <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-red-500 transition">-10 ث ⏪</button>
-          <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-red-500 transition">⏩ +10 ث</button>
+          <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">-10 ث ⏪</button>
+          <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">⏩ +10 ث</button>
           <div class="flex items-center gap-1.5">
-            <label for="playerSpeedSelect" class="text-slate-300">السرعة:</label>
-            <select id="playerSpeedSelect" class="min-h-[44px] bg-slate-800 text-white rounded-xl px-2.5 py-1.5 border border-slate-700">
+            <label for="playerSpeedSelect" class="text-neutral-300">السرعة:</label>
+            <select id="playerSpeedSelect" class="min-h-[44px] bg-[#232323] text-white rounded-md px-2.5 py-1.5 border border-[#737373]">
               <option value="0.5">0.5x</option>
               <option value="0.75">0.75x</option>
               <option value="1" selected>1x</option>
@@ -207,129 +244,127 @@
               <option value="2">2x</option>
             </select>
           </div>
-          <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-red-500 transition">صورة داخل صورة</button>
+          <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">صورة داخل صورة</button>
         </div>
         <div class="flex items-center gap-2">
-          <button id="btnTheater" type="button" aria-label="وضع المسرح" aria-pressed="false" class="hidden sm:inline-flex items-center min-h-[44px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:border-amber-500 transition">وضع المسرح</button>
-          <button id="btnFullscreen" type="button" aria-label="ملء الشاشة" class="min-h-[44px] px-3 py-1.5 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600 hover:text-white transition">⛶ ملء الشاشة</button>
+          <button id="btnTheater" type="button" aria-label="وضع المسرح" aria-pressed="false" class="hidden sm:inline-flex items-center min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-amber-500 transition">وضع المسرح</button>
+          <button id="btnFullscreen" type="button" aria-label="ملء الشاشة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#e50914] text-white hover:bg-red-700 transition">⛶ ملء الشاشة</button>
         </div>
       </div>
 
       <!-- Modal Content Body -->
-      <div class="p-5 overflow-y-auto space-y-4">
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-5">
         <!-- Auto-next episode countdown (series only, native player) -->
-        <div id="autoNextBar" class="hidden items-center justify-between gap-2 rounded-xl bg-red-600/15 border border-red-500/30 px-3 py-2">
+        <div id="autoNextBar" class="hidden items-center justify-between gap-2 rounded-md bg-red-600/20 border border-red-500/40 px-3 py-2">
           <span id="autoNextText" class="text-xs font-bold text-white">الحلقة التالية خلال 5 ثواني…</span>
           <span class="flex gap-2 shrink-0">
-            <button id="btnAutoNextNow" class="px-3 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-bold">تشغيل الآن</button>
-            <button id="btnAutoNextCancel" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-[11px] font-bold border border-slate-700">إلغاء</button>
+            <button id="btnAutoNextNow" type="button" class="min-h-[44px] px-3.5 py-1.5 rounded-md bg-[#e50914] text-white text-xs font-bold">تشغيل الآن</button>
+            <button id="btnAutoNextCancel" type="button" class="min-h-[44px] px-3.5 py-1.5 rounded-md bg-[#232323] text-neutral-200 text-xs font-bold border border-[#737373]">إلغاء</button>
           </span>
         </div>
-        <div class="flex gap-4">
-          <img id="modalPoster" src="" alt="Poster" class="w-24 h-36 object-cover rounded-xl shadow-md border border-brand-border flex-shrink-0 bg-slate-900" />
+        <div class="flex gap-4 items-start">
+          <img id="modalPoster" src="" alt="Poster" class="hidden sm:block w-20 h-28 object-cover rounded-md shadow-md border border-neutral-700 shrink-0 bg-neutral-900" />
           <div class="flex-1 min-w-0">
-            <h3 id="modalTitle" class="text-lg font-black text-white leading-tight"></h3>
-            <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
-              <span id="modalRating" class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">⭐ 8.5</span>
-              <span id="modalYear" class="text-slate-400 font-semibold">2026</span>
-              <span id="modalKind" class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold">فيلم</span>
+            <h3 id="modalTitle" class="text-xl sm:text-2xl font-black text-white leading-tight"></h3>
+            <div class="flex flex-wrap items-center gap-2.5 mt-2 text-xs">
+              <span id="modalRating" class="px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 font-bold border border-emerald-500/30">⭐ 8.5</span>
+              <span id="modalYear" class="text-[#a3a3a3] font-semibold">2026</span>
+              <span id="modalKind" class="px-2 py-0.5 rounded bg-[#232323] text-neutral-200 border border-neutral-700 font-semibold">فيلم</span>
             </div>
-            <p id="modalStory" class="text-slate-300 text-xs mt-2.5 line-clamp-2 leading-relaxed"></p>
+            <p id="modalStory" class="text-[#e5e5e5] text-xs sm:text-sm mt-2.5 line-clamp-3 leading-relaxed"></p>
           </div>
         </div>
 
         <!-- Series Seasons & Episodes Picker (Visible if TV show) -->
-        <div id="seriesControls" class="hidden space-y-3 pt-2 border-t border-brand-border">
-          <div class="flex items-center justify-between">
-            <label for="seasonSelect" class="text-xs font-bold text-slate-300">الموسم:</label>
-            <select id="seasonSelect" class="bg-slate-800 text-white text-xs rounded-xl px-3 py-1.5 border border-brand-border focus:outline-none"></select>
+        <div id="seriesControls" class="hidden space-y-3 pt-3 border-t border-neutral-800">
+          <div class="flex items-center justify-between gap-3">
+            <label for="seasonSelect" class="text-xs font-bold text-neutral-300">الموسم:</label>
+            <select id="seasonSelect" class="min-h-[44px] bg-[#232323] text-white text-xs font-bold rounded-md px-3 py-1.5 border border-[#737373] focus:outline-none"></select>
           </div>
           <div>
-            <label class="text-xs font-bold text-slate-300 block mb-2">اختر الحلقة:</label>
-            <div id="episodesGrid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto pr-1"></div>
+            <label class="text-xs font-bold text-neutral-300 block mb-2">اختر الحلقة:</label>
+            <div id="episodesGrid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-44 overflow-y-auto pr-1"></div>
           </div>
         </div>
 
         <!-- Server & Quality Picker -->
-        <div id="serverControls" class="hidden space-y-2 pt-2 border-t border-brand-border">
+        <div id="serverControls" class="hidden space-y-3 pt-3 border-t border-neutral-800">
           <div>
-            <label class="text-xs font-bold text-slate-300 block mb-1.5">السيرفر:</label>
+            <label class="text-xs font-bold text-neutral-300 block mb-1.5">السيرفر:</label>
             <div id="serversRow" class="flex flex-wrap gap-2"></div>
           </div>
           <div id="qualityWrap">
-            <label class="text-xs font-bold text-slate-300 block mb-1.5">الجودة:</label>
+            <label class="text-xs font-bold text-neutral-300 block mb-1.5">الجودة:</label>
             <div id="qualitiesRow" class="flex flex-wrap gap-2"></div>
           </div>
         </div>
 
         <!-- Action Buttons -->
-        <div class="pt-3 border-t border-brand-border space-y-2">
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btnPlayInApp" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg shadow-red-900/30">
-              <span>▶️</span> <span id="btnPlayInAppLabel">مشاهدة فورية</span>
+        <div class="pt-3 border-t border-neutral-800 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button id="btnPlayInApp" type="button" class="min-h-[46px] w-full py-2.5 px-5 rounded-md bg-white hover:bg-neutral-200 text-black font-black text-sm flex items-center justify-center gap-2 transition">
+              <span>▶</span> <span id="btnPlayInAppLabel">مشاهدة فورية</span>
             </button>
-            <button id="btnDirectDownload" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg shadow-emerald-900/30">
-              <span>⬇️</span> <span>تحميل مباشر (.mp4)</span>
+            <button id="btnDirectDownload" type="button" aria-disabled="false" class="min-h-[46px] w-full py-2.5 px-5 rounded-md bg-[#262626] hover:bg-[#333333] text-white border border-[#737373] font-bold text-sm flex items-center justify-center gap-2 transition">
+              <span id="btnDirectDownloadIcon">⬇</span> <span id="btnDirectDownloadLabel">تحميل مباشر (.mp4)</span>
             </button>
           </div>
           <!-- Download quality picker (shown when more than one quality exists) -->
           <div id="downloadPicker" class="hidden space-y-2 pt-1">
-            <label class="text-xs font-bold text-slate-300 block">اختر جودة التحميل:</label>
+            <label class="text-xs font-bold text-neutral-300 block">اختر جودة التحميل:</label>
             <div id="downloadQualitiesRow" class="flex flex-wrap gap-2"></div>
           </div>
           <!-- Whole-season download (series only) -->
-          <button id="btnDownloadSeason" class="hidden w-full py-2.5 px-4 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition">⬇️ تحميل الموسم كامل</button>
+          <button id="btnDownloadSeason" type="button" class="hidden min-h-[44px] w-full py-2.5 px-4 rounded-md bg-[#232323] text-emerald-300 border border-[#737373] font-bold text-xs flex items-center justify-center gap-2 hover:border-white transition">⬇️ تحميل الموسم كامل</button>
           <div id="seasonDownloadPicker" class="hidden space-y-2 pt-1">
-            <label class="text-xs font-bold text-slate-300 block">اختر جودة تحميل الموسم:</label>
+            <label class="text-xs font-bold text-neutral-300 block">اختر جودة تحميل الموسم:</label>
             <div id="seasonDownloadQualitiesRow" class="flex flex-wrap gap-2"></div>
           </div>
           <div id="seasonDownloadProgress" class="hidden space-y-1 pt-1 max-h-32 overflow-y-auto pr-1">
-            <label class="text-xs font-bold text-slate-300 block">تقدّم تحميل الموسم:</label>
+            <label class="text-xs font-bold text-neutral-300 block">تقدّم تحميل الموسم:</label>
             <div id="seasonDownloadList" class="space-y-1"></div>
           </div>
           <!-- Restart from the beginning (shown only when a saved position exists) -->
-          <button id="btnRestartPlay" class="hidden w-full py-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold text-[11px] hover:text-white transition">↺ تشغيل من الأول</button>
-          <!-- My list toggle -->
-          <button id="btnMyList" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 hover:border-red-500 transition">🤍 أضف لقائمتي</button>
-          <!-- Trailer (shown only when TMDB has one) -->
-          <button id="btnTrailer" class="hidden w-full py-2.5 px-4 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition">🎬 مشاهدة التريلر</button>
-          <!-- Report a problem -->
-          <button id="btnReport" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 hover:border-amber-500 hover:text-white transition">⚠️ بلّغ عن مشكلة في التشغيل</button>
-          <div id="reportPicker" class="hidden space-y-2 pt-1">
-            <label class="text-xs font-bold text-slate-300 block">إيه المشكلة؟</label>
-            <div class="flex flex-wrap gap-2">
-              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="المشغّل مش شغال">المشغّل مش شغال</button>
-              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="الفيديو بيقطّع أو الجودة ضعيفة">الفيديو بيقطّع</button>
-              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="الصوت أو الترجمة فيها مشكلة">الصوت / الترجمة</button>
-              <button class="report-problem-btn px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500 transition" data-problem="مشكلة تانية">مشكلة تانية</button>
-            </div>
-            <p class="text-[11px] text-slate-500">هيفتح تيليجرام بالنص جاهز — ابعته للبوت.</p>
+          <button id="btnRestartPlay" type="button" class="hidden min-h-[44px] w-full py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs hover:border-white transition">↺ تشغيل من الأول</button>
+          <!-- Secondary actions strip -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button id="btnMyList" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🤍 أضف لقائمتي</button>
+            <button id="btnTrailer" type="button" class="hidden min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🎬 مشاهدة التريلر</button>
+            <button id="btnOpenInBot" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🚀 إرسال للتليجرام</button>
+            <button id="btnReport" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-amber-500 transition">⚠️ بلّغ عن مشكلة</button>
           </div>
-          <button id="btnOpenInBot" class="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition">
-            <span>🚀</span> <span>طلب إرسال الفيديو عبر بوت التليجرام</span>
-          </button>
+          <div id="reportPicker" class="hidden space-y-2 pt-1">
+            <label class="text-xs font-bold text-neutral-300 block">إيه المشكلة؟</label>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="report-problem-btn min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition" data-problem="المشغّل مش شغال">المشغّل مش شغال</button>
+              <button type="button" class="report-problem-btn min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition" data-problem="الفيديو بيقطّع أو الجودة ضعيفة">الفيديو بيقطّع</button>
+              <button type="button" class="report-problem-btn min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition" data-problem="الصوت أو الترجمة فيها مشكلة">الصوت / الترجمة</button>
+              <button type="button" class="report-problem-btn min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition" data-problem="مشكلة تانية">مشكلة تانية</button>
+            </div>
+            <p class="text-[11px] text-[#a3a3a3]">هيفتح تيليجرام بالنص جاهز - ابعته للبوت.</p>
+          </div>
         </div>
 
         <!-- Bot Code Panel (hidden until the bot button is tapped) -->
-        <div id="botCodePanel" class="hidden space-y-3 pt-3 border-t border-brand-border">
+        <div id="botCodePanel" class="hidden space-y-3 pt-3 border-t border-neutral-800">
           <div id="botCodeQualityWrap">
-            <label class="text-xs font-bold text-slate-300 block mb-1.5">اختر الجودة لإرسالها عبر البوت:</label>
+            <label class="text-xs font-bold text-neutral-300 block mb-1.5">اختر الجودة لإرسالها عبر البوت:</label>
             <div id="botCodeQualitiesRow" class="flex flex-wrap gap-2"></div>
           </div>
           <div id="botCodeResult" class="hidden text-center space-y-2">
-            <p class="text-xs text-slate-400">أرسل هذا الكود للبوت (صالح لمدة ساعة):</p>
+            <p class="text-xs text-[#a3a3a3]">أرسل هذا الكود للبوت (صالح لمدة ساعة):</p>
             <p id="botCodeValue" class="text-3xl font-black tracking-[0.3em] text-amber-400 select-all" dir="ltr">…</p>
             <div class="flex gap-2 justify-center">
-              <button id="btnCopyBotCode" class="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold">📋 نسخ الكود</button>
-              <button id="btnOpenBotPlain" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold">🚀 فتح البوت</button>
+              <button id="btnCopyBotCode" type="button" class="min-h-[44px] px-4 py-2 rounded-md bg-[#232323] border border-[#737373] text-white text-xs font-bold">📋 نسخ الكود</button>
+              <button id="btnOpenBotPlain" type="button" class="min-h-[44px] px-4 py-2 rounded-md bg-[#e50914] text-white text-xs font-bold">🚀 فتح البوت</button>
             </div>
-            <button id="btnBotDeepLink" class="text-[11px] text-slate-500 underline">أو: فتح البوت برابط مباشر للفيلم</button>
+            <button id="btnBotDeepLink" type="button" class="min-h-[44px] px-3 text-xs text-neutral-300 underline">أو: فتح البوت برابط مباشر للفيلم</button>
           </div>
         </div>
 
         <!-- Similar titles (stage D) -->
-        <div id="similarWrap" class="hidden pt-3 border-t border-brand-border">
-          <h4 class="text-sm font-extrabold text-white mb-2">🎬 أعمال شبه ده</h4>
+        <div id="similarWrap" class="hidden pt-3 border-t border-neutral-800">
+          <h4 class="text-sm font-extrabold text-white mb-3">🎬 أعمال شبه ده</h4>
           <div id="similarRow" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"></div>
         </div>
       </div>
@@ -481,12 +516,15 @@
     const btnDirectDownload = document.getElementById('btnDirectDownload');
     const btnOpenInBot = document.getElementById('btnOpenInBot');
 
-    // Home: most-watched first, then top-rated, with year filter chips.
+    // Home: featured hero billboard, most-watched first, then top-rated, with year filter chips.
     // The grid view (search / discover / filters) hides these sections.
     let homeData = null; // { mostWatched, topRated }
     let homeYearFilter = 'all';
+    let heroItem = null;
 
     function showGridView() {
+      const hero = document.getElementById('heroBanner');
+      if (hero) hero.classList.add('hidden');
       document.getElementById('homeSections').classList.add('hidden');
       document.getElementById('gridHeader').classList.remove('hidden');
       mediaGrid.classList.remove('hidden');
@@ -496,12 +534,58 @@
       mediaGrid.classList.add('hidden');
       document.getElementById('gridHeader').classList.add('hidden');
       document.getElementById('homeSections').classList.remove('hidden');
+      const hero = document.getElementById('heroBanner');
+      if (hero && heroItem) hero.classList.remove('hidden');
     }
+
+    function renderHeroBanner() {
+      const hero = document.getElementById('heroBanner');
+      if (!hero || !homeData) return;
+      const pool = [...(homeData.mostWatched || []), ...(homeData.topRated || [])];
+      heroItem = pool.find((i) => i && (i.backdrop_path || i.poster_path)) || pool[0] || null;
+      if (!heroItem) {
+        hero.classList.add('hidden');
+        return;
+      }
+      const type = heroItem.media_type === 'tv' || (!heroItem.media_type && heroItem.name) ? 'tv' : 'movie';
+      const title = heroItem.title || heroItem.name || '';
+      const date = heroItem.release_date || heroItem.first_air_date || '';
+      const year = date ? date.slice(0, 4) : '';
+      const rating = heroItem.vote_average ? heroItem.vote_average.toFixed(1) : '8.0';
+      const imgPath = heroItem.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${heroItem.backdrop_path}`
+        : `${IMG_BASE}${heroItem.poster_path}`;
+      const heroImg = document.getElementById('heroImg');
+      heroImg.src = imgPath;
+      heroImg.alt = title;
+      document.getElementById('heroTitle').innerText = title;
+      document.getElementById('heroKind').innerText = type === 'tv' ? 'مسلسل' : 'فيلم';
+      document.getElementById('heroYear').innerText = year;
+      document.getElementById('heroRating').innerText = `★ ${rating}`;
+      document.getElementById('heroOverview').innerText = heroItem.overview || '';
+      if (!document.getElementById('homeSections').classList.contains('hidden')) {
+        hero.classList.remove('hidden');
+      }
+    }
+
+    document.getElementById('heroInfoBtn').addEventListener('click', () => {
+      if (!heroItem) return;
+      const type = heroItem.media_type === 'tv' || (!heroItem.media_type && heroItem.name) ? 'tv' : 'movie';
+      openDetails(heroItem.id, type);
+    });
+    document.getElementById('heroPlayBtn').addEventListener('click', async () => {
+      if (!heroItem) return;
+      const type = heroItem.media_type === 'tv' || (!heroItem.media_type && heroItem.name) ? 'tv' : 'movie';
+      await openDetails(heroItem.id, type);
+      const entry = currentResumeEntry();
+      pendingResume = entry ? entry.t : null;
+      playActiveStream();
+    });
 
     async function loadHome() {
       showHomeView();
       const sectionsEl = document.getElementById('homeSections');
-      sectionsEl.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
+      sectionsEl.innerHTML = '<div class="animate-pulse bg-[#181818] rounded-xl h-64 border border-neutral-800"></div>';
       try {
         const [homeRes, airingRes, upcomingRes] = await Promise.all([
           fetch(`${API_BASE}/api/home`),
@@ -520,9 +604,10 @@
           upcoming: ((upcoming?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'movie' })),
         };
         homeYearFilter = 'all';
+        renderHeroBanner();
         renderHomeSections();
       } catch (e) {
-        sectionsEl.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>`;
+        sectionsEl.innerHTML = `<div class="text-center py-12 text-[#a3a3a3] text-sm font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>`;
       }
     }
 
@@ -552,21 +637,21 @@
         { value: 'older', label: 'أقدم' },
       ];
       const chips = years.map((y) => `
-        <button data-year="${y.value}" class="home-year-chip whitespace-nowrap px-4 py-2 rounded-xl border transition text-xs font-bold ${homeYearFilter === y.value ? 'bg-red-600 border-red-600 text-white' : 'bg-brand-card border-brand-border text-slate-300 hover:border-slate-500'}">${y.label}</button>
+        <button type="button" data-year="${y.value}" class="home-year-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md border transition text-xs font-bold ${homeYearFilter === y.value ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white'}">${y.label}</button>
       `).join('');
       const mostWatched = filterHomeList(homeData.mostWatched);
       const topRated = filterHomeList(homeData.topRated);
       const emptyNote = (!mostWatched.length && !topRated.length)
-        ? '<div class="text-center py-12 text-slate-400 text-sm font-bold">لا توجد أعمال في هذه السنة.</div>'
+        ? '<div class="text-center py-12 text-[#a3a3a3] text-sm font-bold">لا توجد أعمال في هذه السنة.</div>'
         : '';
       sectionsEl.innerHTML = `
         ${continueSectionHtml(getContinueItems())}
         ${myListSectionHtml(getMyListItems())}
         <div class="flex flex-wrap gap-2 items-center">
-          <span class="text-xs font-bold text-slate-400">السنة:</span>
+          <span class="text-xs font-bold text-[#a3a3a3]">السنة:</span>
           ${chips}
         </div>
-        ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched)}
+        ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched, true)}
         ${homeSectionHtml('⭐ الأعلى تقييمًا', topRated)}
         ${homeSectionHtml('🆕 حلقات جديدة', homeData.newEpisodes || [])}
         ${homeSectionHtml('📅 قريبًا', homeData.upcoming || [])}
@@ -580,37 +665,40 @@
       });
     }
 
-    function homeSectionHtml(title, items) {
+    function homeSectionHtml(title, items, showRank = false) {
       if (!items.length) return '';
       return `
         <section>
-          <h3 class="text-base font-extrabold text-white mb-3">${title}</h3>
+          <h3 class="text-base sm:text-lg font-extrabold text-white mb-3">${title}</h3>
           <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            ${items.map(homeCardHtml).join('')}
+            ${items.map((item, idx) => homeCardHtml(item, showRank && idx < 10 ? idx + 1 : 0)).join('')}
           </div>
         </section>
       `;
     }
 
-    function homeCardHtml(item) {
-      const title = item.title || item.name || 'بدون عنوان';
+    function homeCardHtml(item, rankNum = 0) {
+      const title = (item.title || item.name || 'بدون عنوان').replace(/"/g, '&quot;');
       const date = item.release_date || item.first_air_date || '';
       const year = date ? date.slice(0, 4) : '';
       const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
-      const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+      const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
       const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+      const badgeLeft = rankNum > 0
+        ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#e50914] text-white text-[11px] font-black shadow">#${rankNum}</span>`
+        : `<span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold">${kind}</span>`;
       return `
-        <div class="group cursor-pointer shrink-0 w-36 sm:w-40 bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 shadow-lg" onclick="openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-            <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-amber-400 text-[11px] font-extrabold border border-amber-500/20">⭐ ${rating}</span>
-            <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-slate-300 text-[10px] font-bold border border-white/10">${kind}</span>
+        <div role="button" tabindex="0" class="group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover" />
+            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>
+            ${badgeLeft}
           </div>
-          <div class="p-2.5">
+          <div class="p-2.5 bg-[#181818]">
             <h4 class="text-xs font-bold text-white truncate">${title}</h4>
-            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
-              <span>${year}</span>
-              <span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>
+            <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
+              <span>${year || kind}</span>
+              <span>${year ? kind : ''}</span>
             </div>
           </div>
         </div>
@@ -625,7 +713,7 @@
       if (!items.length) return '';
       return `
         <section>
-          <h3 class="text-base font-extrabold text-white mb-3">▶ أكمل المشاهدة</h3>
+          <h3 class="text-base sm:text-lg font-extrabold text-white mb-3">▶ أكمل المشاهدة</h3>
           <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             ${items.map(continueCardHtml).join('')}
           </div>
@@ -635,18 +723,18 @@
 
     function continueCardHtml(entry) {
       const pct = entry.d > 0 ? Math.min(100, Math.round((entry.t / entry.d) * 100)) : 0;
-      const poster = entry.poster || 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+      const poster = entry.poster || 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
       const epLabel = entry.type === 'tv' ? ` • حلقة ${entry.e}` : '';
       const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
       return `
-        <div class="group cursor-pointer shrink-0 w-36 sm:w-40 bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 shadow-lg" onclick="openContinueEntry('${entry.type}', ${entry.id}, ${entry.s}, ${entry.e})">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-            <span class="absolute bottom-0 right-0 left-0 h-1.5 bg-black/60"><span class="block h-full bg-red-600" style="width:${pct}%"></span></span>
+        <div role="button" tabindex="0" class="group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="openContinueEntry('${entry.type}', ${entry.id}, ${entry.s}, ${entry.e})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover" />
+            <span class="absolute bottom-0 right-0 left-0 h-1.5 bg-black/75"><span class="block h-full bg-[#e50914]" style="width:${pct}%"></span></span>
           </div>
-          <div class="p-2.5">
+          <div class="p-2.5 bg-[#181818]">
             <h4 class="text-xs font-bold text-white truncate">${title}${epLabel}</h4>
-            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+            <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
               <span>أكمل من ${formatTime(entry.t)}</span>
             </div>
           </div>
@@ -667,10 +755,12 @@
         selectedEpisode = e;
         document.querySelectorAll('.ep-btn').forEach((b, i) => {
           const on = i + 1 === e;
-          b.classList.toggle('bg-red-600', on);
+          b.classList.toggle('bg-[#e50914]', on);
+          b.classList.toggle('border-[#e50914]', on);
           b.classList.toggle('text-white', on);
-          b.classList.toggle('bg-slate-800', !on);
-          b.classList.toggle('text-slate-300', !on);
+          b.classList.toggle('bg-[#232323]', !on);
+          b.classList.toggle('border-[#737373]', !on);
+          b.classList.toggle('text-neutral-200', !on);
         });
         updateResumeButton();
       }
@@ -684,7 +774,7 @@
       if (!items.length) return '';
       return `
         <section>
-          <h3 class="text-base font-extrabold text-white mb-3">❤️ قائمتي</h3>
+          <h3 class="text-base sm:text-lg font-extrabold text-white mb-3">❤️ قائمتي</h3>
           <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             ${items.map(myListCardHtml).join('')}
           </div>
@@ -693,18 +783,17 @@
     }
 
     function myListCardHtml(entry) {
-      const poster = entry.poster || 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster';
+      const poster = entry.poster || 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
       const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
       return `
-        <div class="group cursor-pointer shrink-0 w-36 sm:w-40 bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 shadow-lg" onclick="openDetails(${entry.id}, '${entry.type}')">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+        <div role="button" tabindex="0" class="group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="openDetails(${entry.id}, '${entry.type}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
+            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover" />
           </div>
-          <div class="p-2.5">
+          <div class="p-2.5 bg-[#181818]">
             <h4 class="text-xs font-bold text-white truncate">${title}</h4>
-            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+            <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
               <span>${entry.type === 'tv' ? 'مسلسل' : 'فيلم'}</span>
-              <span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>
             </div>
           </div>
         </div>
@@ -913,11 +1002,22 @@
       }
     }
 
+    function syncHeaderNavFilter(activeFilter) {
+      document.querySelectorAll('.nav-filter-link').forEach((link) => {
+        const isMatch = link.dataset.navFilter === activeFilter;
+        link.classList.toggle('text-white', isMatch);
+        link.classList.toggle('font-black', isMatch);
+        link.classList.toggle('text-neutral-300', !isMatch);
+        link.classList.toggle('font-semibold', !isMatch);
+      });
+    }
+
     function clearActiveFilters() {
       filterBtns.forEach((b) => {
-        b.classList.remove('bg-red-600', 'text-white');
-        b.classList.add('bg-brand-card', 'text-slate-300');
+        b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+        b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
       });
+      syncHeaderNavFilter('');
     }
 
     // Drawer language items.
@@ -949,13 +1049,14 @@
     filterBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         filterBtns.forEach(b => {
-          b.classList.remove('bg-red-600', 'text-white');
-          b.classList.add('bg-brand-card', 'text-slate-300');
+          b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+          b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
         });
-        btn.classList.remove('bg-brand-card', 'text-slate-300');
-        btn.classList.add('bg-red-600', 'text-white');
+        btn.classList.remove('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+        btn.classList.add('bg-[#e50914]', 'border-[#e50914]', 'text-white');
 
         const filter = btn.dataset.filter;
+        syncHeaderNavFilter(filter);
         searchInput.value = '';
         clearSearch.classList.add('hidden');
 
@@ -967,16 +1068,35 @@
       });
     });
 
+    document.querySelectorAll('.nav-filter-link').forEach((link) => {
+      link.addEventListener('click', () => {
+        const target = document.querySelector(`.filter-btn[data-filter="${link.dataset.navFilter}"]`);
+        if (target) target.click();
+      });
+    });
+
+    const brandHomeBtn = document.getElementById('brandHomeBtn');
+    if (brandHomeBtn) {
+      const goHome = () => {
+        const trendingBtn = document.querySelector('.filter-btn[data-filter="trending"]');
+        if (trendingBtn) trendingBtn.click(); else loadHome();
+      };
+      brandHomeBtn.addEventListener('click', goHome);
+      brandHomeBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goHome(); }
+      });
+    }
+
     function renderLoading() {
       showGridView();
-      mediaGrid.innerHTML = Array(10).fill(0).map(() => `
-        <div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>
+      mediaGrid.innerHTML = Array(12).fill(0).map(() => `
+        <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
       `).join('');
     }
 
     function showError(msg) {
       showGridView();
-      mediaGrid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-sm font-semibold">${msg}</div>`;
+      mediaGrid.innerHTML = `<div class="col-span-full text-center py-12 text-[#a3a3a3] text-sm font-semibold">${msg}</div>`;
     }
 
     function renderCards(items, title) {
@@ -985,7 +1105,7 @@
 
       if (!items.length) {
         mediaGrid.innerHTML = `
-          <div class="col-span-full text-center py-16 text-slate-400">
+          <div class="col-span-full text-center py-16 text-[#a3a3a3]">
             <p class="text-3xl mb-2">🍿</p>
             <p class="text-sm font-bold">لم يتم العثور على نتائج مطابقة.</p>
           </div>`;
@@ -993,38 +1113,74 @@
       }
 
       mediaGrid.innerHTML = items.map(item => {
-        const title = item.title || item.name || 'بدون عنوان';
+        const rawTitle = item.title || item.name || 'بدون عنوان';
+        const safeTitle = rawTitle.replace(/"/g, '&quot;');
         const date = item.release_date || item.first_air_date || '';
         const year = date ? date.slice(0, 4) : '';
         const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
         // Provider-only entries carry a full poster URL and a provider link
         // (no TMDB id): prefer the full URL, and open the provider page.
-        const poster = item.poster || (item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=No+Poster');
+        const poster = item.poster || (item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster');
         const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
         const click = item.providerUrl
           ? `window.open('${item.providerUrl}', '_blank')`
           : `openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')`;
-        const action = item.provider
+        const metaRight = item.provider
           ? `<span class="text-blue-400 font-semibold">${item.provider} ↗</span>`
-          : '<span class="text-red-400 font-semibold group-hover:underline">عرض ◀</span>';
+          : `<span>${year ? kind : ''}</span>`;
 
         return `
-          <div class="group cursor-pointer bg-brand-card rounded-2xl overflow-hidden border border-brand-border hover:border-red-500/60 transition-all duration-200 hover:-translate-y-1 shadow-lg" onclick="${click}">
-            <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-              <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-              <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-amber-400 text-[11px] font-extrabold border border-amber-500/20">⭐ ${rating}</span>
-              <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-slate-300 text-[10px] font-bold border border-white/10">${kind}</span>
+          <div role="button" tabindex="0" class="group cursor-pointer bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="${click}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+            <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
+              <img src="${poster}" alt="${safeTitle}" loading="lazy" class="w-full h-full object-cover" />
+              <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>
+              <span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold">${kind}</span>
             </div>
-            <div class="p-2.5">
-              <h4 class="text-xs font-bold text-white truncate">${title}</h4>
-              <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
-                <span>${year}</span>
-                ${action}
+            <div class="p-2.5 bg-[#181818]">
+              <h4 class="text-xs font-bold text-white truncate">${safeTitle}</h4>
+              <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
+                <span>${year || kind}</span>
+                ${metaRight}
               </div>
             </div>
           </div>
         `;
       }).join('');
+    }
+
+    function getDownloadQualities(resolved) {
+      if (!resolved || !resolved.ok || !resolved.servers || !resolved.servers[0]) return [];
+      if (isEmbedServer(resolved.servers[0])) return [];
+      return (resolved.servers[0].qualities || []).filter((q) => q.download);
+    }
+
+    function syncDownloadButtonState(resolved) {
+      const label = document.getElementById('btnDirectDownloadLabel');
+      const icon = document.getElementById('btnDirectDownloadIcon');
+      if (!btnDirectDownload || !label || !icon) return;
+      if (!resolved) {
+        btnDirectDownload.setAttribute('aria-disabled', 'false');
+        btnDirectDownload.classList.remove('opacity-60');
+        icon.innerText = '⬇';
+        label.innerText = 'تحميل مباشر (.mp4)';
+        return;
+      }
+      if (getDownloadQualities(resolved).length > 0) {
+        btnDirectDownload.setAttribute('aria-disabled', 'false');
+        btnDirectDownload.classList.remove('opacity-60');
+        icon.innerText = '⬇';
+        label.innerText = 'تحميل مباشر (.mp4)';
+      } else {
+        btnDirectDownload.setAttribute('aria-disabled', 'true');
+        btnDirectDownload.classList.add('opacity-60');
+        icon.innerText = 'ℹ';
+        label.innerText = 'متاح مشاهدة أونلاين فقط';
+      }
+    }
+
+    function hideModalBackdrop() {
+      const wrap = document.getElementById('modalBackdropWrap');
+      if (wrap) wrap.classList.add('hidden');
     }
 
     // Modal Details Logic
@@ -1038,19 +1194,37 @@
         const date = currentItem.release_date || currentItem.first_air_date || '';
         const year = date ? date.slice(0, 4) : '';
         const rating = currentItem.vote_average ? currentItem.vote_average.toFixed(1) : '8.0';
-        const poster = currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : 'https://placehold.co/300x450/161e2e/94a3b8?text=Poster';
+        const poster = currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=Poster';
 
         modalTitle.innerText = title;
         modalPoster.src = poster;
-        modalRating.innerText = `⭐ ${rating}`;
+        modalRating.innerText = `★ ${rating}`;
         modalYear.innerText = year;
         modalKind.innerText = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
         modalStory.innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
+
+        const backdropWrap = document.getElementById('modalBackdropWrap');
+        const backdropImg = document.getElementById('modalBackdropImg');
+        if (backdropWrap && backdropImg) {
+          const bPath = currentItem.backdrop_path
+            ? `https://image.tmdb.org/t/p/w1280${currentItem.backdrop_path}`
+            : (currentItem.poster_path ? poster : '');
+          if (bPath) {
+            backdropImg.src = bPath;
+            backdropImg.alt = title || '';
+            backdropWrap.classList.remove('hidden');
+          } else {
+            backdropWrap.classList.add('hidden');
+          }
+        }
 
         // Player reset
         resetPlayer();
         playerContainer.classList.add('hidden');
         updatePlayerToolbarVisibility(false);
+        document.getElementById('serverControls').classList.add('hidden');
+        document.getElementById('downloadPicker').classList.add('hidden');
+        document.getElementById('botCodePanel').classList.add('hidden');
 
         if (mediaType === 'tv') {
           seriesControls.classList.remove('hidden');
@@ -1063,6 +1237,9 @@
         document.getElementById('btnDownloadSeason').classList.toggle('hidden', mediaType !== 'tv');
         document.getElementById('seasonDownloadPicker').classList.add('hidden');
         document.getElementById('seasonDownloadProgress').classList.add('hidden');
+
+        const k = resolveKey(mediaType === 'tv' ? 'tv' : 'movie', currentItem.id, mediaType === 'tv' ? selectedSeason : undefined, mediaType === 'tv' ? selectedEpisode : undefined);
+        syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
 
         mediaModal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
@@ -1132,11 +1309,15 @@
         const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
         const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
         return `
-        <button class="ep-btn relative overflow-hidden ${epNum === 1 ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl py-1.5 text-xs font-bold border border-brand-border hover:bg-red-600 hover:text-white transition" onclick="selectEpisode(${epNum}, this)">
+        <button type="button" class="ep-btn relative overflow-hidden min-h-[44px] ${epNum === 1 ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-[#737373] text-neutral-200'} rounded-md py-1.5 text-xs font-bold border hover:border-white transition" onclick="selectEpisode(${epNum}, this)">
           ${watched ? '✓ ' : ''}حلقة ${epNum}
           ${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}
         </button>
       `; }).join('');
+      if (currentItem) {
+        const k = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
+        syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
+      }
       updateResumeButton();
     }
 
@@ -1144,11 +1325,15 @@
       selectedEpisode = epNum;
       clearAutoNext();
       document.querySelectorAll('.ep-btn').forEach(b => {
-        b.classList.remove('bg-red-600', 'text-white');
-        b.classList.add('bg-slate-800', 'text-slate-300');
+        b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+        b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
       });
-      btn.classList.remove('bg-slate-800', 'text-slate-300');
-      btn.classList.add('bg-red-600', 'text-white');
+      btn.classList.remove('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+      btn.classList.add('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+      if (currentItem) {
+        const k = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
+        syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
+      }
       updateResumeButton();
 
       // Update active stream player if already open
@@ -1444,9 +1629,10 @@
       serversRow.innerHTML = '';
       currentServers.forEach((server, idx) => {
         const b = document.createElement('button');
-        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border transition ' + (idx === selectedServerIdx
-          ? 'bg-red-600 border-red-600 text-white'
-          : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-red-500');
+        b.type = 'button';
+        b.className = 'min-h-[44px] px-3.5 py-1.5 rounded-md text-xs font-bold border transition ' + (idx === selectedServerIdx
+          ? 'bg-[#e50914] border-[#e50914] text-white'
+          : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white');
         b.textContent = server.name;
         b.addEventListener('click', () => {
           captureCurrentPlaybackTime();
@@ -1463,9 +1649,10 @@
         qualityWrap.classList.remove('hidden');
         server.qualities.forEach((q, idx) => {
           const b = document.createElement('button');
-          b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border transition ' + (idx === selectedQualityIdx
+          b.type = 'button';
+          b.className = 'min-h-[44px] px-3.5 py-1.5 rounded-md text-xs font-bold border transition ' + (idx === selectedQualityIdx
             ? 'bg-emerald-600 border-emerald-600 text-white'
-            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500');
+            : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white');
           b.textContent = q.quality;
           b.addEventListener('click', () => {
             captureCurrentPlaybackTime();
@@ -1486,6 +1673,7 @@
       const server = selectedServer();
       const quality = selectedQuality();
       if (!server || !quality) { loadEmbedFallback(); return; }
+      hideModalBackdrop();
       playerContainer.classList.remove('hidden');
       if (isEmbedServer(server)) {
         resetPlayer();
@@ -1542,12 +1730,15 @@
     // the dead link.
     function loadEmbedFallback() {
       if (!currentItem) return;
+      hideModalBackdrop();
       playerContainer.classList.remove('hidden');
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
       const s = type === 'tv' ? selectedSeason : undefined;
       const e = type === 'tv' ? selectedEpisode : undefined;
       const key = resolveKey(type, currentItem.id, s, e);
-      if (lastResolved && lastResolved.key === key) lastResolved = null;
+      if (lastResolved && lastResolved.key === key && lastResolved.data && lastResolved.data.ok) {
+        lastResolved = null;
+      }
       if (!currentServers) {
         showPlayerStatus('⚠️ لا يوجد مصدر شغّال لهذا العمل حالياً.');
         return;
@@ -1642,6 +1833,7 @@
     document.getElementById('btnTrailer').addEventListener('click', () => {
       if (!trailerKey) return;
       resetPlayer();
+      hideModalBackdrop();
       playerContainer.classList.remove('hidden');
       videoIframe.removeAttribute('sandbox');
       videoIframe.classList.remove('hidden');
@@ -1775,7 +1967,9 @@
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
       const s = type === 'tv' ? selectedSeason : undefined;
       const e = type === 'tv' ? selectedEpisode : undefined;
+      const key = resolveKey(type, currentItem.id, s, e);
       recordViewOnce(type, currentItem.id, s, e);
+      hideModalBackdrop();
       playerContainer.classList.remove('hidden');
       showPlayerStatus('⏳ جاري تجهيز مشغّل بدون إعلانات...');
       const resolved = await fetchResolve(type, currentItem.id, s, e);
@@ -1785,8 +1979,11 @@
       document.getElementById('downloadPicker').classList.add('hidden');
       document.getElementById('botCodePanel').classList.add('hidden');
       renderServerControls();
+      if (resolved && Array.isArray(resolved.servers)) {
+        lastResolved = { key, data: resolved };
+        syncDownloadButtonState(resolved);
+      }
       if (resolved && resolved.ok) {
-        lastResolved = { key: resolveKey(type, currentItem.id, s, e), data: resolved };
         playSelected();
         return;
       }
@@ -1803,25 +2000,30 @@
       const key = resolveKey(type, currentItem.id, s, e);
       const picker = document.getElementById('downloadPicker');
       const pickerRow = document.getElementById('downloadQualitiesRow');
-      const originalHtml = btnDirectDownload.innerHTML;
+      const labelEl = document.getElementById('btnDirectDownloadLabel');
+      const iconEl = document.getElementById('btnDirectDownloadIcon');
+      const prevLabel = labelEl ? labelEl.innerText : '';
+      const prevIcon = iconEl ? iconEl.innerText : '';
       btnDirectDownload.disabled = true;
-      btnDirectDownload.innerHTML = '<span>⏳</span> <span>جاري تجهيز الرابط...</span>';
+      if (iconEl) iconEl.innerText = '⏳';
+      if (labelEl) labelEl.innerText = 'جاري تجهيز الرابط...';
       try {
         let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
         if (!resolved) {
           resolved = await fetchResolve(type, currentItem.id, s, e);
-          if (resolved && resolved.ok) lastResolved = { key, data: resolved };
+          if (resolved && Array.isArray(resolved.servers)) {
+            lastResolved = { key, data: resolved };
+          }
         }
-        // Downloadable qualities live on the first (native) server.
-        const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
-          ? resolved.servers[0].qualities.filter((q) => q.download)
-          : [];
+        syncDownloadButtonState(resolved);
+        const qualities = getDownloadQualities(resolved);
         if (qualities.length > 1) {
           // More than one quality: show the picker; tapping one downloads it.
           pickerRow.innerHTML = '';
           qualities.forEach((q) => {
             const b = document.createElement('button');
-            b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500 transition';
+            b.type = 'button';
+            b.className = 'min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition';
             b.textContent = q.quality;
             b.addEventListener('click', () => {
               picker.classList.add('hidden');
@@ -1836,24 +2038,18 @@
           await downloadQuality(qualities[0], key);
           return;
         }
-        showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
-        openBotRequest();
+        showToast('هذا العمل متاح للمشاهدة الأونلاين فقط ولا يتوفر له ملف MP4 مباشر حالياً');
       } finally {
         btnDirectDownload.disabled = false;
-        btnDirectDownload.innerHTML = originalHtml;
+        if (!lastResolved || lastResolved.key !== key) {
+          if (iconEl) iconEl.innerText = prevIcon || '⬇';
+          if (labelEl) labelEl.innerText = prevLabel || 'تحميل مباشر (.mp4)';
+        } else {
+          syncDownloadButtonState(lastResolved.data);
+        }
       }
     });
 
-    // Trigger the browser download of one quality immediately — no
-    // liveness probe first. The probe used to gate this (8s timeout) but
-    // the upstream host is slow to first byte, so the probe kept timing
-    // out on healthy links and the app pushed the user to the bot instead
-    // of downloading. A dead upstream is now handled server-side (the
-    // Worker never serves an error body as a download), so the browser
-    // either starts the real download or shows the error itself. The bot
-    // fallback stays only when there is no download URL at all.
-    // Starts one browser download for a quality (anchor click). Used by
-    // the single download and by the whole-season download.
     function startAnchorDownload(q, filename) {
       const a = document.createElement('a');
       a.href = q.download;
@@ -1865,13 +2061,14 @@
     }
     async function downloadQuality(q, key) {
       if (!q.download) {
-        if (lastResolved && lastResolved.key === key) lastResolved = null;
-        showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
-        openBotRequest();
+        if (lastResolved && lastResolved.key === key && lastResolved.data && lastResolved.data.ok) {
+          lastResolved = null;
+        }
+        showToast('تعذر بدء التحميل المباشر لهذا العمل حالياً');
         return;
       }
       startAnchorDownload(q, downloadFileName(selectedEpisode));
-      showToast('بدأ التحميل — هتلاقي الملف في التنزيلات');
+      showToast('بدأ التحميل - هتلاقي الملف في التنزيلات');
     }
 
     // File name the browser saves: movies "Title.mp4", episodes
@@ -1936,20 +2133,19 @@
       let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
       if (!resolved) {
         resolved = await fetchResolve('tv', currentItem.id, selectedSeason, selectedEpisode);
-        if (resolved && resolved.ok) lastResolved = { key, data: resolved };
+        if (resolved && Array.isArray(resolved.servers)) lastResolved = { key, data: resolved };
       }
-      const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
-        ? resolved.servers[0].qualities.filter((q) => q.download)
-        : [];
+      syncDownloadButtonState(resolved);
+      const qualities = getDownloadQualities(resolved);
       if (!qualities.length) {
-        showToast('الرابط المباشر مش متاح للعمل ده دلوقتي — هنبعتهولك على البوت');
-        openBotRequest();
+        showToast('هذا العمل متاح للمشاهدة الأونلاين فقط ولا يتوفر له ملفات MP4 مباشرة حالياً');
         return;
       }
       row.innerHTML = '';
       qualities.forEach((q) => {
         const b = document.createElement('button');
-        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500 transition';
+        b.type = 'button';
+        b.className = 'min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition';
         b.textContent = q.quality;
         b.addEventListener('click', () => {
           picker.classList.add('hidden');
@@ -1986,21 +2182,30 @@
       let resolved = (lastResolved && lastResolved.key === key) ? lastResolved.data : null;
       if (!resolved) {
         resolved = await fetchResolve(type, currentItem.id, s, e);
-        if (resolved && resolved.ok) lastResolved = { key, data: resolved };
+        if (resolved && Array.isArray(resolved.servers)) lastResolved = { key, data: resolved };
       }
-      const qualities = resolved && resolved.ok && resolved.servers && resolved.servers[0]
-        ? resolved.servers[0].qualities
-        : [];
+      syncDownloadButtonState(resolved);
+      const qualities = getDownloadQualities(resolved);
       qRow.innerHTML = '';
       if (qualities.length === 0) {
-        // No direct source: fall back to the old deep link.
-        panel.classList.add('hidden');
-        openBotDeepLink();
+        const hasTgSendData = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData && window.Telegram.WebApp.sendData);
+        if (hasTgSendData) {
+          panel.classList.add('hidden');
+          openBotDeepLink();
+          return;
+        }
+        qRow.innerHTML = `
+          <div class="w-full space-y-2">
+            <p class="text-xs text-neutral-300">لا تتوفر جودة مباشرة لهذا العمل حالياً - يمكنك طلبه من البوت مباشرة:</p>
+            <a href="https://t.me/filmatibot?start=${botPayload(currentItem, s, e)}" target="_blank" rel="noopener" class="inline-flex items-center justify-center min-h-[44px] px-4 py-2 rounded-md bg-[#e50914] hover:bg-red-700 text-white text-xs font-bold transition">🚀 فتح البوت في التليجرام</a>
+          </div>
+        `;
         return;
       }
       qualities.forEach((q) => {
         const b = document.createElement('button');
-        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-800 border-slate-700 text-slate-300 hover:border-blue-500 transition';
+        b.type = 'button';
+        b.className = 'min-h-[44px] px-3 py-1.5 rounded-md text-xs font-bold border bg-[#232323] border-[#737373] text-neutral-200 hover:border-white transition';
         b.textContent = q.quality;
         b.addEventListener('click', () => requestBotCode(type, currentItem.id, s, e, q.quality));
         qRow.appendChild(b);
@@ -2073,6 +2278,7 @@
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       mediaModal.classList.add('hidden');
       document.body.classList.remove('overflow-hidden');
+      hideModalBackdrop();
       resetPlayer();
       playerContainer.classList.add('hidden');
       updatePlayerToolbarVisibility(false);
