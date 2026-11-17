@@ -11,6 +11,7 @@ import { searchTitles } from "./engine/search.ts";
 import { BROWSE_COLLECTIONS, BROWSE_LANGS, browseTitles } from "./engine/browse.ts";
 import { getHome, recordView } from "./engine/home.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
+import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
 import { FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
 import { handleTelegramUpdate } from "./telegram/handlers.ts";
@@ -522,7 +523,13 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
       const token = await signToken(
         {
           u: q.directVideoUrl,
-          n: resolved.title,
+          // The download file name: "Title" for movies, "Title S01E01"
+          // for episodes — the /stream proxy turns this into the
+          // Content-Disposition filename, which is what the browser
+          // actually saves (the anchor's `download` attribute is ignored
+          // cross-origin, so a bare title here made every episode of a
+          // season download as the same "VisionQuest.mp4").
+          n: downloadDisplayName(resolved.title, seasonNum, episodeNum),
           k: "mp4",
           e: Math.floor(Date.now() / 1000) + 3 * 3600,
         },
