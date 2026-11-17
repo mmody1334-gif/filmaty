@@ -134,9 +134,27 @@ test("/start m550 looks the movie up on TMDB and searches for it", async () => {
     assert.equal(res.status, 200);
     const texts = sent.map((m) => m.text as string);
     assert.ok(
-      texts.some((t) => t.includes("جاري البحث عن: Fight Club")),
+      texts.some((t) => t.includes("جاري البحث عن") && t.includes("Fight Club")),
       `expected TMDB title message, sent: ${JSON.stringify(texts)}`,
     );
+  } finally {
+    restore();
+  }
+});
+
+// Bot search budget: a /start deep link used to send TWO "searching"
+// messages (one from the payload handler, one from the search itself).
+// Now executeSearch sends the only one.
+test("/start m550 sends exactly one searching message", async () => {
+  const sent: any[] = [];
+  const edited: any[] = [];
+  const restore = installFetchMock(sent, edited);
+  const { env } = mockEnv();
+  try {
+    const res = await handleTelegramUpdate(messageUpdate("/start m550"), env);
+    assert.equal(res.status, 200);
+    const searching = sent.filter((m) => (m.text as string)?.includes("جاري البحث عن"));
+    assert.equal(searching.length, 1, `Expected 1 status message, got ${searching.length}: ${JSON.stringify(sent.map((m) => m.text))}`);
   } finally {
     restore();
   }
@@ -152,7 +170,7 @@ test("/start t1399s1e3 searches the series and stores the episode preference", a
     assert.equal(res.status, 200);
     const texts = sent.map((m) => m.text as string);
     assert.ok(
-      texts.some((t) => t.includes("جاري البحث عن: Game of Thrones")),
+      texts.some((t) => t.includes("جاري البحث عن") && t.includes("Game of Thrones")),
       `expected TMDB title message, sent: ${JSON.stringify(texts)}`,
     );
     const pref = map.get("pref_ep:12345678");
@@ -221,7 +239,7 @@ test("web_app_data JSON routes through the same payload logic", async () => {
     assert.equal(res.status, 200);
     const texts = sent.map((m) => m.text as string);
     assert.ok(
-      texts.some((t) => t.includes("جاري البحث عن: Game of Thrones")),
+      texts.some((t) => t.includes("جاري البحث عن") && t.includes("Game of Thrones")),
       `expected TMDB title message via web_app_data, sent: ${JSON.stringify(texts)}`,
     );
   } finally {
