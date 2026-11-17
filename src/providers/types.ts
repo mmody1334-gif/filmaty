@@ -65,7 +65,7 @@ export interface Provider {
   id: string;
   label: string;
   kinds: MediaKind[];
-  search(query: string, kind?: MediaKind): Promise<Candidate[]>;
+  search(query: string, kind?: MediaKind, opts?: { pages?: number }): Promise<Candidate[]>;
   getDetails(candidate: Candidate): Promise<MediaDetails>;
   getEpisodeSources(episode: Episode): Promise<SourceLink[]>;
   resolveStream?(watchUrl: string): Promise<ResolvedStream>;

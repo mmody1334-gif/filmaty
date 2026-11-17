@@ -47,6 +47,13 @@ export async function searchAllProviders(
   // stubs, or embeds, which cannot serve the native player or a direct
   // download anyway.
   onlySites?: string[],
+  // When set, bound how deep a provider may sweep. Only Akwam honors it
+  // today: its search fans out over smart-query variants × up to 9 pages
+  // (~30 subrequests per call), which is what killed the bot search for
+  // Spartacus. The bot passes { pages: 1 } — page 1 is where the exact
+  // title lives. The site and the resolver pass nothing, so their recall
+  // is unchanged.
+  searchOpts?: { pages?: number },
 ): Promise<Candidate[]> {
   const activeProviders = ALL_PROVIDERS.filter(
     (p) => !disabledSites.includes(p.id) && (!onlySites || onlySites.includes(p.id)),
@@ -56,7 +63,7 @@ export async function searchAllProviders(
   const settled = await Promise.allSettled(
     activeProviders.map(async (p) => {
       try {
-        return await p.search(query, kind);
+        return await p.search(query, kind, searchOpts);
       } catch (err) {
         console.error(`Search error on provider ${p.id}:`, err);
         return [];

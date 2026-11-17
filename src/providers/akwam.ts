@@ -156,7 +156,7 @@ export class AkwamProvider implements Provider {
   label = "أكوام (سيرفرات فائقة السرعة)";
   kinds: MediaKind[] = ["movie", "series"];
 
-  async search(query: string, kind?: MediaKind): Promise<Candidate[]> {
+  async search(query: string, kind?: MediaKind, opts?: { pages?: number }): Promise<Candidate[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
@@ -164,13 +164,19 @@ export class AkwamProvider implements Provider {
     const seenUrls = new Set<string>();
     const allResults: Candidate[] = [];
 
-    // Search across smart queries and multiple pages in parallel to catch all seasons
+    // Search across smart queries and multiple pages in parallel to catch all seasons.
+    // opts.pages caps the sweep (the bot passes pages: 1 — page 1 is
+    // where the exact title lives, and the uncapped 9-page × multi-variant
+    // fan-out burns ~30 subrequests per search, which is what killed the
+    // bot search for Spartacus against the Worker's ~50 cap). The site
+    // and the resolver pass no opts, so their recall is unchanged.
     const isMultiSeasonQuery =
       kind === "series" ||
       trimmed.includes("مسلسل") ||
       trimmed.includes("اللعبة") ||
       trimmed.length <= 8;
-    const pages = isMultiSeasonQuery ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [1, 2, 3];
+    const pageCount = opts?.pages ?? (isMultiSeasonQuery ? 9 : 3);
+    const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
 
     const fetchTasks: Promise<Candidate[]>[] = [];
     for (const q of queries) {
