@@ -48,7 +48,7 @@
     button:not(:disabled), a[href], select, [role="button"] { cursor: pointer; }
     button:disabled { cursor: not-allowed; opacity: 0.6; }
     :focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
-    #modalCard.theater-mode { max-width: 68rem; }
+    #modalCard.theater-mode { max-width: 80rem; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
     }
@@ -71,6 +71,10 @@
         </nav>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <button id="profileBtn" type="button" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
+          <span id="profileBtnAvatar" class="w-5 h-5 rounded bg-[#e50914] text-white text-[11px] font-black flex items-center justify-center" aria-hidden="true">👤</span>
+          <span id="profileBtnLabel">دخول يوزر</span>
+        </button>
         <a href="Tv/" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
           <span>📺 وضع التلفزيون</span>
         </a>
@@ -210,56 +214,65 @@
     <div id="homeSections" class="hidden space-y-9"></div>
   </main>
 
-  <!-- Media Details & Player Modal -->
-  <div id="mediaModal" class="fixed inset-0 z-50 bg-black/85 hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
-    <div id="modalCard" class="bg-[#181818] border border-neutral-800 rounded-t-2xl sm:rounded-xl max-w-3xl w-full max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl relative">
-      <!-- Close button -->
-      <button id="closeModal" type="button" aria-label="إغلاق" class="absolute top-3 left-3 z-20 w-11 h-11 rounded-full bg-[#181818]/90 border border-[#737373] text-white flex items-center justify-center hover:border-white hover:bg-[#e50914] transition">✕</button>
-
-      <!-- Modal Backdrop Banner (hidden once player opens) -->
-      <div id="modalBackdropWrap" class="hidden relative aspect-video max-h-64 sm:max-h-80 w-full bg-neutral-900 overflow-hidden shrink-0">
-        <img id="modalBackdropImg" src="" alt="" class="w-full h-full object-cover" />
-        <div class="modal-backdrop-scrim absolute inset-0"></div>
+  <!-- Full-Screen Watch & Details View (dedicated extension page, no outside-click backdrop dismissal) -->
+  <div id="mediaModal" class="fixed inset-0 z-50 bg-[#141414] hidden overflow-y-auto">
+    <div class="sticky top-0 z-30 glass px-4 sm:px-6 py-2.5">
+      <div class="max-w-5xl mx-auto w-full flex items-center justify-between gap-3">
+        <button id="closeModal" type="button" aria-label="رجوع للرئيسية" class="min-h-[44px] px-4 py-2 rounded-md bg-[#232323] border border-[#737373] text-white text-xs sm:text-sm font-extrabold flex items-center gap-2 hover:border-white hover:bg-[#e50914] transition">← رجوع للرئيسية</button>
+        <span id="watchPageBreadcrumb" class="text-xs sm:text-sm font-bold text-neutral-300 truncate"></span>
+        <button id="watchProfileBtn" type="button" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] border border-[#737373] text-neutral-200 hover:border-white text-xs font-bold transition flex items-center gap-1.5 shrink-0">
+          <span id="watchProfileAvatar" class="w-5 h-5 rounded bg-[#e50914] text-white text-[11px] font-black flex items-center justify-center" aria-hidden="true">👤</span>
+          <span id="watchProfileLabel">دخول يوزر</span>
+        </button>
       </div>
-
-      <!-- Video Player Frame Area -->
-      <div id="playerContainer" class="hidden relative aspect-video w-full bg-black select-none shrink-0">
-        <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
-        <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
-        <div id="iframeSpinner" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-white text-sm font-bold pointer-events-none">
-          <span class="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
-          <span id="iframeSpinnerLabel">⏳ جاري تحميل المشغّل...</span>
+    </div>
+    <div id="modalCard" class="max-w-5xl w-full mx-auto px-0 sm:px-6 py-0 sm:py-6 pb-12 flex flex-col gap-4">
+      <div class="bg-[#181818] sm:border sm:border-neutral-800 sm:rounded-xl overflow-hidden shadow-2xl">
+        <!-- Modal Backdrop Banner (hidden once player opens) -->
+        <div id="modalBackdropWrap" class="hidden relative aspect-video max-h-64 sm:max-h-96 w-full bg-neutral-900 overflow-hidden shrink-0">
+          <img id="modalBackdropImg" src="" alt="" class="w-full h-full object-cover" />
+          <div class="modal-backdrop-scrim absolute inset-0"></div>
         </div>
-        <div id="seekIndicator" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-sm font-black border border-white/20 pointer-events-none"></div>
-        <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/75 text-white text-sm font-bold px-4 text-center"></div>
-      </div>
 
-      <!-- Player Controls Bar -->
-      <div id="playerToolbar" class="hidden flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#141414] border-b border-neutral-800 text-xs font-bold shrink-0">
-        <div id="nativeToolbarGroup" class="flex flex-wrap items-center gap-2">
-          <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">-10 ث ⏪</button>
-          <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">⏩ +10 ث</button>
-          <div class="flex items-center gap-1.5">
-            <label for="playerSpeedSelect" class="text-neutral-300">السرعة:</label>
-            <select id="playerSpeedSelect" class="min-h-[44px] bg-[#232323] text-white rounded-md px-2.5 py-1.5 border border-[#737373]">
-              <option value="0.5">0.5x</option>
-              <option value="0.75">0.75x</option>
-              <option value="1" selected>1x</option>
-              <option value="1.25">1.25x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2">2x</option>
-            </select>
+        <!-- Video Player Frame Area -->
+        <div id="playerContainer" class="hidden relative aspect-video w-full bg-black select-none shrink-0">
+          <iframe id="videoIframe" class="w-full h-full" src="" allowfullscreen frameborder="0" referrerpolicy="origin" allow="fullscreen; autoplay; encrypted-media"></iframe>
+          <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
+          <div id="iframeSpinner" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-white text-sm font-bold pointer-events-none">
+            <span class="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
+            <span id="iframeSpinnerLabel">⏳ جاري تحميل المشغّل...</span>
           </div>
-          <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">صورة داخل صورة</button>
+          <div id="seekIndicator" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-sm font-black border border-white/20 pointer-events-none"></div>
+          <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/75 text-white text-sm font-bold px-4 text-center"></div>
         </div>
-        <div class="flex items-center gap-2">
-          <button id="btnTheater" type="button" aria-label="وضع المسرح" aria-pressed="false" class="hidden sm:inline-flex items-center min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-amber-500 transition">وضع المسرح</button>
-          <button id="btnFullscreen" type="button" aria-label="ملء الشاشة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#e50914] text-white hover:bg-red-700 transition">⛶ ملء الشاشة</button>
+
+        <!-- Player Controls Bar -->
+        <div id="playerToolbar" class="hidden flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#141414] border-t border-neutral-800 text-xs font-bold shrink-0">
+          <div id="nativeToolbarGroup" class="flex flex-wrap items-center gap-2">
+            <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">-10 ث ⏪</button>
+            <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">⏩ +10 ث</button>
+            <div class="flex items-center gap-1.5">
+              <label for="playerSpeedSelect" class="text-neutral-300">السرعة:</label>
+              <select id="playerSpeedSelect" class="min-h-[44px] bg-[#232323] text-white rounded-md px-2.5 py-1.5 border border-[#737373]">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+              </select>
+            </div>
+            <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">صورة داخل صورة</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnTheater" type="button" aria-label="وضع المسرح" aria-pressed="false" class="hidden sm:inline-flex items-center min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-amber-500 transition">وضع المسرح</button>
+            <button id="btnFullscreen" type="button" aria-label="ملء الشاشة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#e50914] text-white hover:bg-red-700 transition">⛶ ملء الشاشة</button>
+          </div>
         </div>
       </div>
 
-      <!-- Modal Content Body -->
-      <div class="p-4 sm:p-6 overflow-y-auto space-y-5">
+      <!-- Watch Page Content Body -->
+      <div class="p-4 sm:p-6 bg-[#181818] sm:border sm:border-neutral-800 sm:rounded-xl space-y-5 shadow-xl">
         <!-- Auto-next episode countdown (series only, native player) -->
         <div id="autoNextBar" class="hidden items-center justify-between gap-2 rounded-md bg-red-600/20 border border-red-500/40 px-3 py-2">
           <span id="autoNextText" class="text-xs font-bold text-white">الحلقة التالية خلال 5 ثواني…</span>
@@ -378,6 +391,46 @@
     </div>
   </div>
 
+  <!-- Netflix-style Profile / Username Gate & Switcher (cloud synced per username, e.g. megoo) -->
+  <div id="profileOverlay" class="fixed inset-0 z-[70] bg-[#141414]/98 hidden flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="profileOverlayTitle">
+    <div class="max-w-md w-full bg-[#181818] border border-neutral-700 rounded-xl p-6 shadow-2xl space-y-5">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="profileOverlayTitle" class="text-2xl font-black text-white">مين بيتفرج؟</h2>
+          <p class="text-xs sm:text-sm text-[#a3a3a3] mt-1 leading-relaxed">اكتب اسم المستخدم (مثال: megoo) لحفظ أفلامك ومسلسلاتك ومكان ما وقفت ومزامنتها مع التلفزيون.</p>
+        </div>
+        <button id="profileCloseBtn" type="button" aria-label="إغلاق نافذة الحساب" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition shrink-0">✕</button>
+      </div>
+
+      <div id="profileSavedWrap" class="hidden space-y-2">
+        <p class="text-xs font-bold text-neutral-300">حساباتك المحفوظة على الجهاز:</p>
+        <div id="profileSavedUsers" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <form id="profileForm" class="space-y-3">
+        <div>
+          <label for="profileInput" class="block text-xs font-bold text-neutral-200 mb-1.5">اسم المستخدم</label>
+          <input
+            id="profileInput"
+            type="text"
+            dir="ltr"
+            autocomplete="username"
+            maxlength="32"
+            placeholder="megoo"
+            class="w-full min-h-[46px] px-3.5 py-2.5 rounded-md bg-[#1f1f1f] text-white placeholder-neutral-400 border border-[#737373] focus:border-white focus:outline-none text-sm font-bold"
+          />
+        </div>
+        <p id="profileStatus" class="hidden text-xs font-bold text-amber-400"></p>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <button id="profileSubmitBtn" type="submit" class="flex-1 min-h-[46px] px-5 py-2.5 rounded-md bg-[#e50914] hover:bg-red-700 text-white font-black text-sm transition">دخول وحفظ التقدم</button>
+          <button id="profileGuestBtn" type="button" class="min-h-[46px] px-4 py-2.5 rounded-md bg-[#232323] hover:bg-[#333333] text-neutral-200 border border-[#737373] font-bold text-xs transition">تصفح كزائر حالياً</button>
+        </div>
+      </form>
+
+      <button id="profileLogoutBtn" type="button" class="hidden w-full min-h-[44px] px-4 py-2 rounded-md bg-[#232323] text-red-300 border border-red-500/40 hover:border-red-400 text-xs font-bold transition">تسجيل الخروج من الحساب الحالي</button>
+    </div>
+  </div>
+
   <script>
     const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
     const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
@@ -396,12 +449,31 @@
     let selectedServerIdx = 0;
     let selectedQualityIdx = 0;
 
-    // Continue watching (stage A): resume positions + watched marks,
-    // kept in localStorage on this device only (no accounts). The TV
-    // page uses the exact same keys and the same shape.
+    // Continue watching (stage A) + cloud user profile sync: keeps local
+    // stores compatible across Web and TV and syncs per username via /api/profile.
     const PROGRESS_KEY = 'filmaty:progress:v1';
     const WATCHED_KEY = 'filmaty:watched:v1';
-    const MAX_PROGRESS_ITEMS = 20;
+    const MYLIST_KEY = 'filmaty:mylist:v1';
+    const REMOVED_MYLIST_KEY = 'filmaty:mylist-removed:v1';
+    const HISTORY_KEY = 'filmaty:history:v1';
+    const ACTIVE_USER_KEY = 'filmaty:user:v1';
+    const USERS_LIST_KEY = 'filmaty:users-list:v1';
+    const USER_SNAPSHOT_PREFIX = 'filmaty:user-snapshot:v1:';
+    const MAX_PROGRESS_ITEMS = 25;
+    const MAX_MYLIST_ITEMS = 60;
+    const MAX_HISTORY_ITEMS = 40;
+
+    let activeUser = null;
+    try { activeUser = clientNormalizeUsername(localStorage.getItem(ACTIVE_USER_KEY) || ''); } catch (e) {}
+    let personalRecs = [];
+    let profileSyncTimer = null;
+    let clearedProgressKeys = new Set();
+
+    function clientNormalizeUsername(raw) {
+      if (typeof raw !== 'string') return null;
+      const cleaned = raw.trim().toLowerCase().replace(/\s+/g, '_');
+      return /^[a-z0-9_.\-\u0600-\u06ff]{2,32}$/.test(cleaned) ? cleaned : null;
+    }
     function progressKey(type, id, s, e) {
       return `${type}:${id}:${s || 0}:${e || 0}`;
     }
@@ -411,6 +483,114 @@
     function readWatchedStore() {
       try { return JSON.parse(localStorage.getItem(WATCHED_KEY) || '{}'); } catch (e) { return {}; }
     }
+    function readMyListStore() {
+      try { return JSON.parse(localStorage.getItem(MYLIST_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function readRemovedMyListStore() {
+      try { return JSON.parse(localStorage.getItem(REMOVED_MYLIST_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function readHistoryStore() {
+      try {
+        const list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        return Array.isArray(list) ? list : [];
+      } catch (e) { return []; }
+    }
+    function readSavedUsersList() {
+      try {
+        const list = JSON.parse(localStorage.getItem(USERS_LIST_KEY) || '[]');
+        return Array.isArray(list) ? list.filter((u) => clientNormalizeUsername(u)) : [];
+      } catch (e) { return []; }
+    }
+    function saveUsersListEntry(username) {
+      const next = [username, ...readSavedUsersList().filter((u) => u !== username)].slice(0, 10);
+      try { localStorage.setItem(USERS_LIST_KEY, JSON.stringify(next)); } catch (e) {}
+    }
+    function saveLocalUserSnapshot() {
+      if (!activeUser) return;
+      const snap = {
+        updatedAt: Date.now(),
+        progress: readProgressStore(),
+        watched: readWatchedStore(),
+        myList: readMyListStore(),
+        removedMyList: readRemovedMyListStore(),
+        history: readHistoryStore(),
+      };
+      try { localStorage.setItem(`${USER_SNAPSHOT_PREFIX}${activeUser}`, JSON.stringify(snap)); } catch (e) {}
+    }
+    function readLocalUserSnapshot(username) {
+      try { return JSON.parse(localStorage.getItem(`${USER_SNAPSHOT_PREFIX}${username}`) || 'null'); } catch (e) { return null; }
+    }
+    function clearLocalMediaStores() {
+      try {
+        localStorage.removeItem(PROGRESS_KEY);
+        localStorage.removeItem(WATCHED_KEY);
+        localStorage.removeItem(MYLIST_KEY);
+        localStorage.removeItem(REMOVED_MYLIST_KEY);
+        localStorage.removeItem(HISTORY_KEY);
+      } catch (e) {}
+      clearedProgressKeys.clear();
+    }
+    function writeProfileToLocalStores(profile) {
+      if (!profile) return;
+      try {
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(profile.progress || {}));
+        localStorage.setItem(WATCHED_KEY, JSON.stringify(profile.watched || {}));
+        localStorage.setItem(MYLIST_KEY, JSON.stringify(profile.myList || {}));
+        localStorage.setItem(REMOVED_MYLIST_KEY, JSON.stringify(profile.removedMyList || {}));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(Array.isArray(profile.history) ? profile.history : []));
+      } catch (e) {}
+      clearedProgressKeys.clear();
+      saveLocalUserSnapshot();
+    }
+    function buildProfileSyncPayload(username) {
+      return {
+        username,
+        updatedAt: Date.now(),
+        progress: readProgressStore(),
+        watched: readWatchedStore(),
+        myList: readMyListStore(),
+        removedMyList: readRemovedMyListStore(),
+        history: readHistoryStore(),
+        clearProgressKeys: [...clearedProgressKeys],
+      };
+    }
+    async function syncProfileToCloud(immediate = false, targetUser = null) {
+      const user = targetUser || activeUser;
+      if (!user) return null;
+      const payload = buildProfileSyncPayload(user);
+      saveLocalUserSnapshot();
+      try {
+        const res = await fetch(`${API_BASE}/api/profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload),
+          keepalive: !!immediate,
+        });
+        const data = await res.json().catch(() => null);
+        if (data && data.ok && data.profile && !targetUser && user === activeUser) {
+          writeProfileToLocalStores(data.profile);
+          return data.profile;
+        }
+      } catch (e) {}
+      return null;
+    }
+    function scheduleProfileSync() {
+      saveLocalUserSnapshot();
+      if (!activeUser) return;
+      clearTimeout(profileSyncTimer);
+      profileSyncTimer = setTimeout(() => syncProfileToCloud(false), 1200);
+    }
+    function updateProfileBadges() {
+      const text = activeUser || 'دخول يوزر';
+      const initial = activeUser ? activeUser.slice(0, 1).toUpperCase() : '👤';
+      [['profileBtnAvatar', 'profileBtnLabel'], ['watchProfileAvatar', 'watchProfileLabel']].forEach(([avId, lblId]) => {
+        const av = document.getElementById(avId);
+        const lbl = document.getElementById(lblId);
+        if (av) av.textContent = initial;
+        if (lbl) lbl.textContent = text;
+      });
+    }
+
     function getProgress(type, id, s, e) {
       return readProgressStore()[progressKey(type, id, s, e)] || null;
     }
@@ -418,9 +598,10 @@
       return !!readWatchedStore()[progressKey(type, id, s, e)];
     }
     function saveProgressEntry(type, id, s, e, t, d, meta) {
-      if (!Number.isFinite(t) || t < 5) return;
+      if (!Number.isFinite(t) || t < 2) return;
       const store = readProgressStore();
       const key = progressKey(type, id, s, e);
+      clearedProgressKeys.delete(key);
       store[key] = {
         type, id, s: s || 0, e: e || 0,
         t: Math.floor(t), d: Number.isFinite(d) && d > 0 ? Math.floor(d) : 0,
@@ -430,20 +611,45 @@
       const capped = {};
       entries.forEach((en) => { capped[progressKey(en.type, en.id, en.s, en.e)] = en; });
       try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(capped)); } catch (e) {}
+      scheduleProfileSync();
     }
     function clearProgressEntry(type, id, s, e) {
       const store = readProgressStore();
-      delete store[progressKey(type, id, s, e)];
+      const key = progressKey(type, id, s, e);
+      delete store[key];
+      clearedProgressKeys.add(key);
       try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(store)); } catch (e) {}
+      scheduleProfileSync();
     }
-    function markWatchedEntry(type, id, s, e) {
+    function markWatchedEntry(type, id, s, e, meta) {
       const store = readWatchedStore();
-      store[progressKey(type, id, s, e)] = Date.now();
+      const key = progressKey(type, id, s, e);
+      store[key] = Date.now();
       const keys = Object.keys(store).sort((a, b) => store[b] - store[a]).slice(0, 200);
       const capped = {};
       keys.forEach((k) => { capped[k] = store[k]; });
       try { localStorage.setItem(WATCHED_KEY, JSON.stringify(capped)); } catch (e) {}
+      if (meta) recordHistoryEntry(type, id, s, e, meta);
       clearProgressEntry(type, id, s, e);
+    }
+    function recordHistoryEntry(type, id, s, e, meta) {
+      if (!type || !id) return;
+      const list = readHistoryStore().filter((en) => !(en.type === type && Number(en.id) === Number(id)));
+      list.unshift({
+        type,
+        id: Number(id),
+        s: type === 'tv' ? (Number(s) || 1) : 0,
+        e: type === 'tv' ? (Number(e) || 1) : 0,
+        title: (meta && meta.title) || '',
+        poster: (meta && meta.poster) || '',
+        kind: (meta && meta.kind) || type,
+        at: Date.now(),
+      });
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY_ITEMS))); } catch (err) {}
+      scheduleProfileSync();
+    }
+    function getHistoryItems() {
+      return readHistoryStore().sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20);
     }
     function formatTime(sec) {
       sec = Math.max(0, Math.floor(sec || 0));
@@ -456,37 +662,49 @@
       return Object.values(readProgressStore()).sort((a, b) => b.updated - a.updated).slice(0, 10);
     }
 
-    // My list (stage B): titles the user saved to watch later, kept in
-    // localStorage on this device only (no accounts). Same keys on the
-    // TV page.
-    const MYLIST_KEY = 'filmaty:mylist:v1';
-    const MAX_MYLIST_ITEMS = 50;
     function myListKey(type, id) {
       return `${type}:${id}`;
-    }
-    function readMyListStore() {
-      try { return JSON.parse(localStorage.getItem(MYLIST_KEY) || '{}'); } catch (e) { return {}; }
     }
     function isInMyList(type, id) {
       return !!readMyListStore()[myListKey(type, id)];
     }
     function toggleMyList(type, id, meta) {
       const store = readMyListStore();
+      const removed = readRemovedMyListStore();
       const key = myListKey(type, id);
       if (store[key]) {
         delete store[key];
-        try { localStorage.setItem(MYLIST_KEY, JSON.stringify(store)); } catch (e) {}
+        removed[key] = Date.now();
+        try {
+          localStorage.setItem(MYLIST_KEY, JSON.stringify(store));
+          localStorage.setItem(REMOVED_MYLIST_KEY, JSON.stringify(removed));
+        } catch (e) {}
+        scheduleProfileSync();
         return false;
       }
+      delete removed[key];
       store[key] = { type, id, title: meta.title || '', poster: meta.poster || '', kind: meta.kind || '', added: Date.now() };
       const entries = Object.values(store).sort((a, b) => b.added - a.added).slice(0, MAX_MYLIST_ITEMS);
       const capped = {};
       entries.forEach((en) => { capped[myListKey(en.type, en.id)] = en; });
-      try { localStorage.setItem(MYLIST_KEY, JSON.stringify(capped)); } catch (e) {}
+      try {
+        localStorage.setItem(MYLIST_KEY, JSON.stringify(capped));
+        localStorage.setItem(REMOVED_MYLIST_KEY, JSON.stringify(removed));
+      } catch (e) {}
+      scheduleProfileSync();
       return true;
     }
     function getMyListItems() {
       return Object.values(readMyListStore()).sort((a, b) => b.added - a.added);
+    }
+    function cardHref(type, id, s, e) {
+      if (type === 'tv') {
+        return s && e ? `?tv=${id}&s=${s}&e=${e}` : `?tv=${id}&s=1&e=1`;
+      }
+      return `?movie=${id}`;
+    }
+    function isModifiedCardClick(e) {
+      return !!(e && (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || (typeof e.button === 'number' && e.button !== 0)));
     }
 
     // Telegram Mini App initialization
@@ -654,6 +872,8 @@
       sectionsEl.innerHTML = `
         ${continueSectionHtml(getContinueItems())}
         ${myListSectionHtml(getMyListItems())}
+        ${historySectionHtml(getHistoryItems())}
+        ${recommendationsSectionHtml(personalRecs)}
         <div class="flex flex-wrap gap-2 items-center">
           <span class="text-xs font-bold text-[#a3a3a3]">السنة:</span>
           ${chips}
@@ -690,25 +910,27 @@
       const year = date ? date.slice(0, 4) : '';
       const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
       const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
-      const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
+      const mediaType = item.media_type === 'tv' || (!item.media_type && item.name) ? 'tv' : 'movie';
+      const kind = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+      const href = cardHref(mediaType, item.id);
       const badgeLeft = rankNum > 0
-        ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#e50914] text-white text-[11px] font-black shadow">#${rankNum}</span>`
-        : `<span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold">${kind}</span>`;
+        ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#e50914] text-white text-[11px] font-black shadow pointer-events-none">#${rankNum}</span>`
+        : `<span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold pointer-events-none">${kind}</span>`;
       return `
-        <div role="button" tabindex="0" class="group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover" />
+        <a href="${href}" class="block group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
+            <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
             <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>
             ${badgeLeft}
           </div>
-          <div class="p-2.5 bg-[#181818]">
+          <div class="p-2.5 bg-[#181818] pointer-events-none">
             <h4 class="text-xs font-bold text-white truncate">${title}</h4>
             <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
               <span>${year || kind}</span>
               <span>${year ? kind : ''}</span>
             </div>
           </div>
-        </div>
+        </a>
       `;
     }
 
@@ -733,19 +955,20 @@
       const poster = entry.poster || 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
       const epLabel = entry.type === 'tv' ? ` • حلقة ${entry.e}` : '';
       const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
+      const href = cardHref(entry.type, entry.id, entry.s, entry.e);
       return `
-        <div role="button" tabindex="0" class="group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="openContinueEntry('${entry.type}', ${entry.id}, ${entry.s}, ${entry.e})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover" />
+        <a href="${href}" class="block group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openContinueEntry('${entry.type}', ${entry.id}, ${entry.s}, ${entry.e});}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
+            <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
             <span class="absolute bottom-0 right-0 left-0 h-1.5 bg-black/75"><span class="block h-full bg-[#e50914]" style="width:${pct}%"></span></span>
           </div>
-          <div class="p-2.5 bg-[#181818]">
+          <div class="p-2.5 bg-[#181818] pointer-events-none">
             <h4 class="text-xs font-bold text-white truncate">${title}${epLabel}</h4>
             <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
               <span>أكمل من ${formatTime(entry.t)}</span>
             </div>
           </div>
-        </div>
+        </a>
       `;
     }
 
@@ -792,19 +1015,106 @@
     function myListCardHtml(entry) {
       const poster = entry.poster || 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
       const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
+      const href = cardHref(entry.type, entry.id);
       return `
-        <div role="button" tabindex="0" class="group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="openDetails(${entry.id}, '${entry.type}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
-            <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover" />
+        <a href="${href}" class="block group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${entry.id}, '${entry.type}');}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
+            <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
           </div>
-          <div class="p-2.5 bg-[#181818]">
+          <div class="p-2.5 bg-[#181818] pointer-events-none">
             <h4 class="text-xs font-bold text-white truncate">${title}</h4>
             <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
               <span>${entry.type === 'tv' ? 'مسلسل' : 'فيلم'}</span>
             </div>
           </div>
-        </div>
+        </a>
       `;
+    }
+
+    function historySectionHtml(items) {
+      if (!items || !items.length) return '';
+      return `
+        <section>
+          <h3 class="text-base sm:text-lg font-extrabold text-white mb-3">🕘 شاهدت مؤخراً</h3>
+          <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            ${items.map(historyCardHtml).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function historyCardHtml(entry) {
+      const poster = entry.poster || 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
+      const title = (entry.title || 'بدون عنوان').replace(/"/g, '&quot;');
+      const epLabel = entry.type === 'tv' && entry.e ? ` • ح ${entry.e}` : '';
+      const href = cardHref(entry.type, entry.id, entry.s, entry.e);
+      const clickArgs = entry.type === 'tv'
+        ? `${entry.id}, 'tv', ${entry.s || 1}, ${entry.e || 1}`
+        : `${entry.id}, 'movie'`;
+      return `
+        <a href="${href}" class="block group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${clickArgs});}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
+            <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
+            <span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold">${entry.type === 'tv' ? 'مسلسل' : 'فيلم'}</span>
+          </div>
+          <div class="p-2.5 bg-[#181818] pointer-events-none">
+            <h4 class="text-xs font-bold text-white truncate">${title}${epLabel}</h4>
+            <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
+              <span>${entry.type === 'tv' ? 'مسلسل' : 'فيلم'}</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function recommendationsSectionHtml(items) {
+      if (!items || !items.length) return '';
+      const heading = activeUser ? `🎯 مقترحات عشانك (${activeUser.replace(/[<>&"]/g, '')})` : '🎯 مقترحات عشانك';
+      return homeSectionHtml(heading, items);
+    }
+
+    async function loadPersonalRecommendations() {
+      const seeds = [];
+      const seenSeeds = new Set();
+      [...getHistoryItems(), ...getContinueItems(), ...getMyListItems()].forEach((en) => {
+        if (!en || !en.id) return;
+        const type = en.type === 'tv' ? 'tv' : 'movie';
+        const k = `${type}:${en.id}`;
+        if (!seenSeeds.has(k) && seeds.length < 3) {
+          seenSeeds.add(k);
+          seeds.push({ type, id: en.id });
+        }
+      });
+      if (!seeds.length) {
+        personalRecs = [];
+        return;
+      }
+      try {
+        const watchedMap = readWatchedStore();
+        const responses = await Promise.all(
+          seeds.map((s) =>
+            fetch(`${TMDB_BASE}/${s.type}/${s.id}/recommendations?api_key=${TMDB_KEY}&language=ar`)
+              .then((r) => r.json())
+              .catch(() => null),
+          ),
+        );
+        const merged = [];
+        const seenIds = new Set();
+        responses.forEach((res, idx) => {
+          const fallbackType = seeds[idx].type;
+          (res?.results || []).forEach((it) => {
+            if (!it || !it.id) return;
+            const mediaType = it.media_type === 'tv' || (!it.media_type && (it.name || fallbackType === 'tv')) ? 'tv' : 'movie';
+            const k = `${mediaType}:${it.id}`;
+            if (seenIds.has(k) || seenSeeds.has(k)) return;
+            if (mediaType === 'movie' && watchedMap[`movie:${it.id}:0:0`]) return;
+            seenIds.add(k);
+            merged.push({ ...it, media_type: mediaType });
+          });
+        });
+        personalRecs = merged.slice(0, 18);
+        if (homeData) renderHomeSections();
+      } catch (e) {}
     }
 
     // The My list button in the details modal: toggles the current title.
@@ -850,13 +1160,19 @@
           const name = (it.title || it.name || 'بدون عنوان').replace(/"/g, '&quot;');
           const date = it.release_date || it.first_air_date || '';
           const year = date ? date.slice(0, 4) : '';
-          const kind = (it.media_type || (it.name ? 'tv' : 'movie')) === 'tv' ? 'مسلسل' : 'فيلم';
-          return `<button class="suggest-item w-full text-right px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition flex items-center justify-between gap-2" data-id="${it.id}" data-type="${it.media_type || (it.name ? 'tv' : 'movie')}"><span class="truncate">${name}</span><span class="text-[11px] text-slate-400 shrink-0">${kind} ${year}</span></button>`;
+          const type = it.media_type || (it.name ? 'tv' : 'movie');
+          const kind = type === 'tv' ? 'مسلسل' : 'فيلم';
+          return `<a href="${cardHref(type, it.id)}" class="suggest-item block w-full text-right px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition flex items-center justify-between gap-2" data-id="${it.id}" data-type="${type}"><span class="truncate">${name}</span><span class="text-[11px] text-slate-400 shrink-0">${kind} ${year}</span></a>`;
         }).join('')}
       `;
       searchSuggest.classList.remove('hidden');
       searchSuggest.querySelectorAll('.suggest-item').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          if (!btn.dataset.query && isModifiedCardClick(e)) {
+            hideSuggest();
+            return;
+          }
+          if (!btn.dataset.query) e.preventDefault();
           hideSuggest();
           if (btn.dataset.query) {
             searchInput.value = btn.dataset.query;
@@ -1128,29 +1444,31 @@
         // Provider-only entries carry a full poster URL and a provider link
         // (no TMDB id): prefer the full URL, and open the provider page.
         const poster = item.poster || (item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster');
-        const kind = item.media_type === 'tv' ? 'مسلسل' : 'فيلم';
-        const click = item.providerUrl
-          ? `window.open('${item.providerUrl}', '_blank')`
-          : `openDetails(${item.id}, '${item.media_type || (item.name ? 'tv' : 'movie')}')`;
+        const mediaType = item.media_type || (item.name ? 'tv' : 'movie');
+        const kind = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+        const href = item.providerUrl ? item.providerUrl : cardHref(mediaType, item.id);
+        const linkAttrs = item.providerUrl
+          ? `href="${href}" target="_blank" rel="noopener"`
+          : `href="${href}" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}"`;
         const metaRight = item.provider
           ? `<span class="text-blue-400 font-semibold">${item.provider} ↗</span>`
           : `<span>${year ? kind : ''}</span>`;
 
         return `
-          <div role="button" tabindex="0" class="group cursor-pointer bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="${click}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-            <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden">
-              <img src="${poster}" alt="${safeTitle}" loading="lazy" class="w-full h-full object-cover" />
+          <a ${linkAttrs} class="block group cursor-pointer bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200">
+            <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
+              <img src="${poster}" alt="${safeTitle}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
               <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>
               <span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold">${kind}</span>
             </div>
-            <div class="p-2.5 bg-[#181818]">
+            <div class="p-2.5 bg-[#181818] pointer-events-none">
               <h4 class="text-xs font-bold text-white truncate">${safeTitle}</h4>
               <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
                 <span>${year || kind}</span>
                 ${metaRight}
               </div>
             </div>
-          </div>
+          </a>
         `;
       }).join('');
     }
@@ -1325,11 +1643,15 @@
         syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
 
         mediaModal.classList.remove('hidden');
+        mediaModal.scrollTop = 0;
+        const bc = document.getElementById('watchPageBreadcrumb');
+        if (bc) bc.innerText = title || '';
         document.body.classList.add('overflow-hidden');
         syncUrlWithModal('push');
         updateResumeButton();
         updateMyListButton();
         loadTrailerAndSimilar(id, mediaType);
+        prefetchResolve(mediaType === 'tv' ? 'tv' : 'movie', currentItem.id, mediaType === 'tv' ? selectedSeason : undefined, mediaType === 'tv' ? selectedEpisode : undefined);
       } catch (err) {
         alert('تعذر فتح تفاصيل العمل.');
       }
@@ -1387,6 +1709,7 @@
         const s = seasons.find(x => x.season_number === selectedSeason);
         renderEpisodes(s?.episode_count || 10, 1);
         syncUrlWithModal('replace');
+        if (currentItem) prefetchResolve('tv', currentItem.id, selectedSeason, selectedEpisode);
       };
     }
 
@@ -1433,6 +1756,8 @@
         const entry = currentResumeEntry();
         pendingResume = entry ? entry.t : null;
         playActiveStream();
+      } else if (currentItem) {
+        prefetchResolve('tv', currentItem.id, selectedSeason, selectedEpisode);
       }
     }
 
@@ -1440,23 +1765,52 @@
       return `${type}:${id}:${s || 0}:${e || 0}`;
     }
 
-    // Ask the Worker for the servers/qualities of a title. 25s timeout
-    // allows initial uncached provider sweep without dropping prematurely to EmbedWave.
+    const inflightResolves = new Map();
+
+    // Ask the Worker for the servers/qualities of a title, deduplicating
+    // concurrent requests and reusing fresh prefetched results.
     async function fetchResolve(type, id, s, e) {
+      const key = resolveKey(type, id, s, e);
+      if (lastResolved && lastResolved.key === key && lastResolved.data && (lastResolved.data.ok || (Date.now() - (lastResolved.at || 0) < 60000))) {
+        return lastResolved.data;
+      }
+      if (inflightResolves.has(key)) {
+        return await inflightResolves.get(key);
+      }
       const params = new URLSearchParams({ type, id: String(id) });
       if (s) params.set('s', String(s));
       if (e) params.set('e', String(e));
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
-      try {
-        const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
-        const data = await res.json().catch(() => null);
-        return data || null;
-      } catch (err) {
-        return null;
-      } finally {
-        clearTimeout(timer);
-      }
+      const task = (async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
+          const data = await res.json().catch(() => null);
+          if (data && Array.isArray(data.servers)) {
+            lastResolved = { key, data, at: Date.now() };
+          }
+          return data || null;
+        } catch (err) {
+          return null;
+        } finally {
+          clearTimeout(timer);
+          inflightResolves.delete(key);
+        }
+      })();
+      inflightResolves.set(key, task);
+      return await task;
+    }
+
+    function prefetchResolve(type, id, s, e) {
+      const key = resolveKey(type, id, s, e);
+      fetchResolve(type, id, s, e).then((resolved) => {
+        if (!currentItem) return;
+        const curType = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+        const curKey = resolveKey(curType, currentItem.id, curType === 'tv' ? selectedSeason : undefined, curType === 'tv' ? selectedEpisode : undefined);
+        if (curKey === key && resolved) {
+          syncDownloadButtonState(resolved);
+        }
+      }).catch(() => {});
     }
 
     function showPlayerStatus(msg) {
@@ -1590,16 +1944,18 @@
     });
     videoNative.addEventListener('playing', () => { clearNativePlayTimeout(); hideIframeSpinner(); });
     videoNative.addEventListener('loadeddata', hideIframeSpinner);
-    videoNative.addEventListener('canplay', hideIframeSpinner);
+    videoNative.addEventListener('canplay', () => {
+      hideIframeSpinner();
+      applyPendingResumeSeek();
+    });
     videoNative.addEventListener('waiting', () => {
       if (nativeActive) showIframeSpinner('⏳ جاري التحميل...');
     });
     videoIframe.addEventListener('load', hideIframeSpinner);
 
-    // Continue watching: save the position while playing (throttled to
-    // every 5s), on pause, and when the page hides; mark watched at the
-    // end (or past 90%). pendingResume is consumed once by the
-    // loadedmetadata listener — quality/server switches never re-seek.
+    // Continue watching: save position every 3s from t>=2s, on pause,
+    // seeked, visibilitychange, pagehide, and beforeunload; mark watched at
+    // end (or within 30s of end).
     let lastProgressSave = 0;
     let pendingResume = null; // seconds to seek to once metadata loads
     function currentProgressMeta() {
@@ -1607,27 +1963,62 @@
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
       return { type, s: type === 'tv' ? selectedSeason : 0, e: type === 'tv' ? selectedEpisode : 0, title: currentItem.title || currentItem.name || '', poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '', kind: type };
     }
+    function applyPendingResumeSeek() {
+      if (pendingResume == null) return;
+      if (Number.isFinite(videoNative.duration) && videoNative.duration > 0) {
+        videoNative.currentTime = Math.min(pendingResume, Math.max(0, videoNative.duration - 10));
+        pendingResume = null;
+      }
+    }
     function trackProgress(force) {
       const meta = currentProgressMeta();
       if (!meta || !nativeActive) return;
       const t = videoNative.currentTime;
       const d = videoNative.duration;
-      if (!Number.isFinite(t) || t < 5) return;
+      if (!Number.isFinite(t) || t < 2) return;
       const now = Date.now();
-      if (!force && now - lastProgressSave < 5000) return;
+      if (!force && now - lastProgressSave < 3000) return;
       lastProgressSave = now;
-      if (Number.isFinite(d) && d > 0 && t >= d - 30) { markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e); updateResumeButton(); return; }
+      if (Number.isFinite(d) && d > 0 && t >= d - 30) { markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e, meta); updateResumeButton(); return; }
       saveProgressEntry(meta.type, currentItem.id, meta.s, meta.e, t, d, meta);
     }
     videoNative.addEventListener('timeupdate', () => trackProgress(false));
     videoNative.addEventListener('pause', () => trackProgress(true));
+    videoNative.addEventListener('seeked', () => trackProgress(true));
     videoNative.addEventListener('ended', () => {
       const meta = currentProgressMeta();
-      if (meta) markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e);
+      if (meta) markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e, meta);
       updateResumeButton();
       armAutoNext();
     });
-    document.addEventListener('pagehide', () => trackProgress(true));
+    document.addEventListener('pagehide', () => {
+      trackProgress(true);
+      syncProfileToCloud(true);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        trackProgress(true);
+        syncProfileToCloud(true);
+      }
+    });
+    window.addEventListener('beforeunload', () => {
+      trackProgress(true);
+      syncProfileToCloud(true);
+    });
+    window.addEventListener('message', (ev) => {
+      if (!ev || !ev.origin || !ev.origin.includes('embedwave')) return;
+      let payload = ev.data;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch (e) { return; }
+      }
+      if (!payload || typeof payload !== 'object') return;
+      const t = Number(payload.currentTime ?? payload.time ?? payload.seconds);
+      const d = Number(payload.duration);
+      const meta = currentProgressMeta();
+      if (meta && Number.isFinite(t) && t >= 2) {
+        saveProgressEntry(meta.type, currentItem.id, meta.s, meta.e, t, Number.isFinite(d) ? d : 0, meta);
+      }
+    });
     videoNative.addEventListener('loadedmetadata', () => {
       videoNative.playbackRate = currentPlaybackRate;
       if (pendingResume != null && Number.isFinite(videoNative.duration) && videoNative.duration > 0) {
@@ -2018,14 +2409,27 @@
       }
     }, { passive: true });
 
-    // Keyboard shortcuts when the player modal is open.
+    // Keyboard shortcuts when the watch page or profile overlay is open.
     document.addEventListener('keydown', (e) => {
+      const profileOverlayEl = document.getElementById('profileOverlay');
+      if (profileOverlayEl && !profileOverlayEl.classList.contains('hidden')) {
+        if (e.key === 'Escape') closeProfileOverlay();
+        return;
+      }
       if (mediaModal.classList.contains('hidden')) return;
       const active = document.activeElement;
       const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
       if (typing) return;
       if (e.key === 'Escape') {
-        closeModal.click();
+        const subIds = ['reportPicker', 'downloadPicker', 'seasonDownloadPicker', 'botCodePanel'];
+        const openSub = subIds.map((id) => document.getElementById(id)).find((el) => el && !el.classList.contains('hidden'));
+        if (openSub) {
+          openSub.classList.add('hidden');
+          return;
+        }
+        if (playerContainer.classList.contains('hidden')) {
+          closeModal.click();
+        }
         return;
       }
       if (!nativeActive || videoNative.classList.contains('hidden')) return;
@@ -2071,6 +2475,11 @@
       const e = type === 'tv' ? selectedEpisode : undefined;
       const key = resolveKey(type, currentItem.id, s, e);
       recordViewOnce(type, currentItem.id, s, e);
+      recordHistoryEntry(type, currentItem.id, s || 0, e || 0, {
+        title: currentItem.title || currentItem.name || '',
+        poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '',
+        kind: type,
+      });
       hideModalBackdrop();
       playerContainer.classList.remove('hidden');
       showPlayerStatus('⏳ جاري تجهيز مشغّل بدون إعلانات...');
@@ -2377,11 +2786,9 @@
     document.getElementById('btnShareMedia').addEventListener('click', shareCurrentMedia);
     btnOpenInBot.addEventListener('click', openBotRequest);
 
-    mediaModal.addEventListener('click', (e) => {
-      if (e.target === mediaModal) closeModal.click();
-    });
-
     closeModal.addEventListener('click', () => {
+      trackProgress(true);
+      syncProfileToCloud(false);
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       mediaModal.classList.add('hidden');
       document.body.classList.remove('overflow-hidden');
@@ -2396,10 +2803,228 @@
       document.getElementById('botCodePanel').classList.add('hidden');
       document.getElementById('reportPicker').classList.add('hidden');
       syncUrlWithModal('clear');
-      // Refresh the home sections so the continue-watching row reflects
-      // what was just watched.
+      loadPersonalRecommendations();
+      // Refresh the home sections so the continue-watching, history, and
+      // recommendation rows reflect what was just watched.
       if (homeData) renderHomeSections();
     });
+
+    // User profile switcher & cloud sync ("مين بيتفرج؟" e.g. megoo).
+    const profileOverlay = document.getElementById('profileOverlay');
+    const profileForm = document.getElementById('profileForm');
+    const profileInput = document.getElementById('profileInput');
+    const profileStatus = document.getElementById('profileStatus');
+    const profileSubmitBtn = document.getElementById('profileSubmitBtn');
+    const profileSavedWrap = document.getElementById('profileSavedWrap');
+    const profileSavedUsers = document.getElementById('profileSavedUsers');
+    const profileLogoutBtn = document.getElementById('profileLogoutBtn');
+
+    function setProfileStatus(msg, isError = false) {
+      if (!profileStatus) return;
+      if (!msg) {
+        profileStatus.classList.add('hidden');
+        profileStatus.innerText = '';
+        return;
+      }
+      profileStatus.innerText = msg;
+      profileStatus.classList.toggle('text-red-400', !!isError);
+      profileStatus.classList.toggle('text-amber-400', !isError);
+      profileStatus.classList.remove('hidden');
+    }
+
+    function renderSavedProfileButtons() {
+      if (!profileSavedWrap || !profileSavedUsers) return;
+      const users = readSavedUsersList();
+      if (!users.length) {
+        profileSavedWrap.classList.add('hidden');
+        profileSavedUsers.innerHTML = '';
+      } else {
+        profileSavedWrap.classList.remove('hidden');
+        profileSavedUsers.innerHTML = '';
+        users.forEach((u) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'profile-saved-btn min-h-[44px] px-3.5 py-2 rounded-md border text-xs font-bold flex items-center gap-2 transition ' + (u === activeUser
+            ? 'bg-[#e50914] border-[#e50914] text-white'
+            : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white');
+          const av = document.createElement('span');
+          av.className = 'w-5 h-5 rounded bg-black/40 text-white text-[11px] font-black flex items-center justify-center';
+          av.textContent = u.slice(0, 1).toUpperCase();
+          const nameSpan = document.createElement('span');
+          nameSpan.dir = 'ltr';
+          nameSpan.textContent = u;
+          b.appendChild(av);
+          b.appendChild(nameSpan);
+          b.addEventListener('click', () => loginProfile(u));
+          profileSavedUsers.appendChild(b);
+        });
+      }
+      if (profileLogoutBtn) profileLogoutBtn.classList.toggle('hidden', !activeUser);
+    }
+
+    function openProfileOverlay() {
+      setProfileStatus('');
+      renderSavedProfileButtons();
+      if (profileInput) profileInput.value = activeUser || '';
+      if (profileOverlay) profileOverlay.classList.remove('hidden');
+      if (profileInput) setTimeout(() => profileInput.focus(), 40);
+    }
+
+    function closeProfileOverlay() {
+      if (profileOverlay) profileOverlay.classList.add('hidden');
+    }
+
+    function refreshOpenItemProgressUi() {
+      if (!currentItem) return;
+      updateResumeButton();
+      updateMyListButton();
+      if (currentItem.media_type === 'tv') {
+        renderEpisodes(currentSeasonEpisodeCount, selectedEpisode);
+      }
+    }
+
+    function readCurrentMediaBundle() {
+      return {
+        updatedAt: Date.now(),
+        progress: readProgressStore(),
+        watched: readWatchedStore(),
+        myList: readMyListStore(),
+        removedMyList: readRemovedMyListStore(),
+        history: readHistoryStore(),
+      };
+    }
+
+    function hasAnyLocalMediaData() {
+      return Object.keys(readProgressStore()).length > 0
+        || Object.keys(readMyListStore()).length > 0
+        || Object.keys(readWatchedStore()).length > 0
+        || readHistoryStore().length > 0;
+    }
+
+    async function pullProfileFromCloud(username) {
+      if (!username) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}`);
+        const data = await res.json().catch(() => null);
+        if (!data || !data.ok || username !== activeUser) return;
+        const localSnap = readLocalUserSnapshot(username);
+        if (localSnap && (localSnap.updatedAt || 0) > (data.profile?.updatedAt || 0)) {
+          await syncProfileToCloud(false);
+        } else if (data.exists && data.profile) {
+          writeProfileToLocalStores(data.profile);
+        }
+        refreshOpenItemProgressUi();
+        loadPersonalRecommendations();
+        if (homeData) renderHomeSections();
+      } catch (e) {}
+    }
+
+    async function loginProfile(rawName) {
+      const username = clientNormalizeUsername(rawName);
+      if (!username) {
+        setProfileStatus('اكتب اسم مستخدم صحيح (حرفين على الأقل، بدون مسافات غريبة مثل megoo).', true);
+        return;
+      }
+      if (profileSubmitBtn) profileSubmitBtn.disabled = true;
+      setProfileStatus('جاري تحميل بيانات حسابك...');
+      try {
+        const prevUser = activeUser;
+        if (prevUser && prevUser !== username) {
+          await syncProfileToCloud(false, prevUser);
+        }
+        const hadGuestData = !prevUser && hasAnyLocalMediaData();
+        const guestBundle = hadGuestData ? readCurrentMediaBundle() : null;
+        if (prevUser !== username) {
+          clearLocalMediaStores();
+        }
+        let syncedProfile = null;
+        try {
+          const res = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}`);
+          const data = await res.json().catch(() => null);
+          const localSnap = readLocalUserSnapshot(username);
+          if (data && data.ok) {
+            if (!data.exists && hadGuestData && guestBundle) {
+              const postRes = await fetch(`${API_BASE}/api/profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ username, ...guestBundle }),
+              });
+              const postData = await postRes.json().catch(() => null);
+              syncedProfile = postData?.profile || guestBundle;
+            } else if (localSnap && ((localSnap.updatedAt || 0) > (data.profile?.updatedAt || 0))) {
+              const postRes = await fetch(`${API_BASE}/api/profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ username, ...localSnap }),
+              });
+              const postData = await postRes.json().catch(() => null);
+              syncedProfile = postData?.profile || data.profile;
+            } else if (data.exists && data.profile) {
+              syncedProfile = data.profile;
+            } else if (localSnap) {
+              syncedProfile = localSnap;
+            }
+          } else if (localSnap) {
+            syncedProfile = localSnap;
+          }
+        } catch (e) {
+          const localSnap = readLocalUserSnapshot(username);
+          if (localSnap) syncedProfile = localSnap;
+          else if (guestBundle) syncedProfile = guestBundle;
+        }
+
+        if (syncedProfile) {
+          writeProfileToLocalStores(syncedProfile);
+        }
+        activeUser = username;
+        try {
+          localStorage.setItem(ACTIVE_USER_KEY, username);
+          sessionStorage.removeItem('filmaty:guest:v1');
+        } catch (e) {}
+        saveUsersListEntry(username);
+        updateProfileBadges();
+        closeProfileOverlay();
+        refreshOpenItemProgressUi();
+        showToast(`تم تسجيل الدخول: ${username} ✅`);
+        loadPersonalRecommendations();
+        if (homeData) renderHomeSections();
+      } finally {
+        if (profileSubmitBtn) profileSubmitBtn.disabled = false;
+      }
+    }
+
+    document.getElementById('profileBtn')?.addEventListener('click', openProfileOverlay);
+    document.getElementById('watchProfileBtn')?.addEventListener('click', openProfileOverlay);
+    document.getElementById('profileCloseBtn')?.addEventListener('click', closeProfileOverlay);
+    document.getElementById('profileGuestBtn')?.addEventListener('click', () => {
+      try { sessionStorage.setItem('filmaty:guest:v1', '1'); } catch (e) {}
+      closeProfileOverlay();
+    });
+    profileLogoutBtn?.addEventListener('click', async () => {
+      if (activeUser) await syncProfileToCloud(false, activeUser);
+      activeUser = null;
+      personalRecs = [];
+      clearLocalMediaStores();
+      try {
+        localStorage.removeItem(ACTIVE_USER_KEY);
+        sessionStorage.setItem('filmaty:guest:v1', '1');
+      } catch (e) {}
+      updateProfileBadges();
+      refreshOpenItemProgressUi();
+      renderSavedProfileButtons();
+      closeProfileOverlay();
+      if (homeData) renderHomeSections();
+      showToast('تم تسجيل الخروج من الحساب');
+    });
+    profileForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      loginProfile(profileInput ? profileInput.value : '');
+    });
+
+    function hasDeepLinkInUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return Number(params.get('movie')) > 0 || Number(params.get('tv')) > 0 || (Number(params.get('id')) > 0 && (params.get('type') === 'movie' || params.get('type') === 'tv'));
+    }
 
     async function applyUrlParams() {
       const params = new URLSearchParams(window.location.search);
@@ -2429,7 +3054,19 @@
     window.addEventListener('popstate', applyUrlParams);
 
     // Start
+    updateProfileBadges();
     loadHome();
+    if (activeUser) {
+      pullProfileFromCloud(activeUser);
+      loadPersonalRecommendations();
+    } else {
+      loadPersonalRecommendations();
+      let skippedGuest = false;
+      try { skippedGuest = sessionStorage.getItem('filmaty:guest:v1') === '1'; } catch (e) {}
+      if (!skippedGuest && !hasDeepLinkInUrl()) {
+        openProfileOverlay();
+      }
+    }
     applyUrlParams();
   </script>
 </body>

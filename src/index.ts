@@ -7,9 +7,10 @@ import {
   generateBotCode,
   type BotCodePayload,
 } from "./engine/botcode.ts";
-import { searchTitles } from "./engine/search.ts";
-import { BROWSE_COLLECTIONS, BROWSE_LANGS, browseTitles } from "./engine/browse.ts";
 import { getHome, recordView } from "./engine/home.ts";
+import { getProfile, normalizeUsername, saveProfile } from "./engine/profile.ts";
+import { searchTitles, TMDB_BASE, tmdbApiKey } from "./engine/search.ts";
+import { BROWSE_COLLECTIONS, BROWSE_LANGS, browseTitles } from "./engine/browse.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
 import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
@@ -20,14 +21,9 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // Serve Filmaty WebApp directly at root
+    // Serve Filmaty WebApp directly at root (inject OpenGraph meta when deep-linked)
     if (url.pathname === "/" || url.pathname === "" || url.pathname === "/app" || url.pathname === "/web") {
-      return new Response(FILMATY_WEBAPP_HTML, {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "public, max-age=3600",
-        },
-      });
+      return await handleWebappHtml(request, env, url);
     }
 
     // Health check endpoint
@@ -84,6 +80,14 @@ export default {
 
     if (url.pathname === "/api/tv-command" && request.method === "GET") {
       return handleApiTvCommandGet(request, env, url);
+    }
+
+    if (url.pathname === "/api/profile" && request.method === "GET") {
+      return handleApiProfileGet(request, env, url);
+    }
+
+    if (url.pathname === "/api/profile" && request.method === "POST") {
+      return handleApiProfilePost(request, env, url);
     }
 
     // Telegram webhook handler
@@ -589,4 +593,177 @@ function isCorsDirectCdn(url: string): boolean {
   if (url.includes("downet.net")) return true;
   if (url.includes("okprimeone.site") && (url.includes("i=0.0") || !/[?&]i=/.test(url))) return true;
   return false;
+}
+
+function escapeHtmlAttr(val: string): string {
+  return val
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function extractShareTarget(
+  url: URL,
+): { type: "movie" | "tv"; id: number; s?: number; e?: number } | null {
+  const movie = Number(url.searchParams.get("movie"));
+  const tv = Number(url.searchParams.get("tv"));
+  const typeParam = url.searchParams.get("type");
+  const idParam = Number(url.searchParams.get("id"));
+  const s = Number(url.searchParams.get("s"));
+  const e = Number(url.searchParams.get("e"));
+  const sValid = Number.isInteger(s) && s > 0 ? s : undefined;
+  const eValid = Number.isInteger(e) && e > 0 ? e : undefined;
+
+  if (Number.isInteger(movie) && movie > 0) return { type: "movie", id: movie };
+  if (Number.isInteger(tv) && tv > 0) return { type: "tv", id: tv, s: sValid, e: eValid };
+  if ((typeParam === "movie" || typeParam === "tv") && Number.isInteger(idParam) && idParam > 0) {
+    return typeParam === "tv"
+      ? { type: "tv", id: idParam, s: sValid, e: eValid }
+      : { type: "movie", id: idParam };
+  }
+  return null;
+}
+
+interface OgMeta {
+  title: string;
+  overview: string;
+  image: string;
+}
+
+async function fetchOgMeta(env: Env, type: "movie" | "tv", id: number): Promise<OgMeta | null> {
+  const cacheKey = `og:v1:${type}:${id}`;
+  try {
+    const cached = await env.CACHE?.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as OgMeta;
+      if (parsed && parsed.title) return parsed;
+    }
+  } catch {
+    /* ignore corrupt cache */
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2500);
+  try {
+    const apiKey = encodeURIComponent(tmdbApiKey(env));
+    const res = await fetch(`${TMDB_BASE}/${type}/${id}?api_key=${apiKey}&language=ar`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as any;
+    const title = String(data?.title || data?.name || "").trim();
+    if (!title) return null;
+    const overview = String(data?.overview || "").trim().slice(0, 220);
+    const image = data?.backdrop_path
+      ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}`
+      : data?.poster_path
+        ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+        : "";
+    const meta: OgMeta = { title, overview, image };
+    try {
+      await env.CACHE?.put(cacheKey, JSON.stringify(meta), { expirationTtl: 86400 });
+    } catch {
+      /* ignore KV error */
+    }
+    return meta;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function handleWebappHtml(_request: Request, env: Env, url: URL): Promise<Response> {
+  const target = extractShareTarget(url);
+  if (!target) {
+    return new Response(FILMATY_WEBAPP_HTML, {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=3600",
+      },
+    });
+  }
+
+  const meta = await fetchOgMeta(env, target.type, target.id);
+  if (!meta) {
+    return new Response(FILMATY_WEBAPP_HTML, {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=300",
+      },
+    });
+  }
+
+  const epSuffix =
+    target.type === "tv" && target.s && target.e
+      ? ` - الموسم ${target.s} الحلقة ${target.e}`
+      : "";
+  const fullTitle = `${meta.title}${epSuffix} | فيلماتي`;
+  const desc = meta.overview || `شاهد ${meta.title}${epSuffix} على فيلماتي`;
+  const ogTags = [
+    `<meta property="og:type" content="${target.type === "tv" ? "video.episode" : "video.movie"}">`,
+    `<meta property="og:title" content="${escapeHtmlAttr(fullTitle)}">`,
+    `<meta property="og:description" content="${escapeHtmlAttr(desc)}">`,
+    ...(meta.image ? [`<meta property="og:image" content="${escapeHtmlAttr(meta.image)}">`] : []),
+    `<meta property="og:url" content="${escapeHtmlAttr(url.toString())}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+  ].join("\n  ");
+
+  const html = FILMATY_WEBAPP_HTML.replace("</head>", `  ${ogTags}\n</head>`);
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "public, max-age=600",
+    },
+  });
+}
+
+async function handleApiProfileGet(
+  _request: Request,
+  env: Env,
+  url: URL,
+): Promise<Response> {
+  const username = normalizeUsername(
+    url.searchParams.get("u") || url.searchParams.get("username"),
+  );
+  if (!username) {
+    return jsonResponse({ ok: false, error: "invalid_username" }, 400);
+  }
+  const { exists, profile } = await getProfile(env, username);
+  return new Response(JSON.stringify({ ok: true, exists, profile }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...corsHeaders(),
+    },
+  });
+}
+
+async function handleApiProfilePost(
+  request: Request,
+  env: Env,
+  url: URL,
+): Promise<Response> {
+  let body: any;
+  try {
+    const rawText = await request.text();
+    body = JSON.parse(rawText);
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid json" }, 400);
+  }
+  const username = normalizeUsername(body?.username ?? url.searchParams.get("u"));
+  if (!username) {
+    return jsonResponse({ ok: false, error: "invalid_username" }, 400);
+  }
+  const profile = await saveProfile(env, username, body || {});
+  return new Response(JSON.stringify({ ok: true, profile }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...corsHeaders(),
+    },
+  });
 }

@@ -437,7 +437,7 @@ async function fetchResolveCandidateRounds(
         // validated direct mp4, and searching all 9 providers per round
         // exhausts the Worker's subrequest budget before the working
         // copy is tried.
-        const found = await searchAllProviders(q, kind, disabled, true, ["akwam", "laroza", "embed"]);
+        const found = await searchAllProviders(q, kind, disabled, true, ["akwam", "laroza", "embed"], { pages: 2 });
         const matched = found.filter((c) => matchesKnownTitles(c.title, knownTitles));
         if (matched.length > 0) return matched;
       }
