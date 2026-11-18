@@ -164,12 +164,12 @@ test("Stage 1: resolveServersByTmdb collects both Akwam and Laroza and uses 1h T
   }
 });
 
-test("Stage 1: /api/resolve exposes direct URL only for CORS-open downet.net hosts, omits for okprimeone.site", async () => {
+test("Stage 1: /api/resolve exposes direct URL for downet.net and non-IP-bound okprimeone.site", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
     const url = String(input);
     if (url.includes("api.themoviedb.org/3/movie/438631")) {
-      return jsonResponse({ id: 438631, title: "Dune", original_title: "Dune", release_date: "2021-10-22" });
+      return jsonResponse({ id: 438631, title: "Dune", original_title: "Dune", imdb_id: "tt1160419", release_date: "2021-10-22" });
     }
     if (url.includes("akwam.ss/search")) {
       return new Response(
@@ -194,7 +194,7 @@ test("Stage 1: /api/resolve exposes direct URL only for CORS-open downet.net hos
     }
     if (url.includes("laroza1.bond/download.php?vid=dune1")) {
       return new Response(
-        '<a href="https://okprimeone.site/v/02/00029/dune_n/Dune.720p.mp4">720p</a>',
+        '<a href="https://okprimeone.site/v/02/00029/dune_n/Dune.720p.mp4?e=7200&i=0.0">720p</a>',
         { status: 200 },
       );
     }
@@ -221,10 +221,10 @@ test("Stage 1: /api/resolve exposes direct URL only for CORS-open downet.net hos
     const payload = await verifyToken(tok, SECRET);
     assert.equal(payload?.u, body.direct);
 
-    // Server 0 (Akwam) has direct; Server 1 (Laroza) omits direct; Server 2 is embedwave.
+    // Server 0 (Akwam) and Server 1 (non-IP-locked okprimeone) both expose direct; Server 2 is embedwave.
     assert.equal(body.servers.length, 3);
     assert.equal(body.servers[0].qualities[0].direct, "https://s301d5.downet.net/download/123/Dune.1080p.mp4");
-    assert.equal(body.servers[1].qualities[0].direct, undefined);
+    assert.equal(body.servers[1].qualities[0].direct, "https://okprimeone.site/v/02/00029/dune_n/Dune.720p.mp4?e=7200&i=0.0");
     assert.equal(body.servers[2].name, "embedwave");
   } finally {
     globalThis.fetch = originalFetch;
@@ -477,4 +477,76 @@ test("Netflix redesign: index.html ships Netflix hero, backdrop modal, high-cont
   assert.ok(html.includes("popstate"), "expected popstate back-button listener");
   assert.ok(html.includes("navigator.share"), "expected Web Share API support");
   assert.ok(html.includes("color-scheme: dark"), "expected dark native scrollbar/form scheme");
+  assert.ok(html.includes("iframeSpinnerLabel"), "expected spinner label element for native + iframe loading");
+});
+
+test("Resolve speed & accuracy: omits direct for IP-locked okprimeone, omits embedwave on imdb_id:null stubs, and resolves sites in parallel", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes("api.themoviedb.org/3/movie/1828781")) {
+      return jsonResponse({ id: 1828781, title: "Avengers : Endgame Extended", original_title: "Avengers : Endgame Extended", imdb_id: null, release_date: "" });
+    }
+    if (url.includes("api.themoviedb.org/3/movie/777777")) {
+      return jsonResponse({ id: 777777, title: "Unresolvable Stub", original_title: "Unresolvable Stub", imdb_id: null, release_date: "" });
+    }
+    if (url.includes("akwam.ss/search")) {
+      return new Response(
+        '<div class="entry-box"><h3 class="entry-title"><a href="https://akwam.ss/movie/11679/avengers-endgame-encore">Avengers Endgame Extended</a></h3></div>',
+        { status: 200, headers: { "Content-Type": "text/html" } },
+      );
+    }
+    if (url.includes("akwam.ss/movie/11679")) {
+      return new Response('<a href="https://akwam.ss/watch/184756/11679/avengers-endgame-encore">720p</a>', { status: 200 });
+    }
+    if (url.includes("akwam.ss/watch/184756")) {
+      return new Response('<video><source src="https://s204d1.downet.net/download/999/endgame.mp4"></video>', { status: 200 });
+    }
+    if (url.includes("s204d1.downet.net")) {
+      await new Promise((r) => setTimeout(r, 120));
+      return new Response("dead", { status: 526, headers: { "Content-Type": "text/html" } });
+    }
+    if (url.includes("laroza1.bond/search.php")) {
+      return new Response(
+        '<a href="https://laroza1.bond/video.php?vid=eqe3" title="فيلم Avengers : Endgame Extended">Avengers : Endgame Extended</a>',
+        { status: 200 },
+      );
+    }
+    if (url.includes("laroza1.bond/download.php?vid=eqe3")) {
+      await new Promise((r) => setTimeout(r, 120));
+      return new Response(
+        '<a href="https://cdn2.okprimeone.site/v/01/eqe3_n/Encore.720p.mp4?e=7200&i=197.1.2.3">720p</a>',
+        { status: 200 },
+      );
+    }
+    if (url.includes("okprimeone.site")) {
+      return new Response("x", {
+        status: 206,
+        headers: { "Content-Type": "video/mp4", "Content-Range": "bytes 0-0/1000", "Content-Length": "1" },
+      });
+    }
+    return new Response("", { status: 200 });
+  };
+
+  try {
+    const { env } = mockEnv();
+    const t0 = Date.now();
+    const res = await worker.fetch(new Request(`${BASE}/api/resolve?type=movie&id=1828781`), env, {} as any);
+    const elapsed = Date.now() - t0;
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as any;
+    assert.equal(body.ok, true);
+    assert.equal(body.direct, undefined, "IP-locked okprimeone link must omit direct");
+    assert.equal(body.servers.length, 1, "imdb_id:null movie stub must omit embedwave");
+    assert.equal(body.servers[0].name, "لاروزا");
+    // Sequential 2 x 120ms = >= 240ms; parallel overlaps both providers under 210ms.
+    assert.ok(elapsed < 210, `expected parallel Akwam+Laroza evaluation (<210ms), got ${elapsed}ms`);
+
+    const stubRes = await worker.fetch(new Request(`${BASE}/api/resolve?type=movie&id=777777`), env, {} as any);
+    assert.equal(stubRes.status, 404);
+    const stubBody = (await stubRes.json()) as any;
+    assert.deepEqual(stubBody.servers, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -1,6 +1,6 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { embedwaveUrl, qualityMatches, resolveServersByTmdb } from "./engine/resolve.ts";
+import { embedwaveUrl, isUnreliableTmdbEmbed, qualityMatches, resolveServersByTmdb } from "./engine/resolve.ts";
 import {
   BOT_CODE_TTL_SECONDS,
   botCodeKey,
@@ -523,8 +523,9 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
   if (!resolved) {
     // No validated native stream: top-level ok stays false (existing
     // behaviour) so the frontend falls back to the embed player, and the
-    // embedwave server is still listed.
-    return jsonResponse({ ok: false, servers: [embedwaveServer] }, 404);
+    // embedwave server is still listed unless TMDB movie metadata lacks imdb_id.
+    const hideEmbed = await isUnreliableTmdbEmbed(env, type, id);
+    return jsonResponse({ ok: false, servers: hideEmbed ? [] : [embedwaveServer] }, 404);
   }
 
   // Sign one stream/download token per quality (tokens live 3h).
@@ -564,7 +565,9 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     }
     servers.push({ name: server.name, qualities });
   }
-  servers.push(embedwaveServer);
+  if (!resolved.unreliableEmbed) {
+    servers.push(embedwaveServer);
+  }
 
   // Top-level fields stay the default: best quality of the first server.
   const best = servers[0].qualities[0];
@@ -583,5 +586,7 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
 }
 
 function isCorsDirectCdn(url: string): boolean {
-  return url.includes("downet.net");
+  if (url.includes("downet.net")) return true;
+  if (url.includes("okprimeone.site") && (url.includes("i=0.0") || !/[?&]i=/.test(url))) return true;
+  return false;
 }

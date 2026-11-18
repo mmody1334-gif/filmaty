@@ -228,7 +228,7 @@
         <video id="videoNative" class="hidden w-full h-full bg-black" controls playsinline preload="metadata"></video>
         <div id="iframeSpinner" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-white text-sm font-bold pointer-events-none">
           <span class="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
-          <span>⏳ جاري تحميل المشغّل...</span>
+          <span id="iframeSpinnerLabel">⏳ جاري تحميل المشغّل...</span>
         </div>
         <div id="seekIndicator" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-sm font-black border border-white/20 pointer-events-none"></div>
         <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/75 text-white text-sm font-bold px-4 text-center"></div>
@@ -1468,8 +1468,10 @@
       playerStatus.classList.add('hidden');
     }
 
-    function showIframeSpinner() {
+    function showIframeSpinner(labelText = '⏳ جاري تحميل المشغّل...') {
       const sp = document.getElementById('iframeSpinner');
+      const lbl = document.getElementById('iframeSpinnerLabel');
+      if (lbl) lbl.innerText = labelText;
       if (sp) sp.classList.remove('hidden');
     }
 
@@ -1583,9 +1585,15 @@
 
     videoNative.addEventListener('error', () => {
       if (!nativeActive) return;
+      hideIframeSpinner();
       fallbackFromDirectToProxyOrNext(false);
     });
-    videoNative.addEventListener('playing', clearNativePlayTimeout);
+    videoNative.addEventListener('playing', () => { clearNativePlayTimeout(); hideIframeSpinner(); });
+    videoNative.addEventListener('loadeddata', hideIframeSpinner);
+    videoNative.addEventListener('canplay', hideIframeSpinner);
+    videoNative.addEventListener('waiting', () => {
+      if (nativeActive) showIframeSpinner('⏳ جاري التحميل...');
+    });
     videoIframe.addEventListener('load', hideIframeSpinner);
 
     // Continue watching: save the position while playing (throttled to
@@ -1783,6 +1791,7 @@
       videoIframe.src = '';
       videoIframe.classList.add('hidden');
       nativeActive = true;
+      showIframeSpinner('⏳ جاري بدء البث المباشر...');
       if (quality.direct && !quality._directFailed) {
         usingDirectCdn = true;
         videoNative.src = quality.direct;

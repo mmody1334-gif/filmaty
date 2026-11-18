@@ -30,7 +30,7 @@ export async function validateDirectUrl(url: string): Promise<boolean> {
       method: "GET",
       headers: { Range: "bytes=0-0", "User-Agent": RESOLVER_UA },
       redirect: "follow",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4500),
     });
   } catch {
     return false;
@@ -211,11 +211,10 @@ export async function resolveAllDirectStreams(
     }
   }
 
-  // 3. Final fallback: one more attempt at the provider's own resolver
-  // (a transient failure on the first try can succeed on retry), or —
-  // when the provider cannot resolve at all (e.g. the embed provider) —
-  // scrape a direct mp4 out of the target page itself via Akwam.
-  if (!allowAkwamFallback && !provider.resolveStreams && !provider.resolveStream) {
+  // 3. Final fallback: scrape a direct mp4 out of an embed page via Akwam
+  // (or retry when Akwam fallback is enabled); native providers already
+  // tried all watch/download URLs in Step 1 so skip duplicate probes when disabled.
+  if (!allowAkwamFallback) {
     return [];
   }
   const retryProvider =
@@ -383,6 +382,7 @@ async function fetchResolveCandidateRounds(
 ): Promise<{
   enTitle: TmdbTitle;
   kind: MediaKind;
+  unreliableEmbed: boolean;
   nextRound: () => Promise<Candidate[] | null>;
 } | null> {
   const kind: MediaKind = type === "tv" ? "series" : "movie";
@@ -392,6 +392,8 @@ async function fetchResolveCandidateRounds(
   const enData = await fetchTmdbDetails(env, type, tmdbId, "en-US");
   const enTitle = tmdbTitleOf(enData, type);
   if (!enTitle) return null;
+  const unreliableEmbed =
+    type === "movie" && enData !== null && typeof enData === "object" && "imdb_id" in enData && !enData.imdb_id;
 
   // Arabic display title, fetched up front (one extra TMDB call): the
   // strict filter needs all known names before the first search round
@@ -425,6 +427,7 @@ async function fetchResolveCandidateRounds(
   return {
     enTitle,
     kind,
+    unreliableEmbed,
     nextRound: async (): Promise<Candidate[] | null> => {
       while (i < queries.length) {
         const q = queries[i++];
@@ -461,6 +464,17 @@ export interface ResolvedServer {
 export interface ResolvedMulti {
   title: string;
   servers: ResolvedServer[];
+  unreliableEmbed?: boolean;
+}
+
+export async function isUnreliableTmdbEmbed(
+  env: Env,
+  type: "movie" | "tv",
+  tmdbId: number,
+): Promise<boolean> {
+  if (type !== "movie") return false;
+  const enData = await fetchTmdbDetails(env, type, tmdbId, "en-US");
+  return enData !== null && typeof enData === "object" && "imdb_id" in enData && !enData.imdb_id;
 }
 
 // The EmbedWave embed fallback. Unlike vidsrc, EmbedWave plays
@@ -531,7 +545,11 @@ export async function resolveServersByTmdb(
     if (cached) {
       const parsed = JSON.parse(cached) as { ok: boolean } & ResolvedMulti;
       if (parsed && parsed.ok) {
-        return { title: parsed.title, servers: parsed.servers };
+        return {
+          title: parsed.title,
+          servers: parsed.servers,
+          ...(parsed.unreliableEmbed ? { unreliableEmbed: true } : {}),
+        };
       }
       if (parsed && parsed.ok === false) return null;
     }
@@ -571,9 +589,9 @@ async function resolveServersByTmdbUncached(
 ): Promise<ResolvedMulti | null> {
   const found = await fetchResolveCandidateRounds(env, type, tmdbId);
   if (!found) return null;
-  const { enTitle, kind, nextRound } = found;
+  const { enTitle, kind, unreliableEmbed, nextRound } = found;
   // The same copy can surface in two rounds (e.g. Laroza's in both the
-  // English and the Arabic round) — try each URL once.
+  // English and the Arabic round) - try each URL once.
   const tried = new Set<string>();
   const servers: ResolvedServer[] = [];
   const usedSites = new Set<string>();
@@ -581,46 +599,55 @@ async function resolveServersByTmdbUncached(
 
   let round: Candidate[] | null;
   while ((round = await nextRound())) {
-    for (const candidate of round) {
-      if (tried.has(candidate.url)) continue;
-      tried.add(candidate.url);
-      if (usedSites.has(candidate.site)) continue;
-      // Same declared season/episode guard as the single-result path: never
-      // resolve from a page that declares a different season or episode.
-      if (type === "tv") {
-        const declared = parseSeasonEpisode(candidate.title);
-        if (
-          season !== undefined &&
-          declared.season !== undefined &&
-          declared.season !== season
-        ) {
+    while (servers.length < MAX_DIRECT_SERVERS) {
+      const batch: Candidate[] = [];
+      const batchSites = new Set<string>();
+      for (const candidate of round) {
+        if (tried.has(candidate.url) || usedSites.has(candidate.site) || batchSites.has(candidate.site)) {
           continue;
         }
-        if (
-          episode !== undefined &&
-          declared.episode !== undefined &&
-          declared.episode !== episode
-        ) {
-          continue;
+        // Same declared season/episode guard: never resolve from a page that declares a different season or episode.
+        if (type === "tv") {
+          const declared = parseSeasonEpisode(candidate.title);
+          if (season !== undefined && declared.season !== undefined && declared.season !== season) continue;
+          if (episode !== undefined && declared.episode !== undefined && declared.episode !== episode) continue;
         }
+        tried.add(candidate.url);
+        batchSites.add(candidate.site);
+        batch.push(candidate);
+        if (batch.length >= MAX_DIRECT_SERVERS - servers.length) break;
       }
-      const provider = findProvider(candidate.site);
-      if (!provider) continue;
-      try {
-        const details = await provider.getDetails(candidate);
-        const targetUrl = await pickTargetUrl(provider, details, type, season, episode, candidate.url);
-        if (!targetUrl) continue;
-        // Skip the secondary Akwam title lookup once a native server already succeeded
-        // so secondary providers only contribute their own distinct streams.
-        const streams = await resolveAllDirectStreams(
-          provider,
-          targetUrl,
-          enTitle.originalTitle,
-          kind,
-          season,
-          episode,
-          servers.length === 0,
-        );
+      if (batch.length === 0) break;
+
+      const resolvedBatch = await Promise.all(
+        batch.map(async (candidate) => {
+          const provider = findProvider(candidate.site);
+          if (!provider) return null;
+          try {
+            const details = await provider.getDetails(candidate);
+            const targetUrl = await pickTargetUrl(provider, details, type, season, episode, candidate.url);
+            if (!targetUrl) return null;
+            // Only non-native embed candidates fall back to Akwam title lookup when no native server exists yet.
+            const allowFallback = servers.length === 0 && candidate.site !== "akwam" && candidate.site !== "laroza";
+            const streams = await resolveAllDirectStreams(
+              provider,
+              targetUrl,
+              enTitle.originalTitle,
+              kind,
+              season,
+              episode,
+              allowFallback,
+            );
+            return { candidate, provider, streams };
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      for (const item of resolvedBatch) {
+        if (!item || servers.length >= MAX_DIRECT_SERVERS) continue;
+        const { candidate, provider, streams } = item;
         const uniqueStreams = streams.filter((s) => !seenDirectUrls.has(s.directVideoUrl));
         if (uniqueStreams.length > 0) {
           usedSites.add(candidate.site);
@@ -633,14 +660,15 @@ async function resolveServersByTmdbUncached(
               size: s.size,
             })),
           });
-          if (servers.length >= MAX_DIRECT_SERVERS) break;
         }
-      } catch {
-        continue;
       }
     }
     if (servers.length > 0) {
-      return { title: enTitle.title, servers };
+      return {
+        title: enTitle.title,
+        servers,
+        ...(unreliableEmbed ? { unreliableEmbed: true } : {}),
+      };
     }
   }
 
