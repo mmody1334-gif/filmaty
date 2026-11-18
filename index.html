@@ -30,8 +30,14 @@
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+    html { color-scheme: dark; }
     * { font-family: 'Cairo', system-ui, -apple-system, sans-serif; }
     body { background-color: #141414; color: #ffffff; }
+    *:not(.scrollbar-hide) { scrollbar-width: thin; scrollbar-color: #525252 #181818; }
+    *:not(.scrollbar-hide)::-webkit-scrollbar { width: 8px; height: 8px; }
+    *:not(.scrollbar-hide)::-webkit-scrollbar-track { background: #181818; }
+    *:not(.scrollbar-hide)::-webkit-scrollbar-thumb { background: #454545; border-radius: 9999px; }
+    *:not(.scrollbar-hide)::-webkit-scrollbar-thumb:hover { background: #737373; }
     .glass { background: rgba(20, 20, 20, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
     .hero-scrim { background: linear-gradient(to top, #141414 4%, rgba(20, 20, 20, 0.78) 45%, rgba(20, 20, 20, 0.25) 100%), linear-gradient(to left, rgba(20, 20, 20, 0.88) 0%, rgba(20, 20, 20, 0.45) 55%, rgba(20, 20, 20, 0.1) 100%); }
     .modal-backdrop-scrim { background: linear-gradient(to top, #181818 6%, rgba(24, 24, 24, 0.65) 55%, rgba(24, 24, 24, 0.2) 100%); }
@@ -327,11 +333,12 @@
           <!-- Restart from the beginning (shown only when a saved position exists) -->
           <button id="btnRestartPlay" type="button" class="hidden min-h-[44px] w-full py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs hover:border-white transition">↺ تشغيل من الأول</button>
           <!-- Secondary actions strip -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <button id="btnMyList" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🤍 أضف لقائمتي</button>
-            <button id="btnTrailer" type="button" class="hidden min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🎬 مشاهدة التريلر</button>
-            <button id="btnOpenInBot" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🚀 إرسال للتليجرام</button>
-            <button id="btnReport" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-amber-500 transition">⚠️ بلّغ عن مشكلة</button>
+          <div class="flex flex-wrap gap-2">
+            <button id="btnMyList" type="button" class="flex-1 min-w-[130px] min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🤍 أضف لقائمتي</button>
+            <button id="btnShareMedia" type="button" class="flex-1 min-w-[130px] min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🔗 مشاركة</button>
+            <button id="btnTrailer" type="button" class="hidden flex-1 min-w-[130px] min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🎬 مشاهدة التريلر</button>
+            <button id="btnOpenInBot" type="button" class="flex-1 min-w-[130px] min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-white transition">🚀 إرسال للتليجرام</button>
+            <button id="btnReport" type="button" class="flex-1 min-w-[130px] min-h-[44px] px-3 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] font-bold text-xs flex items-center justify-center gap-1.5 hover:border-amber-500 transition">⚠️ بلّغ عن مشكلة</button>
           </div>
           <div id="reportPicker" class="hidden space-y-2 pt-1">
             <label class="text-xs font-bold text-neutral-300 block">إيه المشكلة؟</label>
@@ -743,7 +750,7 @@
     }
 
     async function openContinueEntry(type, id, s, e) {
-      await openDetails(id, type);
+      await openDetails(id, type, type === 'tv' ? s : null, type === 'tv' ? e : null);
       if (type === 'tv' && currentItem) {
         const seasons = (currentItem.seasons || []).filter((x) => x.season_number > 0);
         if (seasons.some((x) => x.season_number === s)) {
@@ -1183,8 +1190,84 @@
       if (wrap) wrap.classList.add('hidden');
     }
 
+    let suppressHistorySync = false;
+
+    function buildShareUrl(item, s, e) {
+      const u = new URL(window.location.href);
+      ['movie', 'tv', 's', 'e', 'id', 'type'].forEach((k) => u.searchParams.delete(k));
+      u.hash = '';
+      if (item && item.id) {
+        if (item.media_type === 'tv') {
+          u.searchParams.set('tv', String(item.id));
+          u.searchParams.set('s', String(s || 1));
+          u.searchParams.set('e', String(e || 1));
+        } else {
+          u.searchParams.set('movie', String(item.id));
+        }
+      }
+      return u.toString();
+    }
+
+    function syncUrlWithModal(mode) {
+      if (suppressHistorySync) return;
+      try {
+        if (mode === 'clear' || !currentItem) {
+          const cleanUrl = buildShareUrl(null);
+          if (window.location.href !== cleanUrl) {
+            history.pushState(null, '', cleanUrl);
+          }
+          return;
+        }
+        const targetUrl = buildShareUrl(currentItem, selectedSeason, selectedEpisode);
+        if (window.location.href === targetUrl) return;
+        if (mode === 'push') {
+          history.pushState({ filmatyModal: true }, '', targetUrl);
+        } else {
+          history.replaceState({ filmatyModal: true }, '', targetUrl);
+        }
+      } catch (e) {}
+    }
+
+    async function shareCurrentMedia() {
+      if (!currentItem) return;
+      const url = buildShareUrl(currentItem, selectedSeason, selectedEpisode);
+      const title = currentItem.title || currentItem.name || 'فيلماتي';
+      const epText = currentItem.media_type === 'tv' ? ` - الموسم ${selectedSeason} الحلقة ${selectedEpisode}` : '';
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title: `${title}${epText} | فيلماتي`,
+            text: `شاهد ${title}${epText} على فيلماتي`,
+            url,
+          });
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('تم نسخ رابط المشاركة ✅');
+      } catch (err) {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast('تم نسخ رابط المشاركة ✅');
+        } catch (e) {
+          showToast(url);
+        }
+        ta.remove();
+      }
+    }
+
     // Modal Details Logic
-    async function openDetails(id, mediaType) {
+    async function openDetails(id, mediaType, wantSeason = null, wantEpisode = null) {
       try {
         const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}?api_key=${TMDB_KEY}&language=ar`);
         currentItem = await res.json();
@@ -1228,7 +1311,7 @@
 
         if (mediaType === 'tv') {
           seriesControls.classList.remove('hidden');
-          setupSeriesSeasons(currentItem);
+          setupSeriesSeasons(currentItem, wantSeason, wantEpisode);
         } else {
           seriesControls.classList.add('hidden');
           selectedSeason = 1;
@@ -1243,6 +1326,7 @@
 
         mediaModal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
+        syncUrlWithModal('push');
         updateResumeButton();
         updateMyListButton();
         loadTrailerAndSimilar(id, mediaType);
@@ -1279,37 +1363,44 @@
         const similar = await similarRes.json().catch(() => null);
         const items = (similar?.results || []).slice(0, 10);
         if (items.length) {
-          row.innerHTML = items.map(homeCardHtml).join('');
+          row.innerHTML = items.map((it) => homeCardHtml(it, 0)).join('');
           wrap.classList.remove('hidden');
         }
       } catch (e) {}
     }
 
-    function setupSeriesSeasons(tv) {
+    function setupSeriesSeasons(tv, wantSeason = null, wantEpisode = null) {
       const seasons = (tv.seasons || []).filter(s => s.season_number > 0);
       seasonSelect.innerHTML = seasons.map(s => `
         <option value="${s.season_number}">الموسم ${s.season_number} (${s.episode_count} حلقة)</option>
       `).join('');
 
-      selectedSeason = seasons[0]?.season_number || 1;
-      renderEpisodes(seasons[0]?.episode_count || 10);
+      const targetS = wantSeason ? Number(wantSeason) : 0;
+      const matched = targetS ? seasons.find((s) => s.season_number === targetS) : null;
+      selectedSeason = matched ? matched.season_number : (seasons[0]?.season_number || 1);
+      seasonSelect.value = String(selectedSeason);
+      const currentSeasonObj = seasons.find((s) => s.season_number === selectedSeason) || seasons[0];
+      renderEpisodes(currentSeasonObj?.episode_count || 10, wantEpisode || 1);
 
       seasonSelect.onchange = (e) => {
         selectedSeason = Number(e.target.value);
         const s = seasons.find(x => x.season_number === selectedSeason);
-        renderEpisodes(s?.episode_count || 10);
+        renderEpisodes(s?.episode_count || 10, 1);
+        syncUrlWithModal('replace');
       };
     }
 
-    function renderEpisodes(count) {
-      selectedEpisode = 1;
+    function renderEpisodes(count, wantEpisode = 1) {
+      const targetEp = Number(wantEpisode) || 1;
+      selectedEpisode = targetEp >= 1 && targetEp <= count ? targetEp : 1;
       currentSeasonEpisodeCount = count;
       episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => {
         const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
         const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
         const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
+        const active = epNum === selectedEpisode;
         return `
-        <button type="button" class="ep-btn relative overflow-hidden min-h-[44px] ${epNum === 1 ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-[#737373] text-neutral-200'} rounded-md py-1.5 text-xs font-bold border hover:border-white transition" onclick="selectEpisode(${epNum}, this)">
+        <button type="button" class="ep-btn relative overflow-hidden min-h-[44px] ${active ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-[#737373] text-neutral-200'} rounded-md py-1.5 text-xs font-bold border hover:border-white transition" onclick="selectEpisode(${epNum}, this)">
           ${watched ? '✓ ' : ''}حلقة ${epNum}
           ${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}
         </button>
@@ -1334,6 +1425,7 @@
         const k = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
         syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
       }
+      syncUrlWithModal('replace');
       updateResumeButton();
 
       // Update active stream player if already open
@@ -1826,7 +1918,8 @@
     }
     function shareReport(problem) {
       const text = buildReportText(problem);
-      const url = 'https://t.me/share/url?url=' + encodeURIComponent('https://mmody1334-gif.github.io/filmaty/') + '&text=' + encodeURIComponent(text);
+      const shareTarget = buildShareUrl(currentItem, selectedSeason, selectedEpisode);
+      const url = 'https://t.me/share/url?url=' + encodeURIComponent(shareTarget) + '&text=' + encodeURIComponent(text);
       window.open(url, '_blank');
     }
 
@@ -2272,7 +2365,12 @@
 
     document.getElementById('btnBotDeepLink').addEventListener('click', openBotDeepLink);
 
+    document.getElementById('btnShareMedia').addEventListener('click', shareCurrentMedia);
     btnOpenInBot.addEventListener('click', openBotRequest);
+
+    mediaModal.addEventListener('click', (e) => {
+      if (e.target === mediaModal) closeModal.click();
+    });
 
     closeModal.addEventListener('click', () => {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -2288,13 +2386,42 @@
       document.getElementById('seasonDownloadProgress').classList.add('hidden');
       document.getElementById('botCodePanel').classList.add('hidden');
       document.getElementById('reportPicker').classList.add('hidden');
+      syncUrlWithModal('clear');
       // Refresh the home sections so the continue-watching row reflects
       // what was just watched.
       if (homeData) renderHomeSections();
     });
 
+    async function applyUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const movieParam = Number(params.get('movie'));
+      const tvParam = Number(params.get('tv'));
+      const typeParam = params.get('type');
+      const idParam = Number(params.get('id'));
+      const sParam = Number(params.get('s')) || 1;
+      const eParam = Number(params.get('e')) || 1;
+
+      suppressHistorySync = true;
+      try {
+        if (Number.isInteger(movieParam) && movieParam > 0) {
+          await openDetails(movieParam, 'movie');
+        } else if (Number.isInteger(tvParam) && tvParam > 0) {
+          await openDetails(tvParam, 'tv', sParam, eParam);
+        } else if ((typeParam === 'movie' || typeParam === 'tv') && Number.isInteger(idParam) && idParam > 0) {
+          await openDetails(idParam, typeParam, typeParam === 'tv' ? sParam : null, typeParam === 'tv' ? eParam : null);
+        } else if (!mediaModal.classList.contains('hidden')) {
+          closeModal.click();
+        }
+      } finally {
+        suppressHistorySync = false;
+      }
+    }
+
+    window.addEventListener('popstate', applyUrlParams);
+
     // Start
     loadHome();
+    applyUrlParams();
   </script>
 </body>
 </html>

@@ -470,4 +470,11 @@ test("Netflix redesign: index.html ships Netflix hero, backdrop modal, high-cont
   assert.ok(html.includes("getDownloadQualities"), "expected direct quality filter helper");
   assert.ok(html.includes("متاح مشاهدة أونلاين فقط"), "expected online-only download button state");
   assert.ok(html.includes("renderHeroBanner"), "expected Netflix hero renderer");
+  assert.ok(html.includes('id="btnShareMedia"'), "expected #btnShareMedia share button");
+  assert.ok(html.includes("buildShareUrl"), "expected buildShareUrl deep-link builder");
+  assert.ok(html.includes("syncUrlWithModal"), "expected syncUrlWithModal browser history sync");
+  assert.ok(html.includes("applyUrlParams"), "expected startup/popstate deep-link handler");
+  assert.ok(html.includes("popstate"), "expected popstate back-button listener");
+  assert.ok(html.includes("navigator.share"), "expected Web Share API support");
+  assert.ok(html.includes("color-scheme: dark"), "expected dark native scrollbar/form scheme");
 });
