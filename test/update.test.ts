@@ -47,7 +47,7 @@ test("handleTelegramUpdate processes /film marvel endgame cleanly without throwi
   try {
     const mockKv = new Map<string, string>();
     const mockEnv: any = {
-      BOT_TOKEN: "9110911940:AAEzBbJK5tED_kamQH0IZxhG0FsqZjJQvns",
+      BOT_TOKEN: "test-bot-token",
       CACHE: {
         get: async (k: string) => mockKv.get(k) || null,
         put: async (k: string, v: string) => { mockKv.set(k, v); },
