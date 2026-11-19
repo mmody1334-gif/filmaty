@@ -16,6 +16,7 @@ import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
 import { FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
 import { handleTelegramUpdate } from "./telegram/handlers.ts";
+import { labHtml } from "./lab/embed-lab.ts";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -117,6 +118,10 @@ export default {
     }
 
     // WebApp Video Player
+    if (url.pathname === "/lab") {
+      return labHtml(url);
+    }
+
     if (url.pathname === "/watch") {
       const token = url.searchParams.get("t");
       if (!token) {
