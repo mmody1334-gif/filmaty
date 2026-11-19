@@ -10,7 +10,10 @@
 import { handleTelegramUpdate } from "./telegram/handlers.ts";
 import type { Env } from "./env.ts";
 
-const BOT_TOKEN = process.env.BOT_TOKEN || "9110911940:AAEzBbJK5tED_kamQH0IZxhG0FsqZjJQvns";
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) {
+  throw new Error("BOT_TOKEN environment variable is required");
+}
 const SIGNING_SECRET = process.env.SIGNING_SECRET || "filmaty-secret-key-2026-super-secure";
 const OWNER_IDS = process.env.OWNER_IDS || "2092236677";
 const API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
