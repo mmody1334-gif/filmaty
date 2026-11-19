@@ -489,15 +489,18 @@
     // up quietly on a dark tile instead of a broken image.
     document.addEventListener('error', (e) => {
       const img = e.target;
-      if (!(img instanceof HTMLImageElement) || !img.src) return;
+      if (!(img instanceof HTMLImageElement) || !/\/img\/|image\.tmdb\.org/.test(img.src)) return;
       const m = img.src.match(/\/img\/(w\d+|original)\/(.+)$/);
-      if (m && !img.dataset.retried) {
-        img.dataset.retried = '1';
+      if (m && img.dataset.retried !== m[2]) {
+        img.dataset.retried = m[2];
         img.src = `https://image.tmdb.org/t/p/${m[1]}/${m[2]}`;
-      } else if (!img.dataset.dead) {
-        img.dataset.dead = '1';
+      } else {
         img.style.visibility = 'hidden';
       }
+    }, true);
+    document.addEventListener('load', (e) => {
+      const img = e.target;
+      if (img instanceof HTMLImageElement && img.style.visibility === 'hidden') img.style.visibility = '';
     }, true);
 
 
