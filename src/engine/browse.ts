@@ -10,8 +10,43 @@ import { attachEnTitles } from "./en-titles.ts";
 export const BROWSE_LANGS = ["ar", "en", "hi", "tr", "ko", "es", "fr", "ja"] as const;
 export type BrowseLang = (typeof BROWSE_LANGS)[number];
 
-export const BROWSE_COLLECTIONS = ["marvel", "netflix"] as const;
+export const BROWSE_COLLECTIONS = [
+  "marvel",
+  "netflix",
+  "shahid",
+  "watchit",
+  "yango",
+  "osn",
+  "showtime",
+  "starzplay",
+  "tod",
+  "disney",
+  "prime",
+  "apple",
+  "hbo",
+  "paramount",
+  "hulu",
+  "peacock",
+  "crunchyroll",
+  "dc",
+] as const;
 export type BrowseCollection = (typeof BROWSE_COLLECTIONS)[number];
+
+const COLLECTION_WATCH_PROVIDERS: Record<string, { id: string; region: string }> = {
+  netflix: { id: "8", region: "US" },
+  shahid: { id: "1715", region: "EG" },
+  osn: { id: "629", region: "EG" },
+  starzplay: { id: "630", region: "EG" },
+  tod: { id: "1750", region: "EG" },
+  disney: { id: "337", region: "US" },
+  prime: { id: "9", region: "US" },
+  apple: { id: "350", region: "US" },
+  hbo: { id: "1899", region: "US" },
+  paramount: { id: "531|2303", region: "US" },
+  hulu: { id: "15", region: "US" },
+  peacock: { id: "386", region: "US" },
+  crunchyroll: { id: "283", region: "US" },
+};
 
 export const BROWSE_GENRES = [
   "28", "12", "16", "35", "80", "99", "18", "10751", "14", "36",
@@ -68,12 +103,25 @@ function browseUrl(env: Env, p: BrowseParams, language = "ar"): string {
   u.searchParams.set("page", String(p.page));
   if (p.collection === "marvel") {
     u.searchParams.set("with_companies", "420");
-  } else if (p.collection === "netflix") {
-    // Everything streaming on Netflix (originals + licensed), not just
-    // Netflix-produced titles: TMDB watch provider 8 in the US catalog,
-    // the largest one. (with_companies=11946 returned 0 movies.)
-    u.searchParams.set("with_watch_providers", "8");
-    u.searchParams.set("watch_region", "US");
+  } else if (p.collection === "dc") {
+    u.searchParams.set("with_companies", "429|9993|128064");
+  } else if (p.collection === "watchit") {
+    if (p.type === "tv") u.searchParams.set("with_networks", "4786");
+    else u.searchParams.set("with_companies", "137350|136598|127387|258445");
+  } else if (p.collection === "yango") {
+    if (p.type === "tv") {
+      u.searchParams.set("with_networks", "7736");
+    } else {
+      u.searchParams.set("with_original_language", "ar");
+      u.searchParams.set("with_origin_country", "EG");
+    }
+  } else if (p.collection === "showtime") {
+    if (p.type === "tv") u.searchParams.set("with_networks", "67");
+    else u.searchParams.set("with_companies", "148935|4343");
+  } else if (p.collection && COLLECTION_WATCH_PROVIDERS[p.collection]) {
+    const wp = COLLECTION_WATCH_PROVIDERS[p.collection];
+    u.searchParams.set("with_watch_providers", wp.id);
+    u.searchParams.set("watch_region", wp.region);
   } else if (p.companies) {
     u.searchParams.set("with_companies", p.companies);
   } else if (p.lang) {

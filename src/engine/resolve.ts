@@ -518,6 +518,37 @@ export function embedwaveUrl(
   return `https://embedwave.cc/embed/movie/${tmdbId}`;
 }
 
+export interface BackupEmbedServer {
+  name: string;
+  embed: true;
+  qualities: Array<{ quality: string; stream: string }>;
+}
+
+/** Build ordered list of sandbox-compatible embed servers (EmbedWave primary + 5 backups). */
+export function buildEmbedServers(
+  type: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): BackupEmbedServer[] {
+  const s = season || 1;
+  const e = episode || 1;
+  const tv = type === "tv";
+  const defs: Array<[string, string]> = [
+    ["embedwave", embedwaveUrl(type, tmdbId, s, e)],
+    ["2embed", tv ? `https://www.2embed.cc/embedtv/${tmdbId}&s=${s}&e=${e}` : `https://www.2embed.cc/embed/${tmdbId}`],
+    ["nontongo", tv ? `https://www.nontongo.win/embed/tv/${tmdbId}/${s}/${e}` : `https://www.nontongo.win/embed/movie/${tmdbId}`],
+    ["2embed-2", tv ? `https://www.2embed.skin/embedtv/${tmdbId}&s=${s}&e=${e}` : `https://www.2embed.skin/embed/${tmdbId}`],
+    ["vidfast", tv ? `https://vidfast.pro/tv/${tmdbId}/${s}/${e}` : `https://vidfast.pro/movie/${tmdbId}`],
+    ["multiembed", tv ? `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${s}&e=${e}` : `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1`],
+  ];
+  return defs.map(([name, stream]) => ({
+    name,
+    embed: true,
+    qualities: [{ quality: "HD", stream }],
+  }));
+}
+
 // Do two quality labels name the same resolution? ("720p HD" vs "720p")
 export function qualityMatches(a: string, b: string): boolean {
   const ra = a.match(/(\d{3,4})/)?.[1];

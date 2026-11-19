@@ -221,8 +221,8 @@ test("Stage 1: /api/resolve exposes direct URL for downet.net and non-IP-bound o
     const payload = await verifyToken(tok, SECRET);
     assert.equal(payload?.u, body.direct);
 
-    // Server 0 (Akwam) and Server 1 (non-IP-locked okprimeone) both expose direct; Server 2 is embedwave.
-    assert.equal(body.servers.length, 3);
+    // Server 0 (Akwam) and Server 1 (non-IP-locked okprimeone) both expose direct; 6 sandboxed embeds follow starting with embedwave.
+    assert.equal(body.servers.length, 8);
     assert.equal(body.servers[0].qualities[0].direct, "https://s301d5.downet.net/download/123/Dune.1080p.mp4");
     assert.equal(body.servers[1].qualities[0].direct, "https://okprimeone.site/v/02/00029/dune_n/Dune.720p.mp4?e=7200&i=0.0");
     assert.equal(body.servers[2].name, "embedwave");

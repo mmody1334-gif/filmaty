@@ -10,6 +10,7 @@ const root = process.cwd();
 const mainPath = join(root, "index.html");
 const tvPath = join(root, "Tv", "index.html");
 const manifestPath = join(root, "manifest.json");
+const swPath = join(root, "sw.js");
 
 function pngSize(buf: Buffer): { width: number; height: number } {
   assert.deepEqual(
@@ -45,12 +46,13 @@ test("PWA icons are real PNGs at the declared sizes", () => {
   }
 });
 
-test("main site links the manifest and sets the theme color", () => {
+test("main site links the manifest, theme color, and registers Service Worker", () => {
   const main = readFileSync(mainPath, "utf-8");
   assert.ok(main.includes('rel="manifest" href="manifest.json"'), "main site must link manifest.json");
   assert.ok(main.includes('<meta name="theme-color" content="#0b0f19">'), "main site must set the theme color");
   assert.ok(main.includes('rel="apple-touch-icon"'), "main site must have an apple touch icon");
-  assert.ok(!main.includes("serviceWorker"), "no service worker: manifest-only installability");
+  assert.ok(existsSync(swPath), "sw.js must exist at repo root");
+  assert.ok(main.includes("serviceWorker.register('./sw.js')"), "main site must register sw.js");
 });
 
 test("TV page links the manifest (relative to /Tv/) and sets the theme color", () => {

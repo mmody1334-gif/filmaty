@@ -73,6 +73,15 @@
       <button data-tab="netflix-movies" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🎬 أفلام نتفليكس</button>
       <button data-tab="netflix" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🔴 نتفليكس</button>
       <button data-tab="action-movies" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">💥 أكشن</button>
+      <button data-tab="shahid" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">💚 شاهد</button>
+      <button data-tab="watchit" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🟠 واتش إت</button>
+      <button data-tab="yango" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🟣 يانجو بلاي</button>
+      <button data-tab="osn" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🔵 OSN+</button>
+      <button data-tab="showtime" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🎬 شوتايم</button>
+      <button data-tab="disney" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🏰 ديزني+</button>
+      <button data-tab="prime" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">📦 برايم</button>
+      <button data-tab="hbo" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🟣 HBO Max</button>
+      <button data-tab="apple" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🍎 Apple TV+</button>
       <button data-tab="tv-ar" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">📺 مسلسلات عربي</button>
       <button data-tab="tv-en" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 مسلسلات إنجليزي</button>
       <button data-tab="top" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">⭐ الأعلى تقييمًا</button>
@@ -183,6 +192,7 @@
         <h2 id="tvGridTitle" class="text-xl font-extrabold text-white"></h2>
         <span id="tvGridCount" class="text-sm text-slate-400 font-bold"></span>
       </div>
+      <div id="tvGridFilterBar" class="hidden space-y-2 mb-4"></div>
       <div id="tvGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
       <div id="tvLoadMoreWrap" class="hidden flex justify-center mt-6">
         <button id="tvLoadMoreBtn" type="button" class="tv-focus min-h-[44px] px-8 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-base font-extrabold transition cursor-pointer">عرض المزيد</button>
@@ -331,6 +341,59 @@
     // Sandbox flags for the embed iframe: scripts + same-origin so the
     // player can run, but NO allow-popups / allow-top-navigation.
     const EMBED_SANDBOX = 'allow-same-origin allow-scripts allow-presentation allow-forms';
+    const SAFE_TV_EMBEDS = new Set(['embedwave', '2embed', 'nontongo', '2embed-2', 'vidfast', 'multiembed']);
+    const TV_PLATFORM_LABELS = {
+      shahid: '💚 شاهد VIP',
+      watchit: '🟠 واتش إت',
+      yango: '🟣 يانجو بلاي',
+      osn: '🔵 شوتايم / OSN+',
+      showtime: '🎬 شوتايم',
+      starzplay: '⭐ STARZPLAY',
+      tod: '🟣 TOD',
+      netflix: '🔴 نتفليكس',
+      disney: '🏰 ديزني+',
+      prime: '📦 برايم فيديو',
+      apple: '🍎 Apple TV+',
+      hbo: '🟣 HBO Max',
+      paramount: '⛰️ Paramount+',
+      hulu: '🟢 Hulu',
+      peacock: '🦚 Peacock',
+      crunchyroll: '🍥 Crunchyroll',
+      marvel: '🦸‍♂️ مارفل',
+      dc: '🦇 عالم DC',
+    };
+    function escHtml(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+    function enTitleOf(item) {
+      const main = (item.title || item.name || '').trim().toLowerCase();
+      const en = (item.title_en || '').trim();
+      return en && en.toLowerCase() !== main ? en : '';
+    }
+    async function fetchTvTmdbJson(path, opts = {}) {
+      const lang = opts.lang || 'ar';
+      const qs = new URLSearchParams({ path, lang });
+      if (opts.append) qs.set('append', opts.append);
+      try {
+        const res = await fetch(`${API_BASE}/api/tmdb?${qs.toString()}`);
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      try {
+        const direct = await fetch(`${TMDB_BASE}${path}?api_key=${TMDB_KEY}&language=${lang}${opts.append ? `&append_to_response=${opts.append}` : ''}`);
+        if (direct.ok) return await direct.json();
+      } catch (e) {}
+      return null;
+    }
+    function buildTvEmbedFallbacks(type, id, s = 1, e = 1) {
+      const tv = type === 'tv';
+      const defs = [
+        ['embedwave', tv ? `https://embedwave.cc/embed/tv/${id}/${s}/${e}` : `https://embedwave.cc/embed/movie/${id}`],
+        ['2embed', tv ? `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}` : `https://www.2embed.cc/embed/${id}`],
+        ['nontongo', tv ? `https://www.nontongo.win/embed/tv/${id}/${s}/${e}` : `https://www.nontongo.win/embed/movie/${id}`],
+        ['2embed-2', tv ? `https://www.2embed.skin/embedtv/${id}&s=${s}&e=${e}` : `https://www.2embed.skin/embed/${id}`],
+        ['vidfast', tv ? `https://vidfast.pro/tv/${id}/${s}/${e}` : `https://vidfast.pro/movie/${id}`],
+        ['multiembed', tv ? `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${s}&e=${e}` : `https://multiembed.mov/?video_id=${id}&tmdb=1`],
+      ];
+      return defs.map(([name, stream]) => ({ name, embed: true, qualities: [{ quality: 'HD', stream }] }));
+    }
 
     let currentItem = null;
     let heroItem = null;
@@ -917,7 +980,8 @@
             <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 text-slate-300 text-xs font-bold border border-white/10">${kind}</span>
           </div>
           <div class="pt-2 px-1">
-            <h4 class="text-sm md:text-base font-bold text-white truncate">${title}</h4>
+            <h4 class="text-sm md:text-base font-bold text-white truncate">${escHtml(title)}</h4>
+            ${enTitleOf(item) ? `<div class="text-xs text-slate-300 font-semibold truncate mt-0.5" dir="ltr" style="text-align:right">${escHtml(enTitleOf(item))}</div>` : ''}
             <div class="flex items-center justify-between mt-0.5 text-xs md:text-sm text-slate-400 font-medium">
               <span>${year}</span>
               <span class="text-red-400 font-semibold">عرض ◀</span>
@@ -1067,11 +1131,7 @@
       try {
         const watchedMap = readWatchedStore();
         const responses = await Promise.all(
-          seeds.map((s) =>
-            fetch(`${TMDB_BASE}/${s.type}/${s.id}/recommendations?api_key=${TMDB_KEY}&language=ar`)
-              .then((r) => r.json())
-              .catch(() => null),
-          ),
+          seeds.map((s) => fetchTvTmdbJson(`/${s.type}/${s.id}/recommendations`).catch(() => null)),
         );
         const merged = [];
         const seenIds = new Set();
@@ -1096,6 +1156,15 @@
 
     const TV_EXTRA_MOVIE_ROWS = [
       { key: 'netflix-movies', title: '🎬 أفلام نتفليكس', params: { type: 'movie', collection: 'netflix', sort: 'popular', page: '1' } },
+      { key: 'shahid', title: '💚 أعمال شاهد VIP', params: { type: 'movie', collection: 'shahid', sort: 'popular', page: '1' } },
+      { key: 'watchit', title: '🟠 حصريات واتش إت', params: { type: 'tv', collection: 'watchit', sort: 'popular', page: '1' } },
+      { key: 'yango', title: '🟣 مسلسلات يانجو بلاي', params: { type: 'tv', collection: 'yango', sort: 'popular', page: '1' } },
+      { key: 'osn', title: '🔵 شوتايم / OSN+', params: { type: 'movie', collection: 'osn', sort: 'popular', page: '1' } },
+      { key: 'disney', title: '🏰 عالم ديزني+', params: { type: 'movie', collection: 'disney', sort: 'popular', page: '1' } },
+      { key: 'prime', title: '📦 برايم فيديو', params: { type: 'movie', collection: 'prime', sort: 'popular', page: '1' } },
+      { key: 'hbo', title: '🟣 HBO Max', params: { type: 'movie', collection: 'hbo', sort: 'popular', page: '1' } },
+      { key: 'showtime', title: '🎬 أعمال شوتايم', params: { type: 'tv', collection: 'showtime', sort: 'popular', page: '1' } },
+      { key: 'apple', title: '🍎 Apple TV+', params: { type: 'movie', collection: 'apple', sort: 'popular', page: '1' } },
       { key: 'newest-movies', title: '🆕 أحدث الأفلام', params: { type: 'movie', sort: 'newest', page: '1' } },
       { key: 'action-movies', title: '💥 أفلام أكشن', params: { type: 'movie', genre: '28', sort: 'popular', page: '1' } },
       { key: 'comedy-movies', title: '😂 أفلام كوميديا', params: { type: 'movie', genre: '35', sort: 'popular', page: '1' } },
@@ -1155,19 +1224,16 @@
       ++tvBrowseReqId;
       tvBrowseState = null;
       document.getElementById('tvLoadMoreWrap')?.classList.add('hidden');
+      document.getElementById('tvGridFilterBar')?.classList.add('hidden');
       showHomeView();
       tvHome.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
       try {
-        const [homeRes, airingRes, upcomingRes] = await Promise.all([
+        const [homeRes, airing, upcoming] = await Promise.all([
           fetch(`${API_BASE}/api/home`),
-          fetch(`${TMDB_BASE}/tv/airing_today?api_key=${TMDB_KEY}&language=ar`).catch(() => null),
-          fetch(`${TMDB_BASE}/movie/upcoming?api_key=${TMDB_KEY}&language=ar`).catch(() => null),
+          fetchTvTmdbJson('/tv/airing_today'),
+          fetchTvTmdbJson('/movie/upcoming'),
         ]);
         const data = await homeRes.json();
-        // New episodes + coming soon (stage H): TMDB direct, each
-        // failure degrades to an empty row instead of breaking home.
-        const airing = airingRes ? await airingRes.json().catch(() => null) : null;
-        const upcoming = upcomingRes ? await upcomingRes.json().catch(() => null) : null;
         const newEpisodes = ((airing?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'tv' }));
         const upcomingMovies = ((upcoming?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'movie' }));
         tvHomeSnapshot = {
@@ -1264,6 +1330,125 @@
       }
     }
 
+    const TV_GRID_SORTS = [
+      ['popular', '🔥 الأكثر شعبية'],
+      ['newest', '🆕 الأحدث'],
+      ['top_rated', '⭐ الأعلى تقييمًا'],
+    ];
+    const TV_MOVIE_GENRES = [
+      ['', 'كل التصنيفات'],
+      ['28', '💥 أكشن'],
+      ['35', '😂 كوميديا'],
+      ['27', '👻 رعب'],
+      ['878', '🚀 خيال علمي'],
+      ['80', '🕵️ جريمة'],
+      ['18', '🎭 دراما'],
+      ['16', '🎨 أنيميشن'],
+    ];
+    const TV_SERIES_GENRES = [
+      ['', 'كل التصنيفات'],
+      ['10759', '💥 أكشن ومغامرات'],
+      ['18', '🎭 دراما'],
+      ['35', '😂 كوميديا'],
+      ['80', '🕵️ جريمة'],
+      ['10765', '🧙 خيال وفانتازيا'],
+      ['16', '🎨 أنيميشن'],
+    ];
+    const TV_GRID_YEARS = ['', '2026', '2025', '2024', '2023', '2020'];
+
+    function renderTvGridFilterBar(state) {
+      const bar = document.getElementById('tvGridFilterBar');
+      if (!bar) return;
+      if (!state) {
+        bar.classList.add('hidden');
+        bar.innerHTML = '';
+        return;
+      }
+      bar.classList.remove('hidden');
+      const activeSort = state.params.sort || 'popular';
+      const activeGenre = state.params.genre || '';
+      const activeYear = state.params.year ? String(state.params.year) : '';
+      const activeKind = state.params.alsoTv ? 'all' : (state.params.type === 'tv' ? 'tv' : 'movie');
+      const genres = state.params.alsoTv ? [] : (state.params.type === 'tv' ? TV_SERIES_GENRES : TV_MOVIE_GENRES);
+
+      const chipCls = (active) => active
+        ? 'bg-red-600 border-red-600 text-white'
+        : 'bg-slate-800 border-slate-700 text-slate-200 hover:border-white';
+
+      const typeRow = state.params.collection ? `
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide text-sm font-bold">
+          <span class="text-slate-400 shrink-0">النوع:</span>
+          ${[['all', 'الكل'], ['movie', 'أفلام'], ['tv', 'مسلسلات']].map(([k, lbl]) =>
+            `<button type="button" data-tv-type="${k}" class="tv-filter-chip tv-focus min-h-[44px] whitespace-nowrap px-4 py-2 rounded-xl border transition ${chipCls(activeKind === k)}">${lbl}</button>`
+          ).join('')}
+        </div>` : '';
+
+      const sortRow = `
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide text-sm font-bold">
+          <span class="text-slate-400 shrink-0">الترتيب:</span>
+          ${TV_GRID_SORTS.map(([id, lbl]) =>
+            `<button type="button" data-tv-sort="${id}" class="tv-filter-chip tv-focus min-h-[44px] whitespace-nowrap px-4 py-2 rounded-xl border transition ${chipCls(activeSort === id)}">${lbl}</button>`
+          ).join('')}
+        </div>`;
+
+      const genreRow = genres.length ? `
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide text-sm font-bold">
+          <span class="text-slate-400 shrink-0">التصنيف:</span>
+          ${genres.map(([id, lbl]) =>
+            `<button type="button" data-tv-genre="${id}" class="tv-filter-chip tv-focus min-h-[44px] whitespace-nowrap px-4 py-2 rounded-xl border transition ${chipCls(activeGenre === id)}">${lbl}</button>`
+          ).join('')}
+        </div>` : '';
+
+      const yearRow = `
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide text-sm font-bold">
+          <span class="text-slate-400 shrink-0">السنة:</span>
+          ${TV_GRID_YEARS.map((y) =>
+            `<button type="button" data-tv-year="${y}" class="tv-filter-chip tv-focus min-h-[44px] whitespace-nowrap px-4 py-2 rounded-xl border transition ${chipCls(activeYear === y)}">${y || 'الكل'}</button>`
+          ).join('')}
+        </div>`;
+
+      bar.innerHTML = typeRow + sortRow + genreRow + yearRow;
+
+      bar.querySelectorAll('[data-tv-type]').forEach((b) => {
+        b.addEventListener('click', () => {
+          if (!tvBrowseState) return;
+          const k = b.dataset.tvType;
+          const nextParams = { ...tvBrowseState.params, page: '1' };
+          if (k === 'all') { nextParams.type = 'movie'; nextParams.alsoTv = '1'; delete nextParams.genre; }
+          else { nextParams.type = k; delete nextParams.alsoTv; }
+          loadBrowse(nextParams, tvBrowseState.title);
+        });
+      });
+      bar.querySelectorAll('[data-tv-sort]').forEach((b) => {
+        b.addEventListener('click', () => {
+          if (!tvBrowseState) return;
+          const nextSort = b.dataset.tvSort;
+          if (nextSort === (tvBrowseState.params.sort || 'popular')) return;
+          loadBrowse({ ...tvBrowseState.params, sort: nextSort, page: '1' }, tvBrowseState.title);
+        });
+      });
+      bar.querySelectorAll('[data-tv-genre]').forEach((b) => {
+        b.addEventListener('click', () => {
+          if (!tvBrowseState) return;
+          const g = b.dataset.tvGenre || '';
+          if (g === (tvBrowseState.params.genre || '')) return;
+          const nextParams = { ...tvBrowseState.params, page: '1' };
+          if (g) nextParams.genre = g; else delete nextParams.genre;
+          loadBrowse(nextParams, tvBrowseState.title);
+        });
+      });
+      bar.querySelectorAll('[data-tv-year]').forEach((b) => {
+        b.addEventListener('click', () => {
+          if (!tvBrowseState) return;
+          const y = b.dataset.tvYear || '';
+          if (y === (tvBrowseState.params.year ? String(tvBrowseState.params.year) : '')) return;
+          const nextParams = { ...tvBrowseState.params, page: '1' };
+          if (y) nextParams.year = y; else delete nextParams.year;
+          loadBrowse(nextParams, tvBrowseState.title);
+        });
+      });
+    }
+
     async function loadBrowse(params, title) {
       const seq = ++tvBrowseReqId;
       tvBrowseState = null;
@@ -1277,6 +1462,7 @@
         const { results, total, reachedPage } = await fetchTvBrowseBatch(params, startPage, 500);
         if (seq !== tvBrowseReqId) return;
         tvBrowseState = { params: { ...params }, title, page: reachedPage, total, items: results.slice(), loading: false };
+        renderTvGridFilterBar(tvBrowseState);
         tvGridCount.innerText = `${tvBrowseState.items.length} عمل`;
         if (!tvBrowseState.items.length) {
           tvGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-base font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
@@ -1288,6 +1474,7 @@
         updateTvLoadMoreUi();
       } catch (e) {
         if (seq !== tvBrowseReqId) return;
+        renderTvGridFilterBar(null);
         tvGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
       }
     }
@@ -1298,6 +1485,7 @@
       ++tvBrowseReqId;
       tvBrowseState = null;
       document.getElementById('tvLoadMoreWrap')?.classList.add('hidden');
+      document.getElementById('tvGridFilterBar')?.classList.add('hidden');
       saveTvRecentSearch(query);
       hideTvSuggest();
       showGridView();
@@ -1339,6 +1527,7 @@
         else if (tab === 'tv-ar') loadBrowse({ type: 'tv', lang: 'ar', sort: 'popular', page: '1' }, '📺 مسلسلات عربي');
         else if (tab === 'tv-en') loadBrowse({ type: 'tv', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 مسلسلات إنجليزي (أمريكي)');
         else if (tab === 'top') loadBrowse({ type: 'movie', alsoTv: '1', sort: 'top_rated', page: '1' }, '⭐ الأعلى تقييمًا');
+        else if (TV_PLATFORM_LABELS[tab]) loadBrowse({ type: 'movie', alsoTv: '1', collection: tab, sort: 'popular', page: '1' }, TV_PLATFORM_LABELS[tab]);
       });
     });
 
@@ -1431,8 +1620,9 @@
     // phone sends them; on the TV the episode buttons call playBest).
     async function openDetails(id, mediaType, autoplay = false, season = null, episode = null) {
       try {
-        const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}?api_key=${TMDB_KEY}&language=ar`);
-        currentItem = await res.json();
+        const fetched = await fetchTvTmdbJson(`/${mediaType}/${id}`);
+        if (!fetched) throw new Error('details_failed');
+        currentItem = fetched;
         currentItem.media_type = mediaType;
         const title = currentItem.title || currentItem.name;
         const date = currentItem.release_date || currentItem.first_air_date || '';
@@ -1495,15 +1685,13 @@
       wrap.classList.add('hidden');
       row.innerHTML = '';
       try {
-        const [videosRes, similarRes] = await Promise.all([
-          fetch(`${TMDB_BASE}/${mediaType}/${id}/videos?api_key=${TMDB_KEY}&language=en-US`),
-          fetch(`${TMDB_BASE}/${mediaType}/${id}/similar?api_key=${TMDB_KEY}&language=ar`),
+        const [videos, similar] = await Promise.all([
+          fetchTvTmdbJson(`/${mediaType}/${id}/videos`, { lang: 'en-US' }),
+          fetchTvTmdbJson(`/${mediaType}/${id}/similar`),
         ]);
         if (loadId !== tvTrailerLoadSeq) return;
-        const videos = await videosRes.json().catch(() => null);
         const trailer = (videos?.results || []).find((v) => v.site === 'YouTube' && v.type === 'Trailer');
         if (trailer) { tvTrailerKey = trailer.key; btn.classList.remove('hidden'); }
-        const similar = await similarRes.json().catch(() => null);
         const items = (similar?.results || []).slice(0, 10);
         if (items.length) {
           row.innerHTML = items.map((it) => `<div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(it)}</div>`).join('');
@@ -1826,7 +2014,7 @@
       return server ? server.qualities[selectedQualityIdx] : null;
     }
     function isEmbedServer(server) {
-      return server && server.name === 'embedwave';
+      return Boolean(server && (server.embed || server.name === 'embedwave'));
     }
 
     function renderServerControls() {
@@ -1839,10 +2027,10 @@
       }
       wrap.classList.remove('hidden');
       // Server choice, labelled plainly: a native server is "مباشر"
-      // (with its provider name), the embed is "EmbedWave". The direct
+      // (with its provider name), EmbedWave and backup embeds follow. The direct
       // server is the primary one and is pre-selected.
       serversRow.innerHTML = currentServers.map((s, i) => `
-        <button data-server="${i}" class="tv-server tv-focus ${i === selectedServerIdx ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-6 py-4 text-lg font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${isEmbedServer(s) ? '▶ EmbedWave' : `▶ مباشر (${s.name})`}</button>
+        <button data-server="${i}" class="tv-server tv-focus ${i === selectedServerIdx ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-6 py-4 text-lg font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${s.name === 'embedwave' ? '▶ EmbedWave' : (isEmbedServer(s) ? `▶ بديل (${s.name})` : `▶ مباشر (${s.name})`)}</button>
       `).join('');
       const server = selectedServer();
       qualitiesRow.innerHTML = (server ? server.qualities : []).map((q, i) => `
@@ -1945,12 +2133,9 @@
 
     function playEmbedwaveFallback(type) {
       recordCurrentTvHistory();
-      const s = type === 'tv' ? selectedSeason : undefined;
-      const e = type === 'tv' ? selectedEpisode : undefined;
-      const url = type === 'tv'
-        ? `https://embedwave.cc/embed/tv/${currentItem.id}/${s || 1}/${e || 1}`
-        : `https://embedwave.cc/embed/movie/${currentItem.id}`;
-      currentServers = [{ name: 'embedwave', qualities: [{ quality: 'HD', stream: url }] }];
+      const s = type === 'tv' ? selectedSeason : 1;
+      const e = type === 'tv' ? selectedEpisode : 1;
+      currentServers = buildTvEmbedFallbacks(type, currentItem.id, s || 1, e || 1);
       selectedServerIdx = 0;
       selectedQualityIdx = 0;
       renderServerControls();
@@ -1976,13 +2161,11 @@
         playEmbedwaveFallback(type);
         return;
       }
-      // TV page: only direct native servers + the sandboxed embed. A
-      // server is native when its qualities carry a download link; the
-      // sandboxed embed is allowed by name. Anything else in the
-      // response is dropped before it can be picked, so no unsandboxed
-      // server can ever appear here and open a pop-up.
+      // TV page: only direct native servers + allowlisted sandboxed embeds. A
+      // server is native when its qualities carry a download link; embeds must
+      // belong to SAFE_TV_EMBEDS so no unsandboxed external player appears here.
       currentServers = data.servers.filter(
-        (s) => s.name === 'embedwave' || (s.qualities && s.qualities.some((q) => q.download)),
+        (s) => SAFE_TV_EMBEDS.has(s.name) || (s.qualities && s.qualities.some((q) => q.download)),
       );
       if (!currentServers.length) {
         playEmbedwaveFallback(type);

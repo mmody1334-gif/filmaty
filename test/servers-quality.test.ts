@@ -168,18 +168,23 @@ test("GET /api/resolve returns servers (native multi-quality + embedwave) and be
     assert.ok(payload);
     assert.ok(payload!.u.includes("1080p"));
 
-    assert.equal(body.servers.length, 2);
+    assert.equal(body.servers.length, 7);
     assert.equal(body.servers[0].qualities.length, 3);
     for (const q of body.servers[0].qualities) {
       assert.ok(q.stream.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.endsWith("&dl=1"));
     }
-    // embedwave is the only embed server, sandboxed, after the native one.
+    // embedwave comes first, followed by 5 backup sandboxed embeds.
     assert.equal(body.servers[1].name, "embedwave");
     assert.equal(body.servers[1].qualities.length, 1);
     assert.equal(body.servers[1].qualities[0].stream, "https://embedwave.cc/embed/movie/157336");
     assert.equal(body.servers[1].qualities[0].download, undefined);
+    for (const emb of body.servers.slice(1)) {
+      assert.equal(emb.embed, true);
+      assert.equal(emb.qualities.length, 1);
+      assert.equal(emb.qualities[0].download, undefined);
+    }
   } finally {
     restore();
   }
@@ -190,7 +195,7 @@ test("embedwaveUrl builds the TMDB-id embed URLs for movies and episodes", () =>
   assert.equal(embedwaveUrl("tv", 48866, 7, 1), "https://embedwave.cc/embed/tv/48866/7/1");
 });
 
-test("no validated native stream: ok:false with the embedwave server only", async () => {
+test("no validated native stream: ok:false returns embedwave and backup embed servers", async () => {
   const restore = installQualityMock({ allDead: true });
   const { env } = mockEnv();
   try {
@@ -202,9 +207,13 @@ test("no validated native stream: ok:false with the embedwave server only", asyn
     assert.equal(res.status, 404);
     const body = (await res.json()) as any;
     assert.equal(body.ok, false);
-    assert.equal(body.servers.length, 1);
+    assert.equal(body.servers.length, 6);
     assert.equal(body.servers[0].name, "embedwave");
     assert.equal(body.servers[0].qualities[0].stream, "https://embedwave.cc/embed/movie/157336");
+    assert.deepEqual(
+      body.servers.map((s: any) => s.name),
+      ["embedwave", "2embed", "nontongo", "2embed-2", "vidfast", "multiembed"],
+    );
   } finally {
     restore();
   }

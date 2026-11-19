@@ -12,8 +12,9 @@ const tvPath = join(process.cwd(), "Tv", "index.html");
 
 test("main site home has new-episodes and coming-soon rows", () => {
   const main = readFileSync(mainPath, "utf-8");
-  assert.ok(main.includes("/tv/airing_today?api_key="), "new episodes must come from TMDB airing_today");
-  assert.ok(main.includes("/movie/upcoming?api_key="), "coming soon must come from TMDB upcoming");
+  assert.ok(main.includes("/api/tmdb"), "main site must route TMDB calls through Worker /api/tmdb");
+  assert.ok(main.includes("/tv/airing_today"), "new episodes must come from airing_today");
+  assert.ok(main.includes("/movie/upcoming"), "coming soon must come from upcoming");
   assert.ok(main.includes("حلقات جديدة"), "home must have a حلقات جديدة row");
   assert.ok(main.includes("قريبًا"), "home must have a قريبًا row");
   assert.ok(main.includes("newEpisodes"), "home data must carry the new episodes");
@@ -22,8 +23,9 @@ test("main site home has new-episodes and coming-soon rows", () => {
 
 test("TV home has new-episodes and coming-soon rows", () => {
   const tv = readFileSync(tvPath, "utf-8");
-  assert.ok(tv.includes("/tv/airing_today?api_key="), "TV new episodes must come from TMDB airing_today");
-  assert.ok(tv.includes("/movie/upcoming?api_key="), "TV coming soon must come from TMDB upcoming");
+  assert.ok(tv.includes("/api/tmdb"), "TV site must route TMDB calls through Worker /api/tmdb");
+  assert.ok(tv.includes("/tv/airing_today"), "TV new episodes must come from airing_today");
+  assert.ok(tv.includes("/movie/upcoming"), "TV coming soon must come from upcoming");
   assert.ok(tv.includes("حلقات جديدة"), "TV home must have a حلقات جديدة row");
   assert.ok(tv.includes("قريبًا"), "TV home must have a قريبًا row");
 });

@@ -2,10 +2,14 @@ package app.filmaty;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.app.PictureInPictureParams;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageInfo;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
@@ -13,6 +17,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Message;
+import android.util.Rational;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -31,11 +36,17 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Filmaty Android app: the website in a WebView, plus what a browser tab
@@ -108,6 +119,60 @@ public class MainActivity extends Activity {
         }
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(start);
+
+        checkForAppUpdate();
+    }
+
+    @SuppressWarnings("deprecation")
+    private long localVersionCode() {
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            if (Build.VERSION.SDK_INT >= 28) return info.getLongVersionCode();
+            return info.versionCode;
+        } catch (Exception e) {
+            return 1L;
+        }
+    }
+
+    private void checkForAppUpdate() {
+        final long currentCode = localVersionCode();
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL u = new URL("https://api.github.com/repos/mmody1334-gif/filmaty/releases/latest");
+                conn = (HttpURLConnection) u.openConnection();
+                conn.setConnectTimeout(6000);
+                conn.setReadTimeout(6000);
+                conn.setRequestProperty("Accept", "application/vnd.github+json");
+                conn.setRequestProperty("User-Agent", "FilmatyApp/" + versionName());
+                if (conn.getResponseCode() != 200) return;
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                }
+                Matcher m = Pattern.compile("\"tag_name\"\\s*:\\s*\"apk-v1\\.(\\d+)\"").matcher(sb.toString());
+                if (!m.find()) return;
+                final long remoteCode = Long.parseLong(m.group(1));
+                if (remoteCode <= currentCode) return;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    new AlertDialog.Builder(this)
+                            .setTitle("تحديث جديد متاح")
+                            .setMessage("يتوفر إصدار أحدث من تطبيق فيلماتي (1." + remoteCode + "). هل تريد تحميله الآن؟")
+                            .setPositiveButton("تحديث الآن", (d, w) -> download(
+                                    "https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk",
+                                    web != null ? web.getSettings().getUserAgentString() : "FilmatyApp",
+                                    "attachment; filename=\"filmaty.apk\"",
+                                    "application/vnd.android.package-archive"))
+                            .setNegativeButton("لاحقاً", null)
+                            .show();
+                });
+            } catch (Exception ignored) {
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
     }
 
     private String versionName() {
@@ -146,7 +211,18 @@ public class MainActivity extends Activity {
             exitFullscreen();
             return;
         }
-        if (web.canGoBack()) {
+        if (web != null) {
+            web.evaluateJavascript("window.__filmatyHandleBack ? window.__filmatyHandleBack() : false", value -> {
+                if ("true".equals(value)) return;
+                handleDefaultBack();
+            });
+            return;
+        }
+        handleDefaultBack();
+    }
+
+    private void handleDefaultBack() {
+        if (web != null && web.canGoBack()) {
             web.goBack();
             return;
         }
@@ -156,6 +232,28 @@ public class MainActivity extends Activity {
         } else {
             lastBackPress = now;
             Toast.makeText(this, "اضغط رجوع مرة تانية للخروج", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (Build.VERSION.SDK_INT >= 26 && customView != null) {
+            try {
+                enterPictureInPictureMode(
+                        new PictureInPictureParams.Builder()
+                                .setAspectRatio(new Rational(16, 9))
+                                .build());
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (!isInPictureInPictureMode && customView != null) {
+            hideSystemBars(true);
         }
     }
 

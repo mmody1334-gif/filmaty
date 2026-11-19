@@ -237,7 +237,7 @@ test("invalid browse params return 400", async () => {
       "type=movie&page=0",
       "type=movie&page=501",
       "type=movie&page=abc",
-      "type=movie&collection=disney",
+      "type=movie&collection=invalidbrand",
       "type=movie&origin=USA",
       "type=movie&origin=U",
       "type=movie&origin=1S",

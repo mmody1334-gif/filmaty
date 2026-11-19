@@ -1,6 +1,12 @@
 import type { Env } from "./env.ts";
 import { handleStreamProxy } from "./engine/proxy.ts";
-import { embedwaveUrl, isUnreliableTmdbEmbed, qualityMatches, resolveServersByTmdb } from "./engine/resolve.ts";
+import {
+  buildEmbedServers,
+  embedwaveUrl,
+  isUnreliableTmdbEmbed,
+  qualityMatches,
+  resolveServersByTmdb,
+} from "./engine/resolve.ts";
 import {
   BOT_CODE_TTL_SECONDS,
   botCodeKey,
@@ -20,7 +26,7 @@ import {
 import { signToken, verifyToken } from "./engine/token.ts";
 import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
-import { FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
+import { FILMATY_MANIFEST_JSON, FILMATY_SW_JS, FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
 import { handleTelegramUpdate } from "./telegram/handlers.ts";
 import { labHtml } from "./lab/embed-lab.ts";
 
@@ -69,8 +75,32 @@ export default {
     }
 
 
+    if (url.pathname === "/sw.js" && request.method === "GET") {
+      return new Response(FILMATY_SW_JS, {
+        headers: {
+          "content-type": "application/javascript; charset=utf-8",
+          "cache-control": "no-cache",
+          "service-worker-allowed": "/",
+        },
+      });
+    }
+
+    if (url.pathname === "/manifest.json" && request.method === "GET") {
+      return new Response(FILMATY_MANIFEST_JSON, {
+        headers: {
+          "content-type": "application/manifest+json; charset=utf-8",
+          "cache-control": "public, max-age=3600",
+          ...corsHeaders(),
+        },
+      });
+    }
+
     if (url.pathname === "/api/browse" && request.method === "GET") {
       return handleApiBrowse(request, env, url);
+    }
+
+    if (url.pathname === "/api/tmdb" && request.method === "GET") {
+      return handleApiTmdb(request, env, url);
     }
 
     if (url.pathname === "/api/view" && request.method === "POST") {
@@ -309,6 +339,81 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
       ...corsHeaders(),
     },
   });
+}
+
+const TMDB_PROXY_PATH_RE =
+  /^\/(?:tv\/airing_today|movie\/upcoming|(?:movie|tv)\/\d+(?:\/(?:videos|similar|recommendations))?|tv\/\d+\/season\/\d+)$/;
+const TMDB_PROXY_DETAILS_RE = /^\/(?:movie|tv)\/\d+$/;
+
+// GET /api/tmdb?path=/movie/upcoming&lang=ar&append=translations
+// Allowlisted TMDB proxy with KV caching so WebApp/TV never hit TMDB blocks.
+async function handleApiTmdb(request: Request, env: Env, url: URL): Promise<Response> {
+  const path = (url.searchParams.get("path") || "").trim();
+  if (!TMDB_PROXY_PATH_RE.test(path)) {
+    return jsonResponse({ ok: false, error: "invalid path" }, 400);
+  }
+  const lang = url.searchParams.get("lang") || "ar";
+  if (lang !== "ar" && lang !== "en-US") {
+    return jsonResponse({ ok: false, error: "invalid lang" }, 400);
+  }
+  const appendRaw = url.searchParams.get("append");
+  let append = "";
+  if (appendRaw !== null && appendRaw !== "") {
+    if (appendRaw !== "translations" || !TMDB_PROXY_DETAILS_RE.test(path)) {
+      return jsonResponse({ ok: false, error: "invalid append" }, 400);
+    }
+    append = "translations";
+  }
+
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "tmdb", 300))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+
+  const cacheKey = `tmdb1:${path}:${lang}:${append}`;
+  try {
+    const cached = await env.CACHE?.get(cacheKey);
+    if (cached) {
+      return new Response(cached, {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=300",
+          ...corsHeaders(),
+        },
+      });
+    }
+  } catch {
+    /* ignore KV read error */
+  }
+
+  const upstream = `${TMDB_BASE}${path}?api_key=${tmdbApiKey(env)}&language=${lang}${
+    append ? `&append_to_response=${append}` : ""
+  }`;
+  try {
+    const res = await fetch(upstream, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) {
+      return jsonResponse({ ok: false, error: "tmdb_error" }, 502);
+    }
+    const text = await res.text();
+    const isList = path === "/tv/airing_today" || path === "/movie/upcoming";
+    const ttl = isList ? 1800 : 7200;
+    try {
+      await env.CACHE?.put(cacheKey, text, { expirationTtl: ttl });
+    } catch {
+      /* ignore KV write error */
+    }
+    return new Response(text, {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "public, max-age=300",
+        ...corsHeaders(),
+      },
+    });
+  } catch {
+    return jsonResponse({ ok: false, error: "tmdb_unreachable" }, 502);
+  }
 }
 
 // GET /api/search?q= — TMDB in ar + en-US merged/deduped, provider
@@ -569,22 +674,16 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     episode !== undefined && Number.isInteger(episode) && episode > 0 ? episode : undefined;
 
   const publicBase = env.PUBLIC_BASE || url.origin;
-  // EmbedWave is the only embed fallback: it plays inside a sandboxed
-  // iframe (popups/redirects blocked). The old vidlink fallback was
-  // removed — it is unsandboxed and its popups could not be blocked.
-  const embedwave = embedwaveUrl(type, id, seasonNum, episodeNum);
-  const embedwaveServer = {
-    name: "embedwave",
-    qualities: [{ quality: "HD", stream: embedwave }],
-  };
+  // EmbedWave is the primary embed fallback followed by 5 backup embeds:
+  // all play inside a sandboxed iframe (popups/redirects blocked).
+  const embedServers = buildEmbedServers(type, id, seasonNum, episodeNum);
 
   const resolved = await resolveServersByTmdb(env, type, id, seasonNum, episodeNum);
   if (!resolved) {
-    // No validated native stream: top-level ok stays false (existing
-    // behaviour) so the frontend falls back to the embed player, and the
-    // embedwave server is still listed unless TMDB movie metadata lacks imdb_id.
+    // No validated native stream: top-level ok stays false so the frontend
+    // falls back to the sandboxed embed servers unless imdb_id is missing.
     const hideEmbed = await isUnreliableTmdbEmbed(env, type, id);
-    return jsonResponse({ ok: false, servers: hideEmbed ? [] : [embedwaveServer] }, 404);
+    return jsonResponse({ ok: false, servers: hideEmbed ? [] : embedServers }, 404);
   }
 
   // Sign one stream/download token per quality (tokens live 3h).
@@ -625,7 +724,7 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
     servers.push({ name: server.name, qualities });
   }
   if (!resolved.unreliableEmbed) {
-    servers.push(embedwaveServer);
+    servers.push(...embedServers);
   }
 
   // Top-level fields stay the default: best quality of the first server.
