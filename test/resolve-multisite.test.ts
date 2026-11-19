@@ -194,7 +194,7 @@ test("VisionQuest S1E1 resolves to Laroza when Akwam's only file is on a dead no
     // resolve must cache for 1h only — a 6h cache kept serving dead
     // links and downloads failed with "Upstream error: HTTP 403".
     assert.equal(
-      puts.find((p) => p.key === "srv9:tv:213375:1:1")?.ttl,
+      puts.find((p) => p.key === "srv10:tv:213375:1:1")?.ttl,
       1 * 3600,
       "Laroza resolves cache for 1h",
     );

@@ -16,6 +16,19 @@ export function isDirectMediaUrl(url?: string): boolean {
   );
 }
 
+// A direct link is time-bound when its host puts an expiry in the URL:
+// Laroza's okprimeone links are signed and expire after 2h (e=7200),
+// and Akwam's downet links carry a fixed expiry timestamp in the path
+// (/download/<expiry>/<hash>/<file>, ~24h from creation — verified live
+// 2026-11-19: two resolves 8 min apart returned the same 1795176189
+// timestamp). A cached resolve can therefore hold a link scraped near
+// the end of its life, so time-bound links must cache short (see
+// SIGNED_LINK_CACHE_TTL below).
+export function isTimeBoundDirectUrl(url?: string): boolean {
+  if (!url) return false;
+  return url.includes("okprimeone.site") || url.includes("downet.net");
+}
+
 const RESOLVER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -287,7 +300,10 @@ export async function resolveByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedDirect | null> {
-  const cacheKey = `dl:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to dl2: after the stale-cache fix — the dl: entries cached
+  // before it can hold a time-bound direct link (Laroza 2h, downet
+  // ~24h) for 6h and must not be reused.
+  const cacheKey = `dl2:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
@@ -313,7 +329,15 @@ export async function resolveByTmdb(
       await env.CACHE?.put(
         cacheKey,
         JSON.stringify({ ok: true, ...result }),
-        { expirationTtl: CACHE_SUCCESS_TTL },
+        {
+          // Same rule as resolveCacheTtl: time-bound provider links
+          // cache for 1h only, so the bot never serves a dead link
+          // from a 6h-old entry (SIGNED_LINK_CACHE_TTL is declared
+          // below; it is read here at call time, after module load).
+          expirationTtl: isTimeBoundDirectUrl(result.directVideoUrl)
+            ? SIGNED_LINK_CACHE_TTL
+            : CACHE_SUCCESS_TTL,
+        },
       );
     } else {
       await env.CACHE?.put(cacheKey, JSON.stringify({ ok: false }), {
@@ -504,20 +528,27 @@ export function qualityMatches(a: string, b: string): boolean {
 const SERVER_CACHE_SUCCESS_TTL = 6 * 3600; // 6 hours
 const SERVER_CACHE_FAILURE_TTL = 30 * 60; // 30 minutes
 
-// Laroza's okprimeone download links are signed and expire after 2h
-// (e=7200 in the URL). A resolve cached longer than that keeps serving
-// dead links, and the download fails with "Upstream error: HTTP 403"
-// (verified live 2026-11-17: a 5.7h-old cached VisionQuest link 403s,
-// a fresh link from the same page returns 206). Cache resolves that
-// carry such links for 1h only, so the link is always served fresh;
-// Akwam/downet links do not expire, so they keep the 6h TTL.
+// Provider direct links are time-bound, and a resolve cached longer
+// than a link's remaining life keeps serving dead links: the player
+// then spins on a URL that can never deliver data (verified live
+// 2026-11-17: a 5.7h-old cached VisionQuest link 403s, a fresh link
+// from the same page returns 206; 2026-11-19: Interstellar loaded
+// ~15 min and never opened on a stale cached link). Laroza's
+// okprimeone links are signed and expire after 2h (e=7200 in the
+// URL); Akwam's downet links carry a fixed expiry timestamp in the
+// path (~24h from creation). Cache resolves that carry such links for
+// 1h only, so the link is always served fresh — 1h is also comfortably
+// below the 3h life of the worker-signed /stream?t= token minted from
+// the cached URL on every /api/resolve request, so a cached resolve
+// can never hand the player a dead stream URL. Generic mp4 hosts with
+// no expiry in the URL keep the 6h TTL.
 const SIGNED_LINK_CACHE_TTL = 1 * 3600; // 1 hour
 
 export function resolveCacheTtl(result: ResolvedMulti): number {
-  const hasSignedLinks = result.servers.some((s) =>
-    s.qualities.some((q) => q.directVideoUrl?.includes("okprimeone.site")),
+  const hasTimeBoundLinks = result.servers.some((s) =>
+    s.qualities.some((q) => isTimeBoundDirectUrl(q.directVideoUrl)),
   );
-  return hasSignedLinks ? SIGNED_LINK_CACHE_TTL : SERVER_CACHE_SUCCESS_TTL;
+  return hasTimeBoundLinks ? SIGNED_LINK_CACHE_TTL : SERVER_CACHE_SUCCESS_TTL;
 }
 
 // Like resolveByTmdb, but returns every validated quality of the first
@@ -531,14 +562,17 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
-  // Bumped to srv9: after the signed-link cache fix — the srv8:
-  // entries cached before it can hold a Laroza resolve whose okprimeone
-  // link expired (links live 2h, the cache kept them 6h) and must not
-  // be reused. (srv8 itself was the direct-providers fix: srv7 entries
-  // could hold a resolve that ran out of the Worker's subrequest budget
-  // mid-loop, e.g. حب متنكر cached as "no download" because Laroza's
-  // details came back empty and round 3 never ran.)
-  const cacheKey = `srv9:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  // Bumped to srv10: after the stale-cache fix — the srv9: entries
+  // cached before it can hold an Akwam resolve whose downet link is
+  // near/past its expiry (links carry a fixed expiry timestamp, the
+  // cache kept them 6h) and must not be reused. (srv9 itself was the
+  // signed-link cache fix: srv8 entries could hold a Laroza resolve
+  // whose okprimeone link expired (links live 2h, the cache kept them
+  // 6h). srv8 was the direct-providers fix: srv7 entries could hold a
+  // resolve that ran out of the Worker's subrequest budget mid-loop,
+  // e.g. حب متنكر cached as "no download" because Laroza's details
+  // came back empty and round 3 never ran.)
+  const cacheKey = `srv10:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);

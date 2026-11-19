@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.ts";
 import { verifyToken } from "../src/engine/token.ts";
+import { isTimeBoundDirectUrl, resolveCacheTtl } from "../src/engine/resolve.ts";
 
 const SECRET = "test-secret-key-at-least-32-characters-long";
 const BASE = "https://filmaty.hudhaifa-bio.workers.dev";
@@ -142,15 +143,119 @@ test("resolves Interstellar to a signed stream + download link", async () => {
     assert.equal(payload!.k, "mp4");
     assert.equal(payload!.n, "Interstellar");
 
-    // Success is cached for 6h under srv9:<type>:<id>:<s>:<e> — Akwam's
-    // downet links do not expire, so they keep the long TTL.
-    const cached = map.get("srv9:movie:157336:0:0");
+    // Success is cached for 1h under srv10:<type>:<id>:<s>:<e> —
+    // Akwam's downet links carry a fixed expiry timestamp in the path,
+    // so they are time-bound like Laroza's okprimeone links: a 6h cache
+    // kept serving a stale link and the player spun forever (Interstellar
+    // loaded ~15 min and never opened on 2026-11-19). 1h is comfortably
+    // below every link life and below the 3h /stream token life.
+    const cached = map.get("srv10:movie:157336:0:0");
     assert.ok(cached, "expected cached resolve result");
     assert.equal(JSON.parse(cached!).ok, true);
     assert.equal(
-      puts.find((p) => p.key === "srv9:movie:157336:0:0")?.ttl,
-      6 * 3600,
-      "Akwam resolves cache for 6h",
+      puts.find((p) => p.key === "srv10:movie:157336:0:0")?.ttl,
+      1 * 3600,
+      "Akwam resolves cache for 1h",
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("resolveCacheTtl: 1h for time-bound provider links, 6h otherwise", () => {
+  const larozaStyle = {
+    title: "VisionQuest",
+    servers: [
+      {
+        name: "لاروزا",
+        qualities: [
+          {
+            quality: "720p HD",
+            // Live Laroza shape (2026-11-19): hashed subdomain on
+            // okprimeone.site, signed query (?t=&s=&e=7200&i=0.0) —
+            // the link dies 2h after issue, so the resolve must cache
+            // for 1h only.
+            directVideoUrl:
+              "https://b6gtc2dez8aqmb6gtc2dez8aqmb6gtc2dez8aqmb6gtc2dez8aqm.okprimeone.site/v/02/00029/tdwa5as7pnce_n/VisionQuest.S01E01.mp4?t=o6H50kKKLc6ixhPDX2_nVR-RWu20GoTB3naQqRQszjM&s=1795090421&e=7200&v=&sp=207&i=0.0",
+          },
+        ],
+      },
+    ],
+  };
+  assert.equal(resolveCacheTtl(larozaStyle as any), 1 * 3600, "Laroza resolves cache for 1h");
+  assert.ok(
+    isTimeBoundDirectUrl(larozaStyle.servers[0].qualities[0].directVideoUrl),
+    "okprimeone.site links are time-bound",
+  );
+
+  const akwamStyle = {
+    title: "Interstellar",
+    servers: [
+      {
+        name: "أكوام",
+        qualities: [
+          {
+            quality: "1080p FHD",
+            // Live Akwam shape: downet links carry a fixed expiry
+            // timestamp in the path (/download/<expiry>/<hash>/<file>).
+            directVideoUrl:
+              "https://s301d5.downet.net/download/1795176189/6afee57d3005d/Interstellar.2014.IMAX.1080p.Bluray.AKWAM.mp4",
+          },
+        ],
+      },
+    ],
+  };
+  assert.equal(resolveCacheTtl(akwamStyle as any), 1 * 3600, "Akwam resolves cache for 1h");
+  assert.ok(
+    isTimeBoundDirectUrl(akwamStyle.servers[0].qualities[0].directVideoUrl),
+    "downet.net links are time-bound",
+  );
+
+  const genericStyle = {
+    title: "Generic",
+    servers: [
+      {
+        name: "Other CDN",
+        qualities: [{ quality: "720p", directVideoUrl: "https://cdn.example.com/files/movie.mp4" }],
+      },
+    ],
+  };
+  assert.equal(resolveCacheTtl(genericStyle as any), 6 * 3600, "generic mp4 hosts keep the 6h TTL");
+  assert.equal(
+    resolveCacheTtl({ title: "Empty", servers: [] } as any),
+    6 * 3600,
+    "results with no qualities keep the 6h TTL",
+  );
+});
+
+test("pre-fix srv9: entries are never reused (key bumped to srv10:)", async () => {
+  const restore = installFetchMock();
+  const { env, map, puts } = mockEnv();
+  try {
+    // A stale pre-fix entry: ok:true but a wrong title. If the resolver
+    // read it, the response would say STALE.
+    map.set(
+      "srv9:movie:157336:0:0",
+      JSON.stringify({
+        ok: true,
+        title: "STALE",
+        servers: [
+          {
+            name: "stale",
+            qualities: [{ quality: "720p", directVideoUrl: "https://cdn.example.com/stale.mp4" }],
+          },
+        ],
+      }),
+    );
+    const res = await callResolve(env, "/api/resolve?type=movie&id=157336");
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as any;
+    assert.equal(body.title, "Interstellar", "stale srv9 entry must be ignored");
+    assert.ok(map.get("srv10:movie:157336:0:0"), "fresh resolve must cache under srv10:");
+    assert.equal(
+      puts.find((p) => p.key === "srv10:movie:157336:0:0")?.ttl,
+      1 * 3600,
+      "fresh Akwam resolve caches for 1h under srv10:",
     );
   } finally {
     restore();
@@ -165,7 +270,7 @@ test("unknown TMDB id returns {ok:false} with 404 (not 500)", async () => {
     assert.equal(res.status, 404);
     assert.equal((await res.json() as any).ok, false);
     // Failures are cached too (30 min) so the lookup is not repeated.
-    const cached = map.get("srv9:movie:999999999:0:0");
+    const cached = map.get("srv10:movie:999999999:0:0");
     assert.ok(cached, "expected cached failure");
     assert.equal(JSON.parse(cached!).ok, false);
   } finally {
