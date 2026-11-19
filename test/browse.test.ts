@@ -116,7 +116,7 @@ test("collection=marvel passes with_companies=420 and skips the language filter"
   }
 });
 
-test("collection=netflix uses with_networks=213 for tv and with_companies=11946 for movies", async () => {
+test("collection=netflix uses Netflix watch provider 8 (US) for tv and movies", async () => {
   const { seen, restore } = installMock();
   const { env } = mockEnv();
   try {
@@ -133,8 +133,10 @@ test("collection=netflix uses with_networks=213 for tv and with_companies=11946 
     );
     assert.equal(movieRes.status, 200);
     assert.equal(seen.length, 2);
-    assert.equal(new URL(seen[0]).searchParams.get("with_networks"), "213");
-    assert.equal(new URL(seen[1]).searchParams.get("with_companies"), "11946");
+    for (const u of seen) {
+      assert.equal(new URL(u).searchParams.get("with_watch_providers"), "8");
+      assert.equal(new URL(u).searchParams.get("watch_region"), "US");
+    }
   } finally {
     restore();
   }

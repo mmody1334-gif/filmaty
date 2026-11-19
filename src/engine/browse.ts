@@ -40,7 +40,7 @@ const BROWSE_CACHE_TTL = 10 * 60; // 10 minutes
 function browseCacheKey(p: BrowseParams): string {
   const scope = p.collection || p.companies || p.lang || "all";
   const origin = p.origin ? `:origin:${p.origin}` : "";
-  return `browse:${p.type}:${scope}:${p.sort}:${p.page}${origin}`;
+  return `browse2:${p.type}:${scope}:${p.sort}:${p.page}${origin}`;
 }
 
 function browseUrl(env: Env, p: BrowseParams): string {
@@ -52,8 +52,11 @@ function browseUrl(env: Env, p: BrowseParams): string {
   if (p.collection === "marvel") {
     u.searchParams.set("with_companies", "420");
   } else if (p.collection === "netflix") {
-    if (p.type === "tv") u.searchParams.set("with_networks", "213");
-    else u.searchParams.set("with_companies", "11946");
+    // Everything streaming on Netflix (originals + licensed), not just
+    // Netflix-produced titles: TMDB watch provider 8 in the US catalog,
+    // the largest one. (with_companies=11946 returned 0 movies.)
+    u.searchParams.set("with_watch_providers", "8");
+    u.searchParams.set("watch_region", "US");
   } else if (p.companies) {
     u.searchParams.set("with_companies", p.companies);
   } else if (p.lang) {
