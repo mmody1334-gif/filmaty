@@ -108,6 +108,9 @@
           <span id="profileBtnAvatar" class="w-5 h-5 rounded bg-[#e50914] text-white text-[11px] font-black flex items-center justify-center" aria-hidden="true">👤</span>
           <span id="profileBtnLabel">دخول يوزر</span>
         </button>
+        <a id="getAppBtn" href="https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk" class="hidden min-h-[44px] items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#e50914] text-white text-xs font-black transition hover:bg-[#f6121d]">
+          <span>📲 التطبيق</span>
+        </a>
         <a href="Tv/" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
           <span>📺 وضع التلفزيون</span>
         </a>
@@ -473,11 +476,17 @@
 
   <script>
     const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
+    const IN_APP = /FilmatyApp\//.test(navigator.userAgent);
+    const APK_URL = 'https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk';
     const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
     const TMDB_BASE = 'https://api.themoviedb.org/3';
     const IMG_BASE = `${API_BASE}/img/w342`;
     const IMG_BACKDROP = `${API_BASE}/img/w1280`;
     // English name under the Arabic one (title_en from the API).
+    if (!IN_APP && /Android/i.test(navigator.userAgent)) {
+      const b = document.getElementById('getAppBtn');
+      if (b) { b.classList.remove('hidden'); b.classList.add('flex'); }
+    }
     function enTitleOf(item) {
       const main = (item.title || item.name || '').trim().toLowerCase();
       const en = (item.title_en || '').trim();
@@ -2425,7 +2434,11 @@
         // embedwave always plays sandboxed (ads blocked): scripts +
         // same-origin so the player can run, but no popups or
         // top-navigation.
-        videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
+        // In the Android app the shell blocks popups/redirects/ad hosts
+        // natively, so the player runs unsandboxed (sandbox-detecting
+        // embeds then work too).
+        if (IN_APP) videoIframe.removeAttribute('sandbox');
+        else videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
         showIframeSpinner();
         videoIframe.src = quality.stream;
         playerContainer.classList.remove('hidden');
