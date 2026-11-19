@@ -232,7 +232,7 @@ test("invalid browse params return 400", async () => {
       "type=movie&lang=xx",
       "type=movie&sort=latest",
       "type=movie&page=0",
-      "type=movie&page=6",
+      "type=movie&page=501",
       "type=movie&page=abc",
       "type=movie&collection=disney",
       "type=movie&origin=USA",

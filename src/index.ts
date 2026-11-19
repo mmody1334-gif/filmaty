@@ -219,7 +219,7 @@ async function handleApiHome(request: Request, env: Env): Promise<Response> {
   return jsonResponse({ ok: true, mostWatched, topRated }, 200);
 }
 
-// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&origin=US&sort=popular|top_rated&page=1..5&collection=marvel|netflix
+// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&origin=US&sort=popular|top_rated&page=1..500&collection=marvel|netflix
 // lang and origin are optional: omitted lang = global (no language
 // filter), omitted origin = any origin country.
 // TMDB discover behind the Worker (cached 10 min). { ok, results, total_pages }.
@@ -250,7 +250,7 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
   }
   const pageRaw = url.searchParams.get("page") || "1";
   const page = Number(pageRaw);
-  if (!Number.isInteger(page) || page < 1 || page > 5) {
+  if (!Number.isInteger(page) || page < 1 || page > 500) {
     return jsonResponse({ ok: false, error: "invalid page" }, 400);
   }
   const collection = url.searchParams.get("collection");

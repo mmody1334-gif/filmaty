@@ -1284,13 +1284,63 @@
 
     // Browse via the Worker (/api/browse) — all browsing goes through the
     // backend now; the old direct-browser TMDB discover calls are gone.
+    // Browse state for "show more": the last browse's params, title,
+    // how many pages are loaded, and the total TMDB reports. A browse
+    // with alsoTv (the Netflix tab) loads movies AND series together.
+    let browseState = null;
+
+    async function fetchBrowsePage(params, page) {
+      const types = params.alsoTv ? ['movie', 'tv'] : [params.type];
+      const pages = await Promise.all(types.map(async (type) => {
+        const p = { ...params, type, page: String(page) };
+        delete p.alsoTv;
+        const res = await fetch(`${API_BASE}/api/browse?${new URLSearchParams(p).toString()}`);
+        return res.json();
+      }));
+      const results = pages.flatMap((d) => d.results || []);
+      if (params.alsoTv) results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      const total = Math.max(...pages.map((d) => Number(d.total_pages) || 0));
+      return { results, total };
+    }
+
+    function renderLoadMore() {
+      document.getElementById('loadMoreWrap')?.remove();
+      if (!browseState || browseState.page >= Math.min(browseState.total, 500)) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'loadMoreWrap';
+      wrap.className = 'flex justify-center my-6';
+      wrap.innerHTML = '<button id="loadMoreBtn" type="button" class="min-h-[44px] px-6 rounded-md bg-[#e50914] hover:bg-[#f6121d] text-white text-sm font-bold">عرض المزيد</button>';
+      mediaGrid.insertAdjacentElement('afterend', wrap);
+      document.getElementById('loadMoreBtn').addEventListener('click', loadMoreBrowse);
+    }
+
+    async function loadMoreBrowse() {
+      if (!browseState || browseState.loading) return;
+      const state = browseState;
+      state.loading = true;
+      const btn = document.getElementById('loadMoreBtn');
+      if (btn) btn.textContent = '⏳ جاري التحميل...';
+      try {
+        const { results } = await fetchBrowsePage(state.params, state.page + 1);
+        if (browseState !== state) return;
+        const seen = new Set(state.items.map((i) => `${i.media_type}:${i.id}`));
+        state.items.push(...results.filter((i) => !seen.has(`${i.media_type}:${i.id}`)));
+        state.page += 1;
+        renderCards(state.items, state.title);
+      } catch (e) {
+        if (btn) btn.textContent = 'عرض المزيد';
+      } finally {
+        state.loading = false;
+      }
+    }
+
     async function loadBrowse(params, title) {
+      browseState = null;
       renderLoading();
       try {
-        const qs = new URLSearchParams(params);
-        const res = await fetch(`${API_BASE}/api/browse?${qs.toString()}`);
-        const data = await res.json();
-        renderCards(data.results || [], title);
+        const { results, total } = await fetchBrowsePage(params, Number(params.page) || 1);
+        browseState = { params, title, page: Number(params.page) || 1, total, items: results.slice() };
+        renderCards(browseState.items, title);
       } catch (e) {
         showError('تعذر جلب البيانات.');
       }
@@ -1365,7 +1415,7 @@
     document.getElementById('drawerNetflix').addEventListener('click', () => {
       clearActiveFilters();
       closeDrawer();
-      loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
+      loadBrowse({ type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
     });
 
     // Category filter click handler: each tab has its own home.
@@ -1387,7 +1437,7 @@
         else if (filter === 'movie') loadBrowse({ type: 'movie', sort: 'popular', page: '1' }, '🎬 أحدث الأفلام');
         else if (filter === 'tv') loadBrowse({ type: 'tv', sort: 'popular', page: '1' }, '📺 أحدث المسلسلات');
         else if (filter === 'marvel') loadBrowse({ type: 'movie', collection: 'marvel', sort: 'popular', page: '1' }, '🦸‍♂️ مارفل');
-        else if (filter === 'netflix') loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
+        else if (filter === 'netflix') loadBrowse({ type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
       });
     });
 
@@ -1411,6 +1461,7 @@
     }
 
     function renderLoading() {
+      document.getElementById('loadMoreWrap')?.remove();
       showGridView();
       mediaGrid.innerHTML = Array(12).fill(0).map(() => `
         <div class="animate-pulse bg-[#181818] rounded-md aspect-[2/3] border border-neutral-800"></div>
@@ -1423,6 +1474,7 @@
     }
 
     function renderCards(items, title) {
+      document.getElementById('loadMoreWrap')?.remove();
       sectionTitle.innerHTML = title;
       itemsCount.innerText = `${items.length} عمل`;
 
@@ -1471,6 +1523,7 @@
           </a>
         `;
       }).join('');
+      if (browseState && browseState.items === items) renderLoadMore();
     }
 
     function getDownloadQualities(resolved) {
