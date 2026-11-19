@@ -1,7 +1,9 @@
 export interface Env {
   CACHE: KVNamespace;
   DB: D1Database;
-  BOT_TOKEN: string;
+  // Telegram bot: off unless BOT_ENABLED === "1" and BOT_TOKEN is set.
+  BOT_TOKEN?: string;
+  BOT_ENABLED?: string;
   SIGNING_SECRET: string;
   OWNER_IDS?: string;
   WEBHOOK_SECRET?: string;

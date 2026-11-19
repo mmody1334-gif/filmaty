@@ -92,7 +92,7 @@ export function webAppDataToPayload(data: any): string | null {
 }
 
 export async function handleTelegramUpdate(update: any, env: Env): Promise<Response> {
-  const bot = new TelegramClient(env.BOT_TOKEN);
+  const bot = new TelegramClient(env.BOT_TOKEN ?? "");
   const store = new AppStore(env);
 
   try {

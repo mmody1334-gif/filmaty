@@ -90,8 +90,14 @@ export default {
       return handleApiProfilePost(request, env, url);
     }
 
-    // Telegram webhook handler
+    // Telegram webhook handler. The bot is switched off unless
+    // BOT_ENABLED is "1" (set from the GitHub repo variable of the same
+    // name at deploy time). While off, answer 200 and drop the update so
+    // Telegram stops retrying; the website does not depend on the bot.
     if (url.pathname === "/telegram/webhook" && request.method === "POST") {
+      if (env.BOT_ENABLED !== "1" || !env.BOT_TOKEN) {
+        return new Response("bot disabled", { status: 200 });
+      }
       // Validate webhook secret token if configured
       if (env.WEBHOOK_SECRET) {
         const secretHeader = request.headers.get("x-telegram-bot-api-secret-token");

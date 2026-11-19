@@ -24,7 +24,12 @@ jobs:
       - name: Run unit & integration tests
         run: npm test
 
+      # Telegram bot is OFF by default; the website runs on its own.
+      # To turn it back on: set the repo variable BOT_ENABLED = 1
+      # (Settings -> Secrets and variables -> Actions -> Variables) and
+      # the secret BOT_TOKEN, then re-run this workflow.
       - name: Sync Telegram bot token
+        if: ${{ vars.BOT_ENABLED == '1' }}
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -39,7 +44,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy --var BOT_ENABLED:${{ vars.BOT_ENABLED == '1' && '1' || '0' }}
 
       # Self-heal the Telegram webhook: the Worker rejects deliveries with
       # 403 unless Telegram sends the secret_token matching its
@@ -55,6 +60,7 @@ jobs:
       # printf '%s' (no newline) so no trailing newline lands in the
       # secret value.)
       - name: Sync Telegram webhook secret
+        if: ${{ vars.BOT_ENABLED == '1' }}
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -70,3 +76,13 @@ jobs:
             --data-urlencode 'allowed_updates=["message","callback_query"]')
           echo "$HOOK_RESP" | grep -q '"ok":true' || { echo "setWebhook failed: $HOOK_RESP"; exit 1; }
           echo "Webhook secret synced."
+
+      # Bot off: unregister the webhook so Telegram stops sending updates.
+      # Skipped quietly when no BOT_TOKEN secret exists.
+      - name: Remove Telegram webhook (bot disabled)
+        if: ${{ vars.BOT_ENABLED != '1' }}
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          if [ -z "$BOT_TOKEN" ]; then echo "No BOT_TOKEN secret; nothing to remove."; exit 0; fi
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | grep -q '"ok":true' && echo "Webhook removed." || echo "deleteWebhook did not succeed (ignored)."
