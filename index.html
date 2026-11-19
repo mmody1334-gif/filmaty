@@ -49,6 +49,39 @@
     button:disabled { cursor: not-allowed; opacity: 0.6; }
     :focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
     #modalCard.theater-mode { max-width: 80rem; }
+    /* --- v2 look: cinematic hero, poster rows, top-10 --- */
+    body { background: radial-gradient(1200px 600px at 80% -10%, rgba(229,9,20,0.10), transparent 60%), #0b0b0f; }
+    header.glass { transition: background-color .35s ease, border-color .35s ease, backdrop-filter .35s ease; }
+    body.hero-top header.glass { background: linear-gradient(to bottom, rgba(0,0,0,.75), rgba(0,0,0,0)); backdrop-filter: none; border-bottom-color: transparent; }
+    #heroBanner { margin-top: -68px; }
+    #heroBanner .hero-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1s ease; }
+    #heroBanner .hero-slide.on { opacity: 1; animation: kenburns 9s ease-out forwards; }
+    @keyframes kenburns { from { transform: scale(1.08); } to { transform: scale(1); } }
+    .hero-scrim { background: linear-gradient(to top, #0b0b0f 2%, rgba(11,11,15,.55) 38%, rgba(11,11,15,0) 70%), linear-gradient(to left, rgba(11,11,15,.92) 0%, rgba(11,11,15,.55) 38%, rgba(11,11,15,0) 70%); }
+    #heroContent > * { animation: heroIn .7s ease both; }
+    #heroContent > *:nth-child(2) { animation-delay: .08s; } #heroContent > *:nth-child(3) { animation-delay: .16s; } #heroContent > *:nth-child(4) { animation-delay: .24s; }
+    @keyframes heroIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    .hero-dot { width: 8px; height: 8px; border-radius: 9999px; background: rgba(255,255,255,.35); transition: all .3s ease; }
+    .hero-dot.on { width: 26px; background: #e50914; }
+    .row-wrap { position: relative; }
+    .row-track { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; scroll-behavior: smooth; padding: 6px 2px 14px; }
+    .row-track > * { scroll-snap-align: start; }
+    .row-arrow { position: absolute; top: 6px; bottom: 14px; width: 44px; z-index: 5; display: none; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #fff; background: rgba(11,11,15,.7); opacity: 0; transition: opacity .2s; border-radius: 8px; }
+    @media (hover: hover) and (min-width: 768px) { .row-arrow { display: flex; } .row-wrap:hover .row-arrow { opacity: 1; } }
+    .row-arrow.prev { right: -6px; } .row-arrow.next { left: -6px; }
+    .pcard { position: relative; flex-shrink: 0; display: block; border-radius: 10px; overflow: hidden; background: #16161c; transition: transform .25s ease, box-shadow .25s ease; }
+    .pcard img { transition: transform .5s ease, filter .3s ease; }
+    @media (hover: hover) { .pcard:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 14px 30px rgba(0,0,0,.6), 0 0 0 2px rgba(229,9,20,.85); z-index: 2; } .pcard:hover img { transform: scale(1.06); } }
+    .pcard .pcard-info { position: absolute; inset: auto 0 0 0; padding: 26px 8px 8px; background: linear-gradient(to top, rgba(0,0,0,.92), rgba(0,0,0,0)); }
+    .top10 { display: flex; align-items: flex-end; flex-shrink: 0; }
+    .top10-num { font-size: 120px; line-height: .78; font-weight: 900; color: #0b0b0f; -webkit-text-stroke: 3px #6b6b75; letter-spacing: -8px; margin-left: -18px; user-select: none; font-family: 'Cairo', system-ui, sans-serif; }
+    @media (max-width: 640px) { .top10-num { font-size: 84px; -webkit-text-stroke: 2px #6b6b75; margin-left: -12px; } }
+    .row-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    .row-title h3 { font-size: clamp(1rem, 1.6vw, 1.3rem); font-weight: 900; }
+    .row-more { font-size: 12px; font-weight: 800; color: #a3a3a3; white-space: nowrap; }
+    .row-more:hover { color: #fff; }
+    #mediaGrid > a { border-radius: 10px; transition: transform .25s ease, box-shadow .25s ease, border-color .25s; }
+    @media (hover: hover) { #mediaGrid > a:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(0,0,0,.6), 0 0 0 2px rgba(229,9,20,.85); } }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
     }
@@ -78,7 +111,7 @@
         <a href="Tv/" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
           <span>📺 وضع التلفزيون</span>
         </a>
-        <a href="https://t.me/filmatibot" target="_blank" rel="noopener" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white text-xs font-bold transition">
+        <a href="https://t.me/filmatibot" target="_blank" rel="noopener" class="hidden min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white text-xs font-bold transition">
           <span>البوت</span>
         </a>
       </div>
@@ -170,26 +203,31 @@
   </section>
 
   <!-- Main Content Grid -->
-  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6">
-    <!-- Netflix Featured Hero Billboard -->
-    <section id="heroBanner" class="hidden relative w-full aspect-[16/11] sm:aspect-[21/9] max-h-[460px] rounded-xl overflow-hidden bg-[#181818] border border-neutral-800 mb-8">
-      <img id="heroImg" src="" alt="" fetchpriority="high" class="w-full h-full object-cover object-center" />
-      <div class="hero-scrim absolute inset-0"></div>
-      <div class="absolute inset-x-0 bottom-0 p-5 sm:p-8 md:p-10 max-w-2xl space-y-2.5">
-        <div class="flex flex-wrap items-center gap-2.5 text-xs font-bold text-neutral-200">
+  <!-- Cinematic hero carousel (full-bleed, under the transparent header) -->
+  <section id="heroBanner" class="hidden relative w-full h-[72vh] min-h-[440px] max-h-[760px] overflow-hidden bg-[#0b0b0f] mb-6">
+    <img id="heroImg" src="" alt="" fetchpriority="high" class="hero-slide on" />
+    <img id="heroImg2" src="" alt="" class="hero-slide" aria-hidden="true" />
+    <div class="hero-scrim absolute inset-0"></div>
+    <div class="absolute inset-x-0 bottom-0 max-w-7xl mx-auto w-full px-4 sm:px-6 pb-12 sm:pb-16">
+      <div id="heroContent" class="max-w-xl space-y-3">
+        <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-neutral-200">
           <span class="px-2 py-0.5 rounded bg-[#e50914] text-white font-extrabold">مختارات فيلماتي</span>
-          <span id="heroKind"></span>
+          <span id="heroKind" class="px-2 py-0.5 rounded bg-white/10 backdrop-blur"></span>
           <span id="heroYear"></span>
           <span id="heroRating" class="text-amber-400 font-extrabold"></span>
         </div>
-        <h2 id="heroTitle" class="font-black text-white leading-tight" style="font-size: clamp(1.5rem, 3.8vw, 2.75rem);"></h2>
-        <p id="heroOverview" class="text-neutral-200 text-xs sm:text-sm line-clamp-2 leading-relaxed max-w-xl"></p>
+        <h2 id="heroTitle" class="font-black text-white leading-[1.1] drop-shadow-[0_4px_18px_rgba(0,0,0,.7)]" style="font-size: clamp(2rem, 5.2vw, 4rem);"></h2>
+        <p id="heroOverview" class="text-neutral-200 text-sm sm:text-base line-clamp-3 leading-relaxed"></p>
         <div class="flex flex-wrap items-center gap-3 pt-1">
-          <button id="heroPlayBtn" type="button" class="min-h-[44px] px-6 py-2.5 rounded-md bg-white hover:bg-neutral-200 text-black font-black text-sm flex items-center gap-2 transition">▶ تشغيل الآن</button>
-          <button id="heroInfoBtn" type="button" class="min-h-[44px] px-5 py-2.5 rounded-md bg-neutral-800/90 hover:bg-neutral-700 text-white border border-[#737373] font-bold text-sm flex items-center gap-2 transition">تفاصيل العمل</button>
+          <button id="heroPlayBtn" type="button" class="min-h-[48px] px-7 rounded-lg bg-[#e50914] hover:bg-[#f6121d] text-white font-black text-base flex items-center gap-2 shadow-lg shadow-red-900/40 transition">▶ شاهد الآن</button>
+          <button id="heroInfoBtn" type="button" class="min-h-[48px] px-6 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur text-white font-bold text-base flex items-center gap-2 transition">ⓘ التفاصيل</button>
         </div>
       </div>
-    </section>
+      <div id="heroDots" class="flex items-center gap-1.5 mt-6"></div>
+    </div>
+  </section>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6">
 
     <!-- Section Title -->
     <div id="gridHeader" class="flex items-center justify-between mb-3">
@@ -750,6 +788,7 @@
     function showGridView() {
       const hero = document.getElementById('heroBanner');
       if (hero) hero.classList.add('hidden');
+      document.body.classList.remove('hero-top');
       document.getElementById('homeSections').classList.add('hidden');
       document.getElementById('gridHeader').classList.remove('hidden');
       mediaGrid.classList.remove('hidden');
@@ -761,37 +800,106 @@
       document.getElementById('homeSections').classList.remove('hidden');
       const hero = document.getElementById('heroBanner');
       if (hero && heroItem) hero.classList.remove('hidden');
+      updateHeaderOverHero();
     }
+
+    // Hero carousel: up to 6 picks with a backdrop, crossfading every 8s
+    // between two stacked <img> layers (Ken Burns zoom on the active one).
+    let heroItems = [];
+    let heroIdx = 0;
+    let heroTimer = null;
 
     function renderHeroBanner() {
       const hero = document.getElementById('heroBanner');
       if (!hero || !homeData) return;
-      const pool = [...(homeData.mostWatched || []), ...(homeData.topRated || [])];
-      heroItem = pool.find((i) => i && (i.backdrop_path || i.poster_path)) || pool[0] || null;
-      if (!heroItem) {
+      const pool = [...(homeData.mostWatched || []), ...(homeData.topRated || []), ...(homeData.upcoming || [])];
+      const seen = new Set();
+      heroItems = pool.filter((i) => {
+        if (!i || !i.backdrop_path) return false;
+        const k = `${i.media_type}:${i.id}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }).slice(0, 6);
+      if (!heroItems.length && pool[0]) heroItems = [pool[0]];
+      if (!heroItems.length) {
+        heroItem = null;
         hero.classList.add('hidden');
         return;
       }
-      const type = heroItem.media_type === 'tv' || (!heroItem.media_type && heroItem.name) ? 'tv' : 'movie';
-      const title = heroItem.title || heroItem.name || '';
-      const date = heroItem.release_date || heroItem.first_air_date || '';
-      const year = date ? date.slice(0, 4) : '';
-      const rating = heroItem.vote_average ? heroItem.vote_average.toFixed(1) : '8.0';
-      const imgPath = heroItem.backdrop_path
-        ? `https://image.tmdb.org/t/p/w1280${heroItem.backdrop_path}`
-        : `${IMG_BASE}${heroItem.poster_path}`;
-      const heroImg = document.getElementById('heroImg');
-      heroImg.src = imgPath;
-      heroImg.alt = title;
-      document.getElementById('heroTitle').innerText = title;
-      document.getElementById('heroKind').innerText = type === 'tv' ? 'مسلسل' : 'فيلم';
-      document.getElementById('heroYear').innerText = year;
-      document.getElementById('heroRating').innerText = `★ ${rating}`;
-      document.getElementById('heroOverview').innerText = heroItem.overview || '';
+      document.getElementById('heroDots').innerHTML = heroItems.map((_, i) =>
+        `<button type="button" class="hero-dot" data-i="${i}" aria-label="العرض ${i + 1}"></button>`).join('');
+      document.querySelectorAll('#heroDots .hero-dot').forEach((d) =>
+        d.addEventListener('click', () => { showHeroSlide(Number(d.dataset.i)); restartHeroTimer(); }));
+      showHeroSlide(0, true);
+      restartHeroTimer();
       if (!document.getElementById('homeSections').classList.contains('hidden')) {
         hero.classList.remove('hidden');
       }
+      updateHeaderOverHero();
     }
+
+    function restartHeroTimer() {
+      clearInterval(heroTimer);
+      if (heroItems.length > 1) heroTimer = setInterval(() => {
+        if (document.hidden || document.getElementById('heroBanner').classList.contains('hidden')) return;
+        showHeroSlide((heroIdx + 1) % heroItems.length);
+      }, 8000);
+    }
+
+    function showHeroSlide(i, first = false) {
+      heroIdx = i;
+      heroItem = heroItems[i];
+      const type = heroItem.media_type === 'tv' || (!heroItem.media_type && heroItem.name) ? 'tv' : 'movie';
+      const title = heroItem.title || heroItem.name || '';
+      const date = heroItem.release_date || heroItem.first_air_date || '';
+      const imgPath = heroItem.backdrop_path
+        ? `https://image.tmdb.org/t/p/original${heroItem.backdrop_path}`
+        : `${IMG_BASE}${heroItem.poster_path}`;
+      const a = document.getElementById('heroImg');
+      const b = document.getElementById('heroImg2');
+      const [front, back] = a.classList.contains('on') ? [a, b] : [b, a];
+      const target = first ? front : back;
+      target.onload = () => {
+        if (!first) { back.classList.add('on'); front.classList.remove('on'); }
+        else { target.classList.remove('on'); void target.offsetWidth; target.classList.add('on'); }
+      };
+      target.alt = title;
+      target.src = imgPath;
+      document.getElementById('heroTitle').innerText = title;
+      document.getElementById('heroKind').innerText = type === 'tv' ? 'مسلسل' : 'فيلم';
+      document.getElementById('heroYear').innerText = date ? date.slice(0, 4) : '';
+      document.getElementById('heroRating').innerText = heroItem.vote_average ? `★ ${heroItem.vote_average.toFixed(1)}` : '';
+      document.getElementById('heroOverview').innerText = heroItem.overview || '';
+      const content = document.getElementById('heroContent');
+      content.querySelectorAll(':scope > *').forEach((el) => { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; });
+      document.querySelectorAll('#heroDots .hero-dot').forEach((d, j) => d.classList.toggle('on', j === i));
+    }
+
+    // Swipe on the hero (phones).
+    (() => {
+      const hero = document.getElementById('heroBanner');
+      let x0 = null;
+      hero.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+      hero.addEventListener('touchend', (e) => {
+        if (x0 === null || heroItems.length < 2) return;
+        const dx = e.changedTouches[0].clientX - x0;
+        x0 = null;
+        if (Math.abs(dx) < 50) return;
+        // RTL: swiping left goes to the next slide.
+        const n = heroItems.length;
+        showHeroSlide(dx < 0 ? (heroIdx + 1) % n : (heroIdx - 1 + n) % n);
+        restartHeroTimer();
+      });
+    })();
+
+    // Header is transparent while it sits over the hero.
+    function updateHeaderOverHero() {
+      const hero = document.getElementById('heroBanner');
+      const over = hero && !hero.classList.contains('hidden') && window.scrollY < 60;
+      document.body.classList.toggle('hero-top', !!over);
+    }
+    window.addEventListener('scroll', updateHeaderOverHero, { passive: true });
 
     document.getElementById('heroInfoBtn').addEventListener('click', () => {
       if (!heroItem) return;
@@ -878,12 +986,15 @@
           <span class="text-xs font-bold text-[#a3a3a3]">السنة:</span>
           ${chips}
         </div>
-        ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched, true)}
+        ${top10SectionHtml(mostWatched)}
+        ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched.slice(10))}
         ${homeSectionHtml('⭐ الأعلى تقييمًا', topRated)}
         ${homeSectionHtml('🆕 حلقات جديدة', homeData.newEpisodes || [])}
         ${homeSectionHtml('📅 قريبًا', homeData.upcoming || [])}
         ${emptyNote}
+        <div id="homeExtraRows" class="space-y-9"></div>
       `;
+      renderExtraRows();
       sectionsEl.querySelectorAll('.home-year-chip').forEach((btn) => {
         btn.addEventListener('click', () => {
           homeYearFilter = btn.dataset.year;
@@ -892,42 +1003,94 @@
       });
     }
 
-    function homeSectionHtml(title, items, showRank = false) {
-      if (!items.length) return '';
+    function rowHtml(title, inner, moreKey = '') {
+      const more = moreKey ? `<button type="button" class="row-more" data-more="${moreKey}">عرض الكل ‹</button>` : '';
       return `
         <section>
-          <h3 class="text-base sm:text-lg font-extrabold text-white mb-3">${title}</h3>
-          <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            ${items.map((item, idx) => homeCardHtml(item, showRank && idx < 10 ? idx + 1 : 0)).join('')}
+          <div class="row-title"><h3 class="text-white">${title}</h3>${more}</div>
+          <div class="row-wrap">
+            <button type="button" class="row-arrow prev" aria-label="السابق" onclick="scrollRow(this, 1)">›</button>
+            <div class="row-track scrollbar-hide">${inner}</div>
+            <button type="button" class="row-arrow next" aria-label="التالي" onclick="scrollRow(this, -1)">‹</button>
           </div>
         </section>
       `;
     }
 
+    // RTL rows: "next" scrolls toward the left (negative scrollLeft).
+    function scrollRow(btn, dir) {
+      const track = btn.parentElement.querySelector('.row-track');
+      track.scrollBy({ left: dir * track.clientWidth * 0.85, behavior: 'smooth' });
+    }
+
+    function homeSectionHtml(title, items, showRank = false, moreKey = '') {
+      if (!items.length) return '';
+      return rowHtml(title, items.map((item, idx) => homeCardHtml(item, showRank && idx < 10 ? idx + 1 : 0)).join(''), moreKey);
+    }
+
+    function top10SectionHtml(items) {
+      const top = items.slice(0, 10);
+      if (top.length < 3) return '';
+      return rowHtml('🏆 أفضل 10 على فيلماتي', top.map((item, idx) =>
+        `<div class="top10"><span class="top10-num" aria-hidden="true">${idx + 1}</span>${homeCardHtml(item)}</div>`).join(''));
+    }
+
+    // Extra discovery rows, loaded after the core home so it paints fast.
+    const EXTRA_ROWS = [
+      { key: 'netflix', title: '🔴 الآن على نتفليكس', params: { type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' } },
+      { key: 'ar-tv', title: 'مسلسلات عربية', params: { type: 'tv', lang: 'ar', sort: 'popular', page: '1' } },
+      { key: 'ar-movie', title: 'أفلام عربية', params: { type: 'movie', lang: 'ar', sort: 'popular', page: '1' } },
+      { key: 'ko', title: 'دراما كورية', params: { type: 'tv', lang: 'ko', sort: 'popular', page: '1' } },
+      { key: 'tr', title: 'مسلسلات تركية', params: { type: 'tv', lang: 'tr', sort: 'popular', page: '1' } },
+      { key: 'ja', title: 'أنمي وياباني', params: { type: 'tv', lang: 'ja', sort: 'popular', page: '1' } },
+      { key: 'marvel', title: 'عالم مارفل', params: { type: 'movie', collection: 'marvel', sort: 'popular', page: '1' } },
+      { key: 'en-movie', title: 'أفلام أمريكية', params: { type: 'movie', lang: 'en', origin: 'US', sort: 'popular', page: '1' } },
+    ];
+    const extraRowCache = {};
+
+    async function renderExtraRows() {
+      const box = document.getElementById('homeExtraRows');
+      if (!box) return;
+      box.innerHTML = EXTRA_ROWS.map((r) => `<div data-row="${r.key}">${extraRowCache[r.key] ? homeSectionHtml(r.title, extraRowCache[r.key], false, r.key) : ''}</div>`).join('');
+      await Promise.all(EXTRA_ROWS.map(async (r) => {
+        if (!extraRowCache[r.key]) {
+          try { extraRowCache[r.key] = (await fetchBrowsePage(r.params, 1)).results; } catch { extraRowCache[r.key] = []; }
+        }
+        const slot = document.querySelector(`#homeExtraRows [data-row="${r.key}"]`);
+        if (slot) slot.innerHTML = homeSectionHtml(r.title, filterHomeList(extraRowCache[r.key]), false, r.key);
+      }));
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.row-more');
+      if (!btn) return;
+      const row = EXTRA_ROWS.find((r) => r.key === btn.dataset.more);
+      if (!row) return;
+      window.scrollTo({ top: 0 });
+      loadBrowse({ ...row.params }, row.title);
+    });
+
     function homeCardHtml(item, rankNum = 0) {
       const title = (item.title || item.name || 'بدون عنوان').replace(/"/g, '&quot;');
       const date = item.release_date || item.first_air_date || '';
       const year = date ? date.slice(0, 4) : '';
-      const rating = item.vote_average ? item.vote_average.toFixed(1) : '7.5';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '';
       const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
       const mediaType = item.media_type === 'tv' || (!item.media_type && item.name) ? 'tv' : 'movie';
       const kind = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
       const href = cardHref(mediaType, item.id);
-      const badgeLeft = rankNum > 0
+      const rank = rankNum > 0
         ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#e50914] text-white text-[11px] font-black shadow pointer-events-none">#${rankNum}</span>`
-        : `<span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 text-neutral-200 text-[10px] font-bold pointer-events-none">${kind}</span>`;
+        : '';
       return `
-        <a href="${href}" class="block group cursor-pointer shrink-0 w-36 sm:w-44 bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
+        <a href="${href}" class="pcard w-32 sm:w-40 lg:w-44" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
           <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
             <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
-            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>
-            ${badgeLeft}
-          </div>
-          <div class="p-2.5 bg-[#181818] pointer-events-none">
-            <h4 class="text-xs font-bold text-white truncate">${title}</h4>
-            <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
-              <span>${year || kind}</span>
-              <span>${year ? kind : ''}</span>
+            ${rank}
+            ${rating ? `<span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>` : ''}
+            <div class="pcard-info pointer-events-none">
+              <h4 class="text-[13px] font-extrabold text-white truncate">${title}</h4>
+              <div class="text-[11px] text-neutral-300 font-semibold">${kind}${year ? ' • ' + year : ''}</div>
             </div>
           </div>
         </a>
