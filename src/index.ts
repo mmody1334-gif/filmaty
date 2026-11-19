@@ -10,7 +10,13 @@ import {
 import { getHome, recordView } from "./engine/home.ts";
 import { getProfile, normalizeUsername, saveProfile } from "./engine/profile.ts";
 import { searchTitles, TMDB_BASE, tmdbApiKey } from "./engine/search.ts";
-import { BROWSE_COLLECTIONS, BROWSE_LANGS, browseTitles } from "./engine/browse.ts";
+import {
+  BROWSE_COLLECTIONS,
+  BROWSE_GENRES,
+  BROWSE_LANGS,
+  BROWSE_SORTS,
+  browseTitles,
+} from "./engine/browse.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
 import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
@@ -226,9 +232,8 @@ async function handleApiHome(request: Request, env: Env): Promise<Response> {
   return jsonResponse({ ok: true, mostWatched, topRated }, 200);
 }
 
-// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&origin=US&sort=popular|top_rated&page=1..500&collection=marvel|netflix
-// lang and origin are optional: omitted lang = global (no language
-// filter), omitted origin = any origin country.
+// GET /api/browse?type=movie|tv&lang=ar|en|hi|tr|ko|es|fr|ja&origin=US&sort=popular|top_rated|newest&page=1..500&collection=marvel|netflix&genre=28&year=2025
+// lang, origin, genre, and year are optional.
 // TMDB discover behind the Worker (cached 10 min). { ok, results, total_pages }.
 async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Response> {
   const type = url.searchParams.get("type");
@@ -251,10 +256,11 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
     }
     origin = originRaw.toUpperCase();
   }
-  const sort = url.searchParams.get("sort") || "popular";
-  if (sort !== "popular" && sort !== "top_rated") {
+  const sortRaw = url.searchParams.get("sort") || "popular";
+  if (!(BROWSE_SORTS as readonly string[]).includes(sortRaw)) {
     return jsonResponse({ ok: false, error: "invalid sort" }, 400);
   }
+  const sort = sortRaw as (typeof BROWSE_SORTS)[number];
   const pageRaw = url.searchParams.get("page") || "1";
   const page = Number(pageRaw);
   if (!Number.isInteger(page) || page < 1 || page > 500) {
@@ -264,8 +270,25 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
   if (collection !== null && !(BROWSE_COLLECTIONS as readonly string[]).includes(collection)) {
     return jsonResponse({ ok: false, error: "invalid collection" }, 400);
   }
+  const genreRaw = url.searchParams.get("genre");
+  let genre: (typeof BROWSE_GENRES)[number] | undefined;
+  if (genreRaw !== null) {
+    if (!(BROWSE_GENRES as readonly string[]).includes(genreRaw)) {
+      return jsonResponse({ ok: false, error: "invalid genre" }, 400);
+    }
+    genre = genreRaw as (typeof BROWSE_GENRES)[number];
+  }
+  const yearRaw = url.searchParams.get("year");
+  let year: number | undefined;
+  if (yearRaw !== null) {
+    const parsedYear = Number(yearRaw);
+    if (!Number.isInteger(parsedYear) || parsedYear < 1950 || parsedYear > 2030) {
+      return jsonResponse({ ok: false, error: "invalid year" }, 400);
+    }
+    year = parsedYear;
+  }
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
-  if (!(await checkResolveRateLimit(env, ip, "browse"))) {
+  if (!(await checkResolveRateLimit(env, ip, "browse", 300))) {
     return jsonResponse({ ok: false, error: "rate_limited" }, 429);
   }
   const { results, total_pages } = await browseTitles(env, {
@@ -275,8 +298,17 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
     sort,
     page,
     collection: (collection as (typeof BROWSE_COLLECTIONS)[number]) || undefined,
+    genre,
+    year,
   });
-  return jsonResponse({ ok: true, results, total_pages }, 200);
+  return new Response(JSON.stringify({ ok: true, results, total_pages }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=300",
+      ...corsHeaders(),
+    },
+  });
 }
 
 // GET /api/search?q= — TMDB in ar + en-US merged/deduped, provider
@@ -489,15 +521,20 @@ async function handleApiTvCommandGet(request: Request, env: Env, url: URL): Prom
   }
 }
 
-// Simple KV rate limit: max 30 requests per IP per 10 min per bucket.
+// Simple KV rate limit: max requests per IP per 10 min per bucket.
 // Fails open (allows the request) if KV is unavailable.
-async function checkResolveRateLimit(env: Env, ip: string, bucket = "resolve"): Promise<boolean> {
+async function checkResolveRateLimit(
+  env: Env,
+  ip: string,
+  bucket = "resolve",
+  limit = 30,
+): Promise<boolean> {
   try {
     if (!env.CACHE) return true;
     const key = `rl:${bucket}:${ip}`;
     const raw = await env.CACHE.get(key);
     const count = raw ? Number.parseInt(raw, 10) || 0 : 0;
-    if (count >= 30) return false;
+    if (count >= limit) return false;
     await env.CACHE.put(key, String(count + 1), { expirationTtl: 600 });
     return true;
   } catch {

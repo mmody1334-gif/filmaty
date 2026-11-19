@@ -173,9 +173,29 @@
           </div>
         </div>
       </div>
-      <button id="drawerTopRated" class="w-full text-right px-3 py-2.5 rounded-xl text-white hover:bg-slate-800 transition">⭐ الأعلى تقييمًا</button>
-      <button id="drawerMarvel" class="w-full text-right px-3 py-2.5 rounded-xl text-white hover:bg-slate-800 transition">🦸‍♂️ مارفل</button>
-      <button id="drawerNetflix" class="w-full text-right px-3 py-2.5 rounded-xl text-white hover:bg-slate-800 transition">🔴 نتفليكس</button>
+      <div>
+        <button type="button" class="drawer-group-btn w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-xl bg-slate-800/70 text-white hover:bg-slate-800 transition cursor-pointer" data-group="movie-genres">
+          <span>🎭 تصنيفات الأفلام</span><span class="drawer-arrow text-slate-400">▾</span>
+        </button>
+        <div id="drawer-movie-genres" class="drawer-sub hidden pr-3 pt-1 space-y-1">
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="28">💥 أكشن</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="35">😂 كوميديا</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="27">👻 رعب</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="878">🚀 خيال علمي</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="80">🕵️ جريمة</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="53">🔪 إثارة وتشويق</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="18">🎭 دراما</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="16">🎨 أنيميشن</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="14">🧙 فانتازيا</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="10749">💘 رومانسي</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="10752">⚔️ حرب</button>
+          <button type="button" class="drawer-genre w-full text-right px-3 py-2 min-h-[44px] rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer" data-type="movie" data-genre="12">🧭 مغامرات</button>
+        </div>
+      </div>
+      <button id="drawerTopRated" class="w-full text-right px-3 py-2.5 min-h-[44px] rounded-xl text-white hover:bg-slate-800 transition cursor-pointer">⭐ الأعلى تقييمًا</button>
+      <button id="drawerMarvel" class="w-full text-right px-3 py-2.5 min-h-[44px] rounded-xl text-white hover:bg-slate-800 transition cursor-pointer">🦸‍♂️ مارفل</button>
+      <button id="drawerNetflixMovies" class="w-full text-right px-3 py-2.5 min-h-[44px] rounded-xl text-white hover:bg-slate-800 transition cursor-pointer">🎬 أفلام نتفليكس</button>
+      <button id="drawerNetflix" class="w-full text-right px-3 py-2.5 min-h-[44px] rounded-xl text-white hover:bg-slate-800 transition cursor-pointer">🔴 نتفليكس</button>
     </nav>
   </aside>
 
@@ -200,8 +220,11 @@
       <button type="button" class="filter-btn active min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#e50914] border border-[#e50914] text-white transition" data-filter="trending">🔥 الأكثر رواجاً</button>
       <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="movie">🎬 أفلام</button>
       <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="tv">📺 مسلسلات</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="marvel">🦸‍♂️ مارفل</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="netflix">🔴 نتفليكس</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="marvel">🦸‍♂️ مارفل</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="netflix-movies">🎬 أفلام نتفليكس</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="newest-movies">🆕 أحدث الأفلام</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="action-movies">💥 أكشن</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="netflix">🔴 نتفليكس</button>
     </div>
   </section>
 
@@ -240,6 +263,9 @@
       </h2>
       <span id="itemsCount" class="text-xs text-[#a3a3a3] font-semibold"></span>
     </div>
+
+    <!-- Interactive Grid Sort & Genre Filter Bar -->
+    <div id="gridFilterBar" class="hidden space-y-2 mb-4"></div>
 
     <!-- Media Cards Grid -->
     <div id="mediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -823,6 +849,11 @@
     let homeYearFilter = 'all';
     let heroItem = null;
 
+    let browseState = null;
+    let browseReqId = 0;
+    let loadMoreObserver = null;
+    let extraRowObserver = null;
+
     function showGridView() {
       const hero = document.getElementById('heroBanner');
       if (hero) hero.classList.add('hidden');
@@ -833,8 +864,13 @@
     }
 
     function showHomeView() {
+      ++browseReqId;
       mediaGrid.classList.add('hidden');
       document.getElementById('gridHeader').classList.add('hidden');
+      document.getElementById('gridFilterBar')?.classList.add('hidden');
+      document.getElementById('loadMoreWrap')?.remove();
+      browseState = null;
+      loadMoreObserver?.disconnect();
       document.getElementById('homeSections').classList.remove('hidden');
       const hero = document.getElementById('heroBanner');
       if (hero && heroItem) hero.classList.remove('hidden');
@@ -1074,30 +1110,79 @@
         `<div class="top10"><span class="top10-num" aria-hidden="true">${idx + 1}</span>${homeCardHtml(item)}</div>`).join(''));
     }
 
-    // Extra discovery rows, loaded after the core home so it paints fast.
+    // Extra discovery rows: first 6 load immediately, remaining rows lazy-load via IntersectionObserver.
     const EXTRA_ROWS = [
+      { key: 'netflix-movies', title: '🎬 أفلام نتفليكس', params: { type: 'movie', collection: 'netflix', sort: 'popular', page: '1' } },
       { key: 'netflix', title: '🔴 الآن على نتفليكس', params: { type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' } },
-      { key: 'ar-tv', title: 'مسلسلات عربية', params: { type: 'tv', lang: 'ar', sort: 'popular', page: '1' } },
-      { key: 'ar-movie', title: 'أفلام عربية', params: { type: 'movie', lang: 'ar', sort: 'popular', page: '1' } },
-      { key: 'ko', title: 'دراما كورية', params: { type: 'tv', lang: 'ko', sort: 'popular', page: '1' } },
-      { key: 'tr', title: 'مسلسلات تركية', params: { type: 'tv', lang: 'tr', sort: 'popular', page: '1' } },
-      { key: 'ja', title: 'أنمي وياباني', params: { type: 'tv', lang: 'ja', sort: 'popular', page: '1' } },
-      { key: 'marvel', title: 'عالم مارفل', params: { type: 'movie', collection: 'marvel', sort: 'popular', page: '1' } },
-      { key: 'en-movie', title: 'أفلام أمريكية', params: { type: 'movie', lang: 'en', origin: 'US', sort: 'popular', page: '1' } },
+      { key: 'newest-movies', title: '🆕 أحدث الأفلام', params: { type: 'movie', sort: 'newest', page: '1' } },
+      { key: 'action-movies', title: '💥 أفلام أكشن وإثارة', params: { type: 'movie', genre: '28', sort: 'popular', page: '1' } },
+      { key: 'ar-movie', title: '🎥 أفلام عربية', params: { type: 'movie', lang: 'ar', sort: 'popular', page: '1' } },
+      { key: 'en-movie', title: '🇺🇸 أفلام أمريكية', params: { type: 'movie', lang: 'en', origin: 'US', sort: 'popular', page: '1' } },
+      { key: 'scifi-movies', title: '🚀 أفلام خيال علمي', params: { type: 'movie', genre: '878', sort: 'popular', page: '1' } },
+      { key: 'horror-movies', title: '👻 أفلام رعب', params: { type: 'movie', genre: '27', sort: 'popular', page: '1' } },
+      { key: 'comedy-movies', title: '😂 أفلام كوميديا', params: { type: 'movie', genre: '35', sort: 'popular', page: '1' } },
+      { key: 'crime-movies', title: '🕵️ أفلام جريمة وغموض', params: { type: 'movie', genre: '80', sort: 'popular', page: '1' } },
+      { key: 'thriller-movies', title: '🔪 أفلام تشويق', params: { type: 'movie', genre: '53', sort: 'popular', page: '1' } },
+      { key: 'animation-movies', title: '🎨 أفلام أنيميشن وعائلية', params: { type: 'movie', genre: '16', sort: 'popular', page: '1' } },
+      { key: 'drama-movies', title: '🎭 أفلام دراما', params: { type: 'movie', genre: '18', sort: 'popular', page: '1' } },
+      { key: 'fantasy-movies', title: '🧙 أفلام فانتازيا', params: { type: 'movie', genre: '14', sort: 'popular', page: '1' } },
+      { key: 'romance-movies', title: '💘 أفلام رومانسية', params: { type: 'movie', genre: '10749', sort: 'popular', page: '1' } },
+      { key: 'war-movies', title: '⚔️ أفلام حرب وتاريخ', params: { type: 'movie', genre: '10752', sort: 'popular', page: '1' } },
+      { key: 'top-movies', title: '🏆 أفلام خالدة الأعلى تقييمًا', params: { type: 'movie', sort: 'top_rated', page: '1' } },
+      { key: 'hi-movie', title: '🇮🇳 أفلام هندية', params: { type: 'movie', lang: 'hi', sort: 'popular', page: '1' } },
+      { key: 'ko-movie', title: '🇰🇷 أفلام كورية', params: { type: 'movie', lang: 'ko', sort: 'popular', page: '1' } },
+      { key: 'marvel', title: '🦸‍♂️ عالم مارفل', params: { type: 'movie', collection: 'marvel', sort: 'popular', page: '1' } },
+      { key: 'ar-tv', title: '📺 مسلسلات عربية', params: { type: 'tv', lang: 'ar', sort: 'popular', page: '1' } },
+      { key: 'ko', title: '🇰🇷 دراما كورية', params: { type: 'tv', lang: 'ko', sort: 'popular', page: '1' } },
+      { key: 'tr', title: '🇹🇷 مسلسلات تركية', params: { type: 'tv', lang: 'tr', sort: 'popular', page: '1' } },
+      { key: 'ja', title: '🇯🇵 أنمي وياباني', params: { type: 'tv', lang: 'ja', sort: 'popular', page: '1' } },
     ];
     const extraRowCache = {};
+
+    async function loadSingleExtraRow(r) {
+      if (!extraRowCache[r.key]) {
+        try { extraRowCache[r.key] = (await fetchBrowsePage(r.params, 1)).results; } catch { extraRowCache[r.key] = []; }
+      }
+      const slot = document.querySelector(`#homeExtraRows [data-row="${r.key}"]`);
+      if (slot) slot.innerHTML = homeSectionHtml(r.title, filterHomeList(extraRowCache[r.key]), false, r.key);
+    }
 
     async function renderExtraRows() {
       const box = document.getElementById('homeExtraRows');
       if (!box) return;
-      box.innerHTML = EXTRA_ROWS.map((r) => `<div data-row="${r.key}">${extraRowCache[r.key] ? homeSectionHtml(r.title, extraRowCache[r.key], false, r.key) : ''}</div>`).join('');
-      await Promise.all(EXTRA_ROWS.map(async (r) => {
-        if (!extraRowCache[r.key]) {
-          try { extraRowCache[r.key] = (await fetchBrowsePage(r.params, 1)).results; } catch { extraRowCache[r.key] = []; }
+      extraRowObserver?.disconnect();
+      box.innerHTML = EXTRA_ROWS.map((r) => (
+        `<div data-row="${r.key}">${extraRowCache[r.key]
+          ? homeSectionHtml(r.title, filterHomeList(extraRowCache[r.key]), false, r.key)
+          : `<div class="space-y-2 py-2"><div class="h-5 w-40 rounded bg-[#181818]"></div><div class="animate-pulse bg-[#181818] rounded-xl h-44 border border-neutral-800"></div></div>`
+        }</div>`
+      )).join('');
+
+      const eagerCount = 6;
+      await Promise.all(EXTRA_ROWS.slice(0, eagerCount).map(loadSingleExtraRow));
+
+      const deferred = EXTRA_ROWS.slice(eagerCount);
+      if (!deferred.length) return;
+      if (!('IntersectionObserver' in window)) {
+        await Promise.all(deferred.map(loadSingleExtraRow));
+        return;
+      }
+
+      extraRowObserver = new IntersectionObserver((entries, observer) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const rowKey = entry.target.getAttribute('data-row');
+          observer.unobserve(entry.target);
+          const row = deferred.find((r) => r.key === rowKey);
+          if (row) loadSingleExtraRow(row);
         }
+      }, { rootMargin: '450px 0px' });
+
+      for (const r of deferred) {
+        if (extraRowCache[r.key]) continue;
         const slot = document.querySelector(`#homeExtraRows [data-row="${r.key}"]`);
-        if (slot) slot.innerHTML = homeSectionHtml(r.title, filterHomeList(extraRowCache[r.key]), false, r.key);
-      }));
+        if (slot) extraRowObserver.observe(slot);
+      }
     }
 
     document.addEventListener('click', (e) => {
@@ -1432,6 +1517,9 @@
     async function executeSearch(query) {
       saveRecentSearch(query);
       hideSuggest();
+      ++browseReqId;
+      browseState = null;
+      document.getElementById('gridFilterBar')?.classList.add('hidden');
       renderLoading();
       try {
         const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
@@ -1490,7 +1578,51 @@
     // Browse state for "show more": the last browse's params, title,
     // how many pages are loaded, and the total TMDB reports. A browse
     // with alsoTv (the Netflix tab) loads movies AND series together.
-    let browseState = null;
+    const GRID_SORTS = [
+      { id: 'popular', label: '🔥 الأكثر شعبية' },
+      { id: 'newest', label: '🆕 الأحدث' },
+      { id: 'top_rated', label: '⭐ الأعلى تقييمًا' },
+    ];
+    const GRID_MOVIE_GENRES = [
+      { id: '', label: 'الكل' },
+      { id: '28', label: '💥 أكشن' },
+      { id: '35', label: '😂 كوميديا' },
+      { id: '27', label: '👻 رعب' },
+      { id: '878', label: '🚀 خيال علمي' },
+      { id: '80', label: '🕵️ جريمة' },
+      { id: '53', label: '🔪 تشويق' },
+      { id: '18', label: '🎭 دراما' },
+      { id: '16', label: '🎨 أنيميشن' },
+      { id: '14', label: '🧙 فانتازيا' },
+      { id: '10749', label: '💘 رومانسي' },
+      { id: '10752', label: '⚔️ حرب' },
+      { id: '12', label: '🧭 مغامرات' },
+    ];
+    const GRID_TV_GENRES = [
+      { id: '', label: 'الكل' },
+      { id: '10759', label: '💥 أكشن ومغامرات' },
+      { id: '18', label: '🎭 دراما' },
+      { id: '35', label: '😂 كوميديا' },
+      { id: '80', label: '🕵️ جريمة' },
+      { id: '9648', label: '🔎 غموض' },
+      { id: '10765', label: '🧙 خيال وفانتازيا' },
+      { id: '16', label: '🎨 أنيميشن' },
+      { id: '10751', label: '👪 عائلي' },
+      { id: '99', label: '🎥 وثائقي' },
+    ];
+
+    function mergeUniqueBrowseItems(existing, incoming) {
+      const seen = new Set(existing.map((i) => `${i.media_type}:${i.id}`));
+      const out = existing.slice();
+      for (const item of incoming) {
+        const key = `${item.media_type}:${item.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push(item);
+        }
+      }
+      return out;
+    }
 
     async function fetchBrowsePage(params, page) {
       const types = params.alsoTv ? ['movie', 'tv'] : [params.type];
@@ -1506,29 +1638,121 @@
       return { results, total };
     }
 
+    async function fetchBrowseBatch(params, startPage, maxPage = 500) {
+      const pageCount = params.alsoTv ? 1 : 2;
+      const pagesToFetch = [startPage];
+      if (pageCount > 1 && startPage + 1 <= maxPage) pagesToFetch.push(startPage + 1);
+      const responses = await Promise.all(pagesToFetch.map((p) => fetchBrowsePage(params, p)));
+      let merged = [];
+      let total = 0;
+      for (const res of responses) {
+        merged = mergeUniqueBrowseItems(merged, res.results || []);
+        if (res.total > total) total = res.total;
+      }
+      const reachedPage = Math.min(pagesToFetch[pagesToFetch.length - 1], total || pagesToFetch[pagesToFetch.length - 1], 500);
+      return { results: merged, total, reachedPage };
+    }
+
+    function renderGridFilterBar(state) {
+      const bar = document.getElementById('gridFilterBar');
+      if (!bar) return;
+      if (!state) {
+        bar.classList.add('hidden');
+        bar.innerHTML = '';
+        return;
+      }
+      bar.classList.remove('hidden');
+      const activeSort = state.params.sort || 'popular';
+      const activeGenre = state.params.genre || '';
+      const genres = state.params.alsoTv ? [] : (state.params.type === 'tv' ? GRID_TV_GENRES : GRID_MOVIE_GENRES);
+
+      const sortHtml = `
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide text-xs font-bold">
+          <span class="text-[#a3a3a3] shrink-0">الترتيب:</span>
+          ${GRID_SORTS.map((s) => {
+            const active = activeSort === s.id;
+            const cls = active
+              ? 'bg-[#e50914] border-[#e50914] text-white'
+              : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white';
+            return `<button type="button" data-grid-sort="${s.id}" class="grid-sort-btn min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-md border transition cursor-pointer ${cls}">${s.label}</button>`;
+          }).join('')}
+        </div>`;
+
+      const genreHtml = genres.length ? `
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide text-xs font-bold">
+          <span class="text-[#a3a3a3] shrink-0">التصنيف:</span>
+          ${genres.map((g) => {
+            const active = activeGenre === g.id;
+            const cls = active
+              ? 'bg-[#e50914] border-[#e50914] text-white'
+              : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white';
+            return `<button type="button" data-grid-genre="${g.id}" class="grid-genre-btn min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-md border transition cursor-pointer ${cls}">${g.label}</button>`;
+          }).join('')}
+        </div>` : '';
+
+      bar.innerHTML = sortHtml + genreHtml;
+
+      bar.querySelectorAll('.grid-sort-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!browseState) return;
+          const nextSort = btn.dataset.gridSort;
+          if (nextSort === (browseState.params.sort || 'popular')) return;
+          const nextParams = { ...browseState.params, sort: nextSort, page: '1' };
+          loadBrowse(nextParams, browseState.title, browseState.baseTitle || browseState.title);
+        });
+      });
+
+      bar.querySelectorAll('.grid-genre-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!browseState) return;
+          const nextGenre = btn.dataset.gridGenre || '';
+          if (nextGenre === (browseState.params.genre || '')) return;
+          const nextParams = { ...browseState.params, page: '1' };
+          if (nextGenre) nextParams.genre = nextGenre;
+          else delete nextParams.genre;
+          const gLabel = nextGenre ? genres.find((x) => x.id === nextGenre)?.label : '';
+          const nextTitle = gLabel && browseState.baseTitle && !browseState.baseTitle.includes(gLabel)
+            ? `${browseState.baseTitle} (${gLabel})`
+            : (browseState.baseTitle || browseState.title);
+          loadBrowse(nextParams, nextTitle, browseState.baseTitle || browseState.title);
+        });
+      });
+    }
+
     function renderLoadMore() {
+      loadMoreObserver?.disconnect();
       document.getElementById('loadMoreWrap')?.remove();
       if (!browseState || browseState.page >= Math.min(browseState.total, 500)) return;
       const wrap = document.createElement('div');
       wrap.id = 'loadMoreWrap';
       wrap.className = 'flex justify-center my-6';
-      wrap.innerHTML = '<button id="loadMoreBtn" type="button" class="min-h-[44px] px-6 rounded-md bg-[#e50914] hover:bg-[#f6121d] text-white text-sm font-bold">عرض المزيد</button>';
+      wrap.innerHTML = '<button id="loadMoreBtn" type="button" class="min-h-[44px] px-6 rounded-md bg-[#e50914] hover:bg-[#f6121d] text-white text-sm font-bold cursor-pointer">عرض المزيد</button>';
       mediaGrid.insertAdjacentElement('afterend', wrap);
       document.getElementById('loadMoreBtn').addEventListener('click', loadMoreBrowse);
+
+      if ('IntersectionObserver' in window) {
+        loadMoreObserver = new IntersectionObserver((entries) => {
+          if (entries.some((e) => e.isIntersecting) && browseState && !browseState.loading) {
+            loadMoreBrowse();
+          }
+        }, { rootMargin: '500px 0px' });
+        loadMoreObserver.observe(wrap);
+      }
     }
 
     async function loadMoreBrowse() {
       if (!browseState || browseState.loading) return;
       const state = browseState;
+      const maxTotal = Math.min(state.total || 500, 500);
+      if (state.page >= maxTotal) return;
       state.loading = true;
       const btn = document.getElementById('loadMoreBtn');
       if (btn) btn.textContent = '⏳ جاري التحميل...';
       try {
-        const { results } = await fetchBrowsePage(state.params, state.page + 1);
+        const { results, reachedPage } = await fetchBrowseBatch(state.params, state.page + 1, maxTotal);
         if (browseState !== state) return;
-        const seen = new Set(state.items.map((i) => `${i.media_type}:${i.id}`));
-        state.items.push(...results.filter((i) => !seen.has(`${i.media_type}:${i.id}`)));
-        state.page += 1;
+        state.items = mergeUniqueBrowseItems(state.items, results);
+        state.page = reachedPage;
         renderCards(state.items, state.title);
       } catch (e) {
         if (btn) btn.textContent = 'عرض المزيد';
@@ -1537,14 +1761,20 @@
       }
     }
 
-    async function loadBrowse(params, title) {
+    async function loadBrowse(params, title, baseTitle = title) {
+      const seq = ++browseReqId;
       browseState = null;
       renderLoading();
       try {
-        const { results, total } = await fetchBrowsePage(params, Number(params.page) || 1);
-        browseState = { params, title, page: Number(params.page) || 1, total, items: results.slice() };
+        const startPage = Number(params.page) || 1;
+        const { results, total, reachedPage } = await fetchBrowseBatch(params, startPage, 500);
+        if (seq !== browseReqId) return;
+        browseState = { params: { ...params }, title, baseTitle, page: reachedPage, total, items: results.slice(), loading: false };
+        renderGridFilterBar(browseState);
         renderCards(browseState.items, title);
       } catch (e) {
+        if (seq !== browseReqId) return;
+        renderGridFilterBar(null);
         showError('تعذر جلب البيانات.');
       }
     }
@@ -1561,21 +1791,9 @@
       );
     }
 
-    // Top-rated: top-rated movies + top-rated series, one grid merged by
-    // vote_average desc.
-    async function loadTopRated() {
-      renderLoading();
-      try {
-        const [movies, tv] = await Promise.all([
-          fetch(`${API_BASE}/api/browse?type=movie&sort=top_rated&page=1`).then((r) => r.json()),
-          fetch(`${API_BASE}/api/browse?type=tv&sort=top_rated&page=1`).then((r) => r.json()),
-        ]);
-        const merged = [...(movies.results || []), ...(tv.results || [])]
-          .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-        renderCards(merged, '⭐ الأعلى تقييمًا');
-      } catch (e) {
-        showError('تعذر جلب البيانات.');
-      }
+    // Top-rated: browse top-rated movies and series with pagination.
+    function loadTopRated() {
+      loadBrowse({ type: 'movie', alsoTv: '1', sort: 'top_rated', page: '1' }, '⭐ الأعلى تقييمًا');
     }
 
     function syncHeaderNavFilter(activeFilter) {
@@ -1615,10 +1833,24 @@
       closeDrawer();
       loadBrowse({ type: 'movie', collection: 'marvel', sort: 'popular', page: '1' }, '🦸‍♂️ مارفل');
     });
+    document.getElementById('drawerNetflixMovies').addEventListener('click', () => {
+      clearActiveFilters();
+      closeDrawer();
+      loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🎬 أفلام نتفليكس');
+    });
     document.getElementById('drawerNetflix').addEventListener('click', () => {
       clearActiveFilters();
       closeDrawer();
       loadBrowse({ type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
+    });
+    document.querySelectorAll('.drawer-genre').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        clearActiveFilters();
+        closeDrawer();
+        const type = btn.dataset.type || 'movie';
+        const label = btn.textContent.trim();
+        loadBrowse({ type, genre: btn.dataset.genre, sort: 'popular', page: '1' }, `🎬 أفلام ${label}`);
+      });
     });
 
     // Category filter click handler: each tab has its own home.
@@ -1637,9 +1869,12 @@
         clearSearch.classList.add('hidden');
 
         if (filter === 'trending') loadHome();
-        else if (filter === 'movie') loadBrowse({ type: 'movie', sort: 'popular', page: '1' }, '🎬 أحدث الأفلام');
+        else if (filter === 'movie') loadBrowse({ type: 'movie', sort: 'popular', page: '1' }, '🎬 أفلام شائعة');
         else if (filter === 'tv') loadBrowse({ type: 'tv', sort: 'popular', page: '1' }, '📺 أحدث المسلسلات');
         else if (filter === 'marvel') loadBrowse({ type: 'movie', collection: 'marvel', sort: 'popular', page: '1' }, '🦸‍♂️ مارفل');
+        else if (filter === 'netflix-movies') loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🎬 أفلام نتفليكس');
+        else if (filter === 'newest-movies') loadBrowse({ type: 'movie', sort: 'newest', page: '1' }, '🆕 أحدث الأفلام');
+        else if (filter === 'action-movies') loadBrowse({ type: 'movie', genre: '28', sort: 'popular', page: '1' }, '💥 أفلام أكشن');
         else if (filter === 'netflix') loadBrowse({ type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
       });
     });
@@ -1664,6 +1899,7 @@
     }
 
     function renderLoading() {
+      loadMoreObserver?.disconnect();
       document.getElementById('loadMoreWrap')?.remove();
       showGridView();
       mediaGrid.innerHTML = Array(12).fill(0).map(() => `

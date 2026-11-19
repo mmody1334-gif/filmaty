@@ -67,12 +67,15 @@
       <h1 class="text-2xl md:text-3xl font-black tracking-wide text-red-600">فيلماتي</h1>
     </div>
     <nav class="flex items-center gap-1 md:gap-2 overflow-x-auto scrollbar-hide" aria-label="التصنيفات">
-      <button data-tab="home" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-white border-b-2 border-red-600 transition">🏠 الرئيسية</button>
-      <button data-tab="movie-ar" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🎬 أفلام عربي</button>
-      <button data-tab="movie-en" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 أفلام إنجليزي</button>
-      <button data-tab="tv-ar" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">📺 مسلسلات عربي</button>
-      <button data-tab="tv-en" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 مسلسلات إنجليزي</button>
-      <button data-tab="top" class="tv-tab tv-focus whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">⭐ الأعلى تقييمًا</button>
+      <button data-tab="home" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-white border-b-2 border-red-600 transition">🏠 الرئيسية</button>
+      <button data-tab="movie-ar" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🎬 أفلام عربي</button>
+      <button data-tab="movie-en" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 أفلام إنجليزي</button>
+      <button data-tab="netflix-movies" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🎬 أفلام نتفليكس</button>
+      <button data-tab="netflix" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🔴 نتفليكس</button>
+      <button data-tab="action-movies" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">💥 أكشن</button>
+      <button data-tab="tv-ar" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">📺 مسلسلات عربي</button>
+      <button data-tab="tv-en" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">🇺🇸 مسلسلات إنجليزي</button>
+      <button data-tab="top" class="tv-tab tv-focus min-h-[44px] whitespace-nowrap px-3 py-2 text-base font-extrabold text-slate-400 border-b-2 border-transparent hover:text-white transition">⭐ الأعلى تقييمًا</button>
     </nav>
     <div class="flex-1"></div>
     <div class="flex items-center gap-2 shrink-0">
@@ -181,6 +184,9 @@
         <span id="tvGridCount" class="text-sm text-slate-400 font-bold"></span>
       </div>
       <div id="tvGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+      <div id="tvLoadMoreWrap" class="hidden flex justify-center mt-6">
+        <button id="tvLoadMoreBtn" type="button" class="tv-focus min-h-[44px] px-8 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-base font-extrabold transition cursor-pointer">عرض المزيد</button>
+      </div>
     </div>
     <p class="text-center text-slate-500 text-xs font-semibold pt-2">التنقّل بالأسهم من الريموت • OK للاختيار • ١ للرجوع ١٠ ثواني • ٣ للتقديم ١٠ ثواني • رجوع للخروج</p>
   </main>
@@ -1088,6 +1094,46 @@
       } catch (e) {}
     }
 
+    const TV_EXTRA_MOVIE_ROWS = [
+      { key: 'netflix-movies', title: '🎬 أفلام نتفليكس', params: { type: 'movie', collection: 'netflix', sort: 'popular', page: '1' } },
+      { key: 'newest-movies', title: '🆕 أحدث الأفلام', params: { type: 'movie', sort: 'newest', page: '1' } },
+      { key: 'action-movies', title: '💥 أفلام أكشن', params: { type: 'movie', genre: '28', sort: 'popular', page: '1' } },
+      { key: 'comedy-movies', title: '😂 أفلام كوميديا', params: { type: 'movie', genre: '35', sort: 'popular', page: '1' } },
+      { key: 'horror-movies', title: '👻 أفلام رعب', params: { type: 'movie', genre: '27', sort: 'popular', page: '1' } },
+      { key: 'scifi-movies', title: '🚀 أفلام خيال علمي', params: { type: 'movie', genre: '878', sort: 'popular', page: '1' } },
+      { key: 'ar-movies', title: '🎥 أفلام عربية', params: { type: 'movie', lang: 'ar', sort: 'popular', page: '1' } },
+      { key: 'top-movies', title: '🏆 أفلام خالدة', params: { type: 'movie', sort: 'top_rated', page: '1' } },
+    ];
+    const tvExtraRowData = {};
+    let tvBrowseState = null;
+    let tvBrowseReqId = 0;
+
+    function tvExtraRowsHtml() {
+      return TV_EXTRA_MOVIE_ROWS.map((r) => {
+        const items = tvExtraRowData[r.key];
+        return `<div data-tv-row="${r.key}">${items ? sectionHtml(r.title, items) : ''}</div>`;
+      }).join('');
+    }
+
+    async function loadTvExtraMovieRows() {
+      await Promise.all(TV_EXTRA_MOVIE_ROWS.map(async (r) => {
+        if (!tvExtraRowData[r.key]) {
+          try {
+            const res = await fetch(`${API_BASE}/api/browse?${new URLSearchParams(r.params).toString()}`);
+            const data = await res.json();
+            tvExtraRowData[r.key] = (data.results || []).slice(0, 20);
+          } catch {
+            tvExtraRowData[r.key] = [];
+          }
+        }
+        const slot = document.querySelector(`#tvExtraMovies [data-tv-row="${r.key}"]`);
+        if (slot) {
+          slot.innerHTML = sectionHtml(r.title, tvExtraRowData[r.key]);
+          bindCards(slot);
+        }
+      }));
+    }
+
     function renderTvHomeRows() {
       if (!tvHomeSnapshot) return;
       tvHome.innerHTML =
@@ -1098,13 +1144,17 @@
         sectionHtml('🔥 الأكثر مشاهدة', tvHomeSnapshot.mostWatched || []) +
         sectionHtml('⭐ الأعلى تقييمًا', tvHomeSnapshot.topRated || []) +
         sectionHtml('🆕 حلقات جديدة', tvHomeSnapshot.newEpisodes || []) +
-        sectionHtml('📅 قريبًا', tvHomeSnapshot.upcomingMovies || []);
+        sectionHtml('📅 قريبًا', tvHomeSnapshot.upcomingMovies || []) +
+        `<div id="tvExtraMovies" class="space-y-8">${tvExtraRowsHtml()}</div>`;
       renderHero((tvHomeSnapshot.mostWatched || [])[0] || (tvHomeSnapshot.topRated || [])[0] || null);
       bindCards(tvHome);
       bindContinueCards(tvHome);
     }
 
     async function loadHome() {
+      ++tvBrowseReqId;
+      tvBrowseState = null;
+      document.getElementById('tvLoadMoreWrap')?.classList.add('hidden');
       showHomeView();
       tvHome.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
       try {
@@ -1127,34 +1177,127 @@
           upcomingMovies,
         };
         renderTvHomeRows();
+        loadTvExtraMovieRows();
       } catch (e) {
         renderHero(null);
         tvHome.innerHTML = '<div class="text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
       }
     }
 
-    async function loadBrowse(params, title) {
-      showGridView();
-      tvGridTitle.innerText = title;
-      tvGrid.innerHTML = Array(10).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>').join('');
-      try {
-        const qs = new URLSearchParams(params);
-        const res = await fetch(`${API_BASE}/api/browse?${qs.toString()}`);
-        const data = await res.json();
-        const items = data.results || [];
-        tvGridCount.innerText = `${items.length} عمل`;
-        if (!items.length) {
-          tvGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-base font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
-          return;
+    function mergeUniqueTvItems(existing, incoming) {
+      const seen = new Set(existing.map((i) => `${i.media_type}:${i.id}`));
+      const out = existing.slice();
+      for (const item of incoming) {
+        const key = `${item.media_type}:${item.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push(item);
         }
-        tvGrid.innerHTML = items.map(cardHtml).join('');
+      }
+      return out;
+    }
+
+    async function fetchTvBrowsePage(params, page) {
+      const types = params.alsoTv ? ['movie', 'tv'] : [params.type || 'movie'];
+      const pages = await Promise.all(types.map(async (type) => {
+        const p = { ...params, type, page: String(page) };
+        delete p.alsoTv;
+        const res = await fetch(`${API_BASE}/api/browse?${new URLSearchParams(p).toString()}`);
+        return res.json();
+      }));
+      const results = pages.flatMap((d) => d.results || []).filter((i) => !i.providerUrl);
+      if (params.alsoTv) {
+        if (params.sort === 'top_rated') results.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+        else results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      }
+      const total = Math.max(...pages.map((d) => Number(d.total_pages) || 0));
+      return { results, total };
+    }
+
+    async function fetchTvBrowseBatch(params, startPage, maxPage = 500) {
+      const pageCount = params.alsoTv ? 1 : 2;
+      const pagesToFetch = [startPage];
+      if (pageCount > 1 && startPage + 1 <= maxPage) pagesToFetch.push(startPage + 1);
+      const responses = await Promise.all(pagesToFetch.map((p) => fetchTvBrowsePage(params, p)));
+      let merged = [];
+      let total = 0;
+      for (const res of responses) {
+        merged = mergeUniqueTvItems(merged, res.results || []);
+        if (res.total > total) total = res.total;
+      }
+      const reachedPage = Math.min(pagesToFetch[pagesToFetch.length - 1], total || pagesToFetch[pagesToFetch.length - 1], 500);
+      return { results: merged, total, reachedPage };
+    }
+
+    function updateTvLoadMoreUi() {
+      const wrap = document.getElementById('tvLoadMoreWrap');
+      const btn = document.getElementById('tvLoadMoreBtn');
+      if (!wrap || !btn) return;
+      if (!tvBrowseState || tvBrowseState.page >= Math.min(tvBrowseState.total, 500)) {
+        wrap.classList.add('hidden');
+        return;
+      }
+      btn.textContent = tvBrowseState.loading ? '⏳ جاري التحميل...' : 'عرض المزيد';
+      btn.disabled = !!tvBrowseState.loading;
+      wrap.classList.remove('hidden');
+    }
+
+    async function loadMoreTvBrowse() {
+      if (!tvBrowseState || tvBrowseState.loading) return;
+      const state = tvBrowseState;
+      const maxTotal = Math.min(state.total || 500, 500);
+      if (state.page >= maxTotal) return;
+      state.loading = true;
+      updateTvLoadMoreUi();
+      try {
+        const { results, reachedPage } = await fetchTvBrowseBatch(state.params, state.page + 1, maxTotal);
+        if (tvBrowseState !== state) return;
+        state.items = mergeUniqueTvItems(state.items, results);
+        state.page = reachedPage;
+        tvGridCount.innerText = `${state.items.length} عمل`;
+        tvGrid.innerHTML = state.items.map(cardHtml).join('');
         bindCards(tvGrid);
       } catch (e) {
+      } finally {
+        state.loading = false;
+        updateTvLoadMoreUi();
+      }
+    }
+
+    async function loadBrowse(params, title) {
+      const seq = ++tvBrowseReqId;
+      tvBrowseState = null;
+      document.getElementById('tvLoadMoreWrap')?.classList.add('hidden');
+      showGridView();
+      tvGridTitle.innerText = title;
+      tvGridCount.innerText = '';
+      tvGrid.innerHTML = Array(12).fill(0).map(() => '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>').join('');
+      try {
+        const startPage = Number(params.page) || 1;
+        const { results, total, reachedPage } = await fetchTvBrowseBatch(params, startPage, 500);
+        if (seq !== tvBrowseReqId) return;
+        tvBrowseState = { params: { ...params }, title, page: reachedPage, total, items: results.slice(), loading: false };
+        tvGridCount.innerText = `${tvBrowseState.items.length} عمل`;
+        if (!tvBrowseState.items.length) {
+          tvGrid.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400"><p class="text-3xl mb-2">🍿</p><p class="text-base font-bold">لم يتم العثور على نتائج مطابقة.</p></div>';
+          updateTvLoadMoreUi();
+          return;
+        }
+        tvGrid.innerHTML = tvBrowseState.items.map(cardHtml).join('');
+        bindCards(tvGrid);
+        updateTvLoadMoreUi();
+      } catch (e) {
+        if (seq !== tvBrowseReqId) return;
         tvGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 text-base font-semibold">تعذر جلب البيانات. يرجى التحقق من اتصالك.</div>';
       }
     }
 
+    document.getElementById('tvLoadMoreBtn')?.addEventListener('click', loadMoreTvBrowse);
+
     async function runSearch(query) {
+      ++tvBrowseReqId;
+      tvBrowseState = null;
+      document.getElementById('tvLoadMoreWrap')?.classList.add('hidden');
       saveTvRecentSearch(query);
       hideTvSuggest();
       showGridView();
@@ -1190,9 +1333,12 @@
         if (tab === 'home') loadHome();
         else if (tab === 'movie-ar') loadBrowse({ type: 'movie', lang: 'ar', sort: 'popular', page: '1' }, '🎬 أفلام عربي');
         else if (tab === 'movie-en') loadBrowse({ type: 'movie', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 أفلام إنجليزي (أمريكي)');
+        else if (tab === 'netflix-movies') loadBrowse({ type: 'movie', collection: 'netflix', sort: 'popular', page: '1' }, '🎬 أفلام نتفليكس');
+        else if (tab === 'netflix') loadBrowse({ type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' }, '🔴 نتفليكس');
+        else if (tab === 'action-movies') loadBrowse({ type: 'movie', genre: '28', sort: 'popular', page: '1' }, '💥 أفلام أكشن');
         else if (tab === 'tv-ar') loadBrowse({ type: 'tv', lang: 'ar', sort: 'popular', page: '1' }, '📺 مسلسلات عربي');
         else if (tab === 'tv-en') loadBrowse({ type: 'tv', lang: 'en', origin: 'US', sort: 'popular', page: '1' }, '🇺🇸 مسلسلات إنجليزي (أمريكي)');
-        else if (tab === 'top') loadBrowse({ sort: 'top_rated', page: '1' }, '⭐ الأعلى تقييمًا');
+        else if (tab === 'top') loadBrowse({ type: 'movie', alsoTv: '1', sort: 'top_rated', page: '1' }, '⭐ الأعلى تقييمًا');
       });
     });
 
