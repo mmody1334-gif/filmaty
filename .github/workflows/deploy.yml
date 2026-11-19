@@ -24,6 +24,16 @@ jobs:
       - name: Run unit & integration tests
         run: npm test
 
+      - name: Sync Telegram bot token
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          test -n "$BOT_TOKEN" || { echo "BOT_TOKEN secret is required"; exit 1; }
+          printf '%s' "$BOT_TOKEN" | npx wrangler secret put BOT_TOKEN
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
@@ -46,14 +56,15 @@ jobs:
       # secret value.)
       - name: Sync Telegram webhook secret
         env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -e
           SECRET=$(openssl rand -hex 24)
           printf '%s' "$SECRET" | npx wrangler secret put WEBHOOK_SECRET
-          TOKEN=$(grep -oP 'BOT_TOKEN = process\.env\.BOT_TOKEN \|\| "\K[^"]+' src/bot-runner.ts)
-          HOOK_RESP=$(curl -s -X POST "https://api.telegram.org/bot${TOKEN}/setWebhook" \
+          test -n "$BOT_TOKEN" || { echo "BOT_TOKEN secret is required"; exit 1; }
+          HOOK_RESP=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
             -d "url=https://filmaty.hudhaifa-bio.workers.dev/telegram/webhook" \
             -d "secret_token=${SECRET}" \
             --data-urlencode 'allowed_updates=["message","callback_query"]')
