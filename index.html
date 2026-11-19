@@ -76,6 +76,14 @@
     .top10 { display: flex; align-items: flex-end; flex-shrink: 0; }
     .top10-num { font-size: 120px; line-height: .78; font-weight: 900; color: #0b0b0f; -webkit-text-stroke: 3px #6b6b75; letter-spacing: -8px; margin-left: -18px; user-select: none; font-family: 'Cairo', system-ui, sans-serif; }
     @media (max-width: 640px) { .top10-num { font-size: 84px; -webkit-text-stroke: 2px #6b6b75; margin-left: -12px; } }
+    .top10-eg[data-platform="netflix"] { --rank-stroke: #e50914; --badge-bg: #e50914; --badge-fg: #ffffff; }
+    .top10-eg[data-platform="shahid"] { --rank-stroke: #10b981; --badge-bg: #10b981; --badge-fg: #052e16; }
+    .top10-eg[data-platform="yango"] { --rank-stroke: #a855f7; --badge-bg: #7c3aed; --badge-fg: #ffffff; }
+    .top10-eg[data-platform="watchit"] { --rank-stroke: #f59e0b; --badge-bg: #f59e0b; --badge-fg: #141414; }
+    .top10-eg .top10-num { -webkit-text-stroke: 3px var(--rank-stroke, #6b6b75); filter: drop-shadow(0 6px 14px rgba(0,0,0,.75)); }
+    @media (max-width: 640px) { .top10-eg .top10-num { -webkit-text-stroke: 2px var(--rank-stroke, #6b6b75); } }
+    .top10-badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 6px; font-weight: 900; font-size: 12px; letter-spacing: .04em; background: var(--badge-bg, #e50914); color: var(--badge-fg, #ffffff); }
+    .top10-ribbon { position: absolute; top: 8px; left: 8px; padding: 2px 6px; border-radius: 5px; font-size: 10px; font-weight: 900; letter-spacing: .03em; background: var(--badge-bg, #e50914); color: var(--badge-fg, #ffffff); box-shadow: 0 2px 8px rgba(0,0,0,.6); pointer-events: none; }
     .row-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
     .row-title h3 { font-size: clamp(1rem, 1.6vw, 1.3rem); font-weight: 900; }
     .row-more { font-size: 12px; font-weight: 800; color: #a3a3a3; white-space: nowrap; }
@@ -1076,10 +1084,11 @@
       const sectionsEl = document.getElementById('homeSections');
       sectionsEl.innerHTML = '<div class="animate-pulse bg-[#181818] rounded-xl h-64 border border-neutral-800"></div>';
       try {
-        const [homeRes, airing, upcoming] = await Promise.all([
+        const [homeRes, airing, upcoming, egyptTop10] = await Promise.all([
           fetch(`${API_BASE}/api/home`),
           fetchTmdbJson('/tv/airing_today'),
           fetchTmdbJson('/movie/upcoming'),
+          fetch(`${API_BASE}/api/top10-egypt`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
         const data = await homeRes.json();
         homeData = {
@@ -1087,6 +1096,7 @@
           topRated: data.topRated || [],
           newEpisodes: ((airing?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'tv' })),
           upcoming: ((upcoming?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'movie' })),
+          egyptTop10: egyptTop10 && egyptTop10.platforms ? egyptTop10 : null,
         };
         homeYearFilter = 'all';
         renderHeroBanner();
@@ -1138,6 +1148,7 @@
           <span class="text-xs font-bold text-[#a3a3a3]">السنة:</span>
           ${chips}
         </div>
+        ${egyptTop10SectionsHtml(homeData.egyptTop10)}
         ${top10SectionHtml(mostWatched)}
         ${homeSectionHtml('🔥 الأكثر مشاهدة', mostWatched.slice(10))}
         ${homeSectionHtml('⭐ الأعلى تقييمًا', topRated)}
@@ -1185,6 +1196,68 @@
       if (top.length < 3) return '';
       return rowHtml('🏆 أفضل 10 على فيلماتي', top.map((item, idx) =>
         `<div class="top10"><span class="top10-num" aria-hidden="true">${idx + 1}</span>${homeCardHtml(item)}</div>`).join(''));
+    }
+
+    const EGYPT_TOP10_PLATFORMS = [
+      { key: 'netflix', badge: 'NETFLIX', title: 'توب 10 الشهر في مصر', browseParams: { type: 'movie', alsoTv: '1', collection: 'netflix', sort: 'popular', page: '1' }, browseTitle: '🔴 نتفليكس' },
+      { key: 'shahid', badge: 'شاهد', title: 'توب 10 الشهر في مصر', browseParams: { type: 'movie', alsoTv: '1', collection: 'shahid', sort: 'popular', page: '1' }, browseTitle: '💚 شاهد VIP' },
+      { key: 'yango', badge: 'يانجو بلاي', title: 'توب 10 الشهر في مصر', browseParams: { type: 'movie', alsoTv: '1', collection: 'yango', sort: 'popular', page: '1' }, browseTitle: '🟣 يانجو بلاي' },
+      { key: 'watchit', badge: 'WATCH IT', title: 'توب 10 الشهر في مصر', browseParams: { type: 'movie', alsoTv: '1', collection: 'watchit', sort: 'popular', page: '1' }, browseTitle: '🟠 واتش إت' },
+    ];
+
+    function top10PlatformCardHtml(item) {
+      const title = (item.title || item.name || 'بدون عنوان').replace(/"/g, '&quot;');
+      const date = item.release_date || item.first_air_date || '';
+      const year = date ? date.slice(0, 4) : '';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '';
+      const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=No+Poster';
+      const mediaType = item.media_type === 'tv' || (!item.media_type && item.name) ? 'tv' : 'movie';
+      const kind = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+      const href = cardHref(mediaType, item.id);
+      return `
+        <a href="${href}" class="pcard w-32 sm:w-40 lg:w-44" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
+          <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
+            <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
+            <span class="top10-ribbon">TOP 10</span>
+            ${rating ? `<span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>` : ''}
+            <div class="pcard-info pointer-events-none">
+              <h4 class="text-[13px] font-extrabold text-white truncate">${title}</h4>
+              ${enTitleOf(item) ? `<div class="text-[11px] text-neutral-300 font-semibold truncate" dir="ltr" style="text-align:right">${escHtml(enTitleOf(item))}</div>` : ''}
+              <div class="text-[11px] text-neutral-400 font-semibold">${kind}${year ? ' • ' + year : ''}</div>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function egyptTop10SectionsHtml(egyptTop10) {
+      if (!egyptTop10 || !egyptTop10.platforms) return '';
+      const dateLabel = egyptTop10.date ? ` • ${escHtml(egyptTop10.date)}` : '';
+      const datePill = `<span class="px-2 py-0.5 rounded-full bg-[#232323] border border-neutral-700 text-neutral-300 text-[11px] font-bold">🇪🇬 تحديث يومي${dateLabel}</span>`;
+      return EGYPT_TOP10_PLATFORMS.map((p) => {
+        const items = (egyptTop10.platforms[p.key] || []).slice(0, 10);
+        if (!items.length) return '';
+        const cards = items.map((item, idx) =>
+          `<div class="top10"><span class="top10-num" aria-hidden="true">${idx + 1}</span>${top10PlatformCardHtml(item)}</div>`
+        ).join('');
+        return `
+          <section class="top10-eg" data-platform="${p.key}">
+            <div class="row-title items-center">
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <span class="top10-badge">${p.badge}</span>
+                <h3 class="text-white">${p.title}</h3>
+                ${datePill}
+              </div>
+              <button type="button" class="row-more min-h-[44px] inline-flex items-center px-2 cursor-pointer" data-top10-more="${p.key}">عرض الكل ‹</button>
+            </div>
+            <div class="row-wrap">
+              <button type="button" class="row-arrow prev" aria-label="السابق" onclick="scrollRow(this, 1)">›</button>
+              <div class="row-track scrollbar-hide">${cards}</div>
+              <button type="button" class="row-arrow next" aria-label="التالي" onclick="scrollRow(this, -1)">‹</button>
+            </div>
+          </section>
+        `;
+      }).join('');
     }
 
     // Extra discovery rows: first 6 load immediately, remaining rows lazy-load via IntersectionObserver.
@@ -1278,6 +1351,14 @@
     }
 
     document.addEventListener('click', (e) => {
+      const top10Btn = e.target.closest('[data-top10-more]');
+      if (top10Btn) {
+        const p = EGYPT_TOP10_PLATFORMS.find((x) => x.key === top10Btn.dataset.top10More);
+        if (!p) return;
+        window.scrollTo({ top: 0 });
+        loadBrowse({ ...p.browseParams }, p.browseTitle);
+        return;
+      }
       const btn = e.target.closest('.row-more');
       if (!btn) return;
       const row = EXTRA_ROWS.find((r) => r.key === btn.dataset.more);

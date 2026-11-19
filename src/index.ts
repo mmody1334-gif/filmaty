@@ -23,6 +23,7 @@ import {
   BROWSE_SORTS,
   browseTitles,
 } from "./engine/browse.ts";
+import { getEgyptTop10 } from "./engine/top10.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
 import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
@@ -101,6 +102,10 @@ export default {
 
     if (url.pathname === "/api/tmdb" && request.method === "GET") {
       return handleApiTmdb(request, env, url);
+    }
+
+    if (url.pathname === "/api/top10-egypt" && request.method === "GET") {
+      return handleApiTop10Egypt(request, env);
     }
 
     if (url.pathname === "/api/view" && request.method === "POST") {
@@ -207,8 +212,9 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    // Scheduled background maintenance: keep domains warm and purge stale caches
+    // Scheduled background maintenance: warm daily Egypt Top 10 and keep Worker cache hot.
     console.log("Filmaty cron running:", new Date().toISOString());
+    ctx.waitUntil(getEgyptTop10(env).catch(() => {}));
   },
 };
 
@@ -414,6 +420,23 @@ async function handleApiTmdb(request: Request, env: Env, url: URL): Promise<Resp
   } catch {
     return jsonResponse({ ok: false, error: "tmdb_unreachable" }, 502);
   }
+}
+
+// GET /api/top10-egypt -> Daily cached Top 10 in Egypt for Netflix, Shahid, Yango Play, WATCH IT.
+async function handleApiTop10Egypt(request: Request, env: Env): Promise<Response> {
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (!(await checkResolveRateLimit(env, ip, "top10", 300))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+  const payload = await getEgyptTop10(env);
+  return new Response(JSON.stringify({ ok: true, ...payload }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=1800",
+      ...corsHeaders(),
+    },
+  });
 }
 
 // GET /api/search?q= — TMDB in ar + en-US merged/deduped, provider

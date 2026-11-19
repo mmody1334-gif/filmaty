@@ -56,6 +56,14 @@
     }
     /* Netflix-style rows: one horizontal strip per section. */
     .tv-row { scroll-behavior: smooth; }
+    .tv-top10 { display: flex; align-items: flex-end; flex-shrink: 0; }
+    .tv-top10-num { font-size: 112px; line-height: .78; font-weight: 900; color: #141414; -webkit-text-stroke: 3px var(--rank-stroke, #6b6b75); letter-spacing: -8px; margin-left: -16px; user-select: none; }
+    .tv-top10-eg[data-platform="netflix"] { --rank-stroke: #e50914; --badge-bg: #e50914; --badge-fg: #ffffff; }
+    .tv-top10-eg[data-platform="shahid"] { --rank-stroke: #10b981; --badge-bg: #10b981; --badge-fg: #052e16; }
+    .tv-top10-eg[data-platform="yango"] { --rank-stroke: #a855f7; --badge-bg: #7c3aed; --badge-fg: #ffffff; }
+    .tv-top10-eg[data-platform="watchit"] { --rank-stroke: #f59e0b; --badge-bg: #f59e0b; --badge-fg: #141414; }
+    .tv-top10-badge { display: inline-flex; align-items: center; padding: 3px 11px; border-radius: 8px; font-weight: 900; font-size: 13px; letter-spacing: .04em; background: var(--badge-bg, #e50914); color: var(--badge-fg, #ffffff); }
+    .tv-top10-ribbon { position: absolute; bottom: 8px; left: 8px; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 900; background: var(--badge-bg, #e50914); color: var(--badge-fg, #ffffff); pointer-events: none; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col pb-12">
@@ -964,7 +972,7 @@
       tvGridWrap.classList.remove('hidden');
       document.getElementById('tvHero').classList.add('hidden');
     }
-    function cardHtml(item, extraClass = '') {
+    function cardHtml(item, extraClass = '', ribbon = '') {
       const title = item.title || item.name || 'بدون عنوان';
       const date = item.release_date || item.first_air_date || '';
       const year = date ? date.slice(0, 4) : '';
@@ -978,6 +986,7 @@
             <img src="${poster}" alt="${title}" loading="lazy" class="w-full h-full object-cover rounded-xl group-hover:opacity-90 transition">
             <span class="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/75 text-amber-400 text-sm font-extrabold border border-amber-500/20">⭐ ${rating}</span>
             <span class="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/75 text-slate-300 text-xs font-bold border border-white/10">${kind}</span>
+            ${ribbon ? `<span class="tv-top10-ribbon">${ribbon}</span>` : ''}
           </div>
           <div class="pt-2 px-1">
             <h4 class="text-sm md:text-base font-bold text-white truncate">${escHtml(title)}</h4>
@@ -1203,6 +1212,35 @@
       }));
     }
 
+    const TV_EGYPT_TOP10_PLATFORMS = [
+      { key: 'netflix', badge: 'NETFLIX', title: 'توب 10 الشهر في مصر' },
+      { key: 'shahid', badge: 'شاهد', title: 'توب 10 الشهر في مصر' },
+      { key: 'yango', badge: 'يانجو بلاي', title: 'توب 10 الشهر في مصر' },
+      { key: 'watchit', badge: 'WATCH IT', title: 'توب 10 الشهر في مصر' },
+    ];
+
+    function tvEgyptTop10SectionsHtml(egyptTop10) {
+      if (!egyptTop10 || !egyptTop10.platforms) return '';
+      const dateStr = egyptTop10.date ? ` • ${escHtml(egyptTop10.date)}` : '';
+      return TV_EGYPT_TOP10_PLATFORMS.map((p) => {
+        const items = (egyptTop10.platforms[p.key] || []).slice(0, 10);
+        if (!items.length) return '';
+        const strip = items.map((it, idx) =>
+          `<div class="tv-top10"><span class="tv-top10-num" aria-hidden="true">${idx + 1}</span><div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(it, '', 'TOP 10')}</div></div>`
+        ).join('');
+        return `
+          <section class="tv-top10-eg" data-platform="${p.key}">
+            <div class="flex flex-wrap items-center gap-2.5 mb-3 px-1">
+              <span class="tv-top10-badge">${p.badge}</span>
+              <h2 class="text-xl md:text-2xl font-extrabold text-white">${p.title}</h2>
+              <span class="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold">🇪🇬 تحديث يومي${dateStr}</span>
+            </div>
+            <div class="tv-row flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x">${strip}</div>
+          </section>
+        `;
+      }).join('');
+    }
+
     function renderTvHomeRows() {
       if (!tvHomeSnapshot) return;
       tvHome.innerHTML =
@@ -1210,6 +1248,7 @@
         tvMyListRowHtml(getMyListItems()) +
         tvHistoryRowHtml(getHistoryItems()) +
         tvRecommendationsRowHtml(tvPersonalRecs) +
+        tvEgyptTop10SectionsHtml(tvHomeSnapshot.egyptTop10) +
         sectionHtml('🔥 الأكثر مشاهدة', tvHomeSnapshot.mostWatched || []) +
         sectionHtml('⭐ الأعلى تقييمًا', tvHomeSnapshot.topRated || []) +
         sectionHtml('🆕 حلقات جديدة', tvHomeSnapshot.newEpisodes || []) +
@@ -1228,10 +1267,11 @@
       showHomeView();
       tvHome.innerHTML = '<div class="animate-pulse bg-brand-card rounded-2xl h-64 border border-brand-border"></div>';
       try {
-        const [homeRes, airing, upcoming] = await Promise.all([
+        const [homeRes, airing, upcoming, egyptTop10] = await Promise.all([
           fetch(`${API_BASE}/api/home`),
           fetchTvTmdbJson('/tv/airing_today'),
           fetchTvTmdbJson('/movie/upcoming'),
+          fetch(`${API_BASE}/api/top10-egypt`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
         const data = await homeRes.json();
         const newEpisodes = ((airing?.results || []).slice(0, 20)).map((i) => ({ ...i, media_type: 'tv' }));
@@ -1241,6 +1281,7 @@
           topRated: data.topRated || [],
           newEpisodes,
           upcomingMovies,
+          egyptTop10: egyptTop10 && egyptTop10.platforms ? egyptTop10 : null,
         };
         renderTvHomeRows();
         loadTvExtraMovieRows();
