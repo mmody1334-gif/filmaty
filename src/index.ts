@@ -118,6 +118,13 @@ export default {
     }
 
     // WebApp Video Player
+    // TMDB image proxy: /img/<size>/<file>. Cached at Cloudflare's edge
+    // for 30 days, so posters load from a nearby PoP instead of
+    // image.tmdb.org (which drops out on some mobile networks).
+    if (url.pathname.startsWith("/img/") && request.method === "GET") {
+      return handleImageProxy(url);
+    }
+
     if (url.pathname === "/lab") {
       return labHtml(url);
     }
@@ -691,7 +698,7 @@ async function handleWebappHtml(_request: Request, env: Env, url: URL): Promise<
     return new Response(FILMATY_WEBAPP_HTML, {
       headers: {
         "content-type": "text/html; charset=utf-8",
-        "cache-control": "public, max-age=3600",
+        "cache-control": "no-cache",
       },
     });
   }
@@ -701,7 +708,7 @@ async function handleWebappHtml(_request: Request, env: Env, url: URL): Promise<
     return new Response(FILMATY_WEBAPP_HTML, {
       headers: {
         "content-type": "text/html; charset=utf-8",
-        "cache-control": "public, max-age=300",
+        "cache-control": "no-cache",
       },
     });
   }
@@ -725,7 +732,7 @@ async function handleWebappHtml(_request: Request, env: Env, url: URL): Promise<
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "public, max-age=600",
+      "cache-control": "no-cache",
     },
   });
 }
@@ -777,4 +784,28 @@ async function handleApiProfilePost(
       ...corsHeaders(),
     },
   });
+}
+
+const IMG_SIZES = new Set(["w92", "w154", "w185", "w300", "w342", "w500", "w780", "w1280", "original"]);
+
+async function handleImageProxy(url: URL): Promise<Response> {
+  const m = url.pathname.match(/^\/img\/(w\d+|original)\/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$/);
+  if (!m || !IMG_SIZES.has(m[1])) return new Response("Bad image path", { status: 400 });
+  const upstream = `https://image.tmdb.org/t/p/${m[1]}/${m[2]}`;
+  try {
+    const res = await fetch(upstream, {
+      cf: { cacheEverything: true, cacheTtl: 30 * 86400 },
+      signal: AbortSignal.timeout(15000),
+    } as RequestInit);
+    if (!res.ok) return new Response("Image not found", { status: res.status === 404 ? 404 : 502 });
+    return new Response(res.body, {
+      headers: {
+        "content-type": res.headers.get("content-type") || "image/jpeg",
+        "cache-control": "public, max-age=2592000, immutable",
+        "access-control-allow-origin": "*",
+      },
+    });
+  } catch {
+    return new Response("Image upstream error", { status: 502 });
+  }
 }

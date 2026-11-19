@@ -5,6 +5,7 @@
 
 import type { Env } from "../env.ts";
 import { TMDB_BASE, tmdbApiKey } from "./search.ts";
+import { attachEnTitles } from "./en-titles.ts";
 
 export const BROWSE_LANGS = ["ar", "en", "hi", "tr", "ko", "es", "fr", "ja"] as const;
 export type BrowseLang = (typeof BROWSE_LANGS)[number];
@@ -40,13 +41,13 @@ const BROWSE_CACHE_TTL = 10 * 60; // 10 minutes
 function browseCacheKey(p: BrowseParams): string {
   const scope = p.collection || p.companies || p.lang || "all";
   const origin = p.origin ? `:origin:${p.origin}` : "";
-  return `browse2:${p.type}:${scope}:${p.sort}:${p.page}${origin}`;
+  return `browse3:${p.type}:${scope}:${p.sort}:${p.page}${origin}`;
 }
 
-function browseUrl(env: Env, p: BrowseParams): string {
+function browseUrl(env: Env, p: BrowseParams, language = "ar"): string {
   const u = new URL(`${TMDB_BASE}/discover/${p.type}`);
   u.searchParams.set("api_key", tmdbApiKey(env));
-  u.searchParams.set("language", "ar");
+  u.searchParams.set("language", language);
   u.searchParams.set("include_adult", "false");
   u.searchParams.set("page", String(p.page));
   if (p.collection === "marvel") {
@@ -89,10 +90,15 @@ export async function browseTitles(env: Env, p: BrowseParams): Promise<BrowseOut
   let results: any[] = [];
   let totalPages = 0;
   try {
-    const res = await fetch(browseUrl(env, p), { signal: AbortSignal.timeout(10000) });
+    const [res, enRes] = await Promise.all([
+      fetch(browseUrl(env, p), { signal: AbortSignal.timeout(10000) }),
+      fetch(browseUrl(env, p, "en-US"), { signal: AbortSignal.timeout(10000) }).catch(() => null),
+    ]);
     if (res.ok) {
       const data = (await res.json().catch(() => null)) as any;
+      const enData = enRes && enRes.ok ? ((await enRes.json().catch(() => null)) as any) : null;
       results = (data?.results || []).map((r: any) => ({ ...r, media_type: p.type }));
+      results = attachEnTitles(results, enData?.results || [], p.type);
       totalPages = Number(data?.total_pages) || 0;
     }
   } catch {

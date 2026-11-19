@@ -217,6 +217,7 @@
           <span id="heroRating" class="text-amber-400 font-extrabold"></span>
         </div>
         <h2 id="heroTitle" class="font-black text-white leading-[1.1] drop-shadow-[0_4px_18px_rgba(0,0,0,.7)]" style="font-size: clamp(2rem, 5.2vw, 4rem);"></h2>
+        <p id="heroTitleEn" dir="ltr" class="text-neutral-300 font-bold tracking-wide text-sm sm:text-lg" style="text-align:right"></p>
         <p id="heroOverview" class="text-neutral-200 text-sm sm:text-base line-clamp-3 leading-relaxed"></p>
         <div class="flex flex-wrap items-center gap-3 pt-1">
           <button id="heroPlayBtn" type="button" class="min-h-[48px] px-7 rounded-lg bg-[#e50914] hover:bg-[#f6121d] text-white font-black text-base flex items-center gap-2 shadow-lg shadow-red-900/40 transition">▶ شاهد الآن</button>
@@ -323,6 +324,7 @@
           <img id="modalPoster" src="" alt="Poster" class="hidden sm:block w-20 h-28 object-cover rounded-md shadow-md border border-neutral-700 shrink-0 bg-neutral-900" />
           <div class="flex-1 min-w-0">
             <h3 id="modalTitle" class="text-xl sm:text-2xl font-black text-white leading-tight"></h3>
+            <p id="modalTitleEn" dir="ltr" class="text-sm text-neutral-400 font-bold mt-0.5" style="text-align:right"></p>
             <div class="flex flex-wrap items-center gap-2.5 mt-2 text-xs">
               <span id="modalRating" class="px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 font-bold border border-emerald-500/30">⭐ 8.5</span>
               <span id="modalYear" class="text-[#a3a3a3] font-semibold">2026</span>
@@ -473,7 +475,31 @@
     const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
     const TMDB_KEY = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
     const TMDB_BASE = 'https://api.themoviedb.org/3';
-    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+    const IMG_BASE = `${API_BASE}/img/w342`;
+    const IMG_BACKDROP = `${API_BASE}/img/w1280`;
+    // English name under the Arabic one (title_en from the API).
+    function enTitleOf(item) {
+      const main = (item.title || item.name || '').trim().toLowerCase();
+      const en = (item.title_en || '').trim();
+      return en && en.toLowerCase() !== main ? en : '';
+    }
+    function escHtml(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+    // Posters go through the Worker's /img proxy (edge-cached). If one
+    // still fails, retry it once straight from image.tmdb.org, then give
+    // up quietly on a dark tile instead of a broken image.
+    document.addEventListener('error', (e) => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || !img.src) return;
+      const m = img.src.match(/\/img\/(w\d+|original)\/(.+)$/);
+      if (m && !img.dataset.retried) {
+        img.dataset.retried = '1';
+        img.src = `https://image.tmdb.org/t/p/${m[1]}/${m[2]}`;
+      } else if (!img.dataset.dead) {
+        img.dataset.dead = '1';
+        img.style.visibility = 'hidden';
+      }
+    }, true);
+
 
     let currentItem = null;
     let selectedSeason = 1;
@@ -854,7 +880,7 @@
       const title = heroItem.title || heroItem.name || '';
       const date = heroItem.release_date || heroItem.first_air_date || '';
       const imgPath = heroItem.backdrop_path
-        ? `https://image.tmdb.org/t/p/original${heroItem.backdrop_path}`
+        ? `${IMG_BACKDROP}${heroItem.backdrop_path}`
         : `${IMG_BASE}${heroItem.poster_path}`;
       const a = document.getElementById('heroImg');
       const b = document.getElementById('heroImg2');
@@ -867,6 +893,7 @@
       target.alt = title;
       target.src = imgPath;
       document.getElementById('heroTitle').innerText = title;
+      document.getElementById('heroTitleEn').innerText = enTitleOf(heroItem);
       document.getElementById('heroKind').innerText = type === 'tv' ? 'مسلسل' : 'فيلم';
       document.getElementById('heroYear').innerText = date ? date.slice(0, 4) : '';
       document.getElementById('heroRating').innerText = heroItem.vote_average ? `★ ${heroItem.vote_average.toFixed(1)}` : '';
@@ -1090,7 +1117,8 @@
             ${rating ? `<span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>` : ''}
             <div class="pcard-info pointer-events-none">
               <h4 class="text-[13px] font-extrabold text-white truncate">${title}</h4>
-              <div class="text-[11px] text-neutral-300 font-semibold">${kind}${year ? ' • ' + year : ''}</div>
+              ${enTitleOf(item) ? `<div class="text-[11px] text-neutral-300 font-semibold truncate" dir="ltr" style="text-align:right">${escHtml(enTitleOf(item))}</div>` : ''}
+              <div class="text-[11px] text-neutral-400 font-semibold">${kind}${year ? ' • ' + year : ''}</div>
             </div>
           </div>
         </a>
@@ -1678,6 +1706,7 @@
             </div>
             <div class="p-2.5 bg-[#181818] pointer-events-none">
               <h4 class="text-xs font-bold text-white truncate">${safeTitle}</h4>
+              ${enTitleOf(item) ? `<div class="text-[11px] text-neutral-300 font-semibold truncate mt-0.5" dir="ltr" style="text-align:right">${escHtml(enTitleOf(item))}</div>` : ''}
               <div class="flex items-center justify-between mt-1 text-[11px] text-[#a3a3a3] font-medium">
                 <span>${year || kind}</span>
                 ${metaRight}
@@ -1803,8 +1832,13 @@
     // Modal Details Logic
     async function openDetails(id, mediaType, wantSeason = null, wantEpisode = null) {
       try {
-        const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}?api_key=${TMDB_KEY}&language=ar`);
+        const res = await fetch(`${TMDB_BASE}/${mediaType}/${id}?api_key=${TMDB_KEY}&language=ar&append_to_response=translations`);
         currentItem = await res.json();
+        {
+          const tr = currentItem.translations?.translations || [];
+          const en = tr.find((t) => t.iso_639_1 === 'en' && t.iso_3166_1 === 'US') || tr.find((t) => t.iso_639_1 === 'en');
+          currentItem.title_en = en?.data?.title || en?.data?.name || (currentItem.original_language === 'en' ? (currentItem.original_title || currentItem.original_name) : '');
+        }
         currentItem.media_type = mediaType;
 
         const title = currentItem.title || currentItem.name;
@@ -1814,6 +1848,7 @@
         const poster = currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : 'https://placehold.co/300x450/181818/a3a3a3?text=Poster';
 
         modalTitle.innerText = title;
+        document.getElementById('modalTitleEn').innerText = enTitleOf(currentItem);
         modalPoster.src = poster;
         modalRating.innerText = `★ ${rating}`;
         modalYear.innerText = year;
@@ -1824,7 +1859,7 @@
         const backdropImg = document.getElementById('modalBackdropImg');
         if (backdropWrap && backdropImg) {
           const bPath = currentItem.backdrop_path
-            ? `https://image.tmdb.org/t/p/w1280${currentItem.backdrop_path}`
+            ? `${IMG_BACKDROP}${currentItem.backdrop_path}`
             : (currentItem.poster_path ? poster : '');
           if (bPath) {
             backdropImg.src = bPath;

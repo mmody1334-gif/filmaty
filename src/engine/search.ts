@@ -6,6 +6,7 @@
 // if TMDB returns nothing, fall back to a direct provider search.
 
 import type { Env } from "../env.ts";
+import { attachEnTitles } from "./en-titles.ts";
 import { parseList } from "../env.ts";
 import { cleanTitle, normalizeArabicQuery } from "./normalize.ts";
 import { searchAllProviders } from "../providers/index.ts";
@@ -107,7 +108,7 @@ async function searchBrand(
     tvs.results.slice(0, 10),
   ]).sort(byPopularity);
   const seen = new Set(brandPool.map((r) => `${r.media_type}:${r.id}`));
-  const titleMatches = mergeTmdbResults([ar, en, searchPopularIndex(normalizedQuery)]).filter(
+  const titleMatches = attachEnTitles(mergeTmdbResults([ar, en, searchPopularIndex(normalizedQuery)]), en).filter(
     (r) => r.id !== null && !seen.has(`${r.media_type}:${r.id}`),
   );
   return [...brandPool, ...rerankResults(titleMatches, normalizedQuery)].slice(0, 20);
@@ -381,7 +382,7 @@ export async function searchTitles(
     tmdbSearch(env, normalizedQuery, "en-US"),
     singleToken && opts?.augment !== false ? providerAugment(env, normalizedQuery) : Promise.resolve([]),
   ]);
-  const merged = mergeTmdbResults([ar, en, augmented, searchPopularIndex(query)]);
+  const merged = attachEnTitles(mergeTmdbResults([ar, en, augmented, searchPopularIndex(query)]), en);
   if (merged.length > 0) return { results: rerankResults(merged, normalizedQuery), source: "tmdb" };
   const fallback = await providerFallback(env, query);
   return { results: fallback, source: "providers" };

@@ -9,6 +9,7 @@
 
 import type { Env } from "../env.ts";
 import { fetchTmdbDetails } from "./resolve.ts";
+import { attachEnTitles, enTitleFromTranslations } from "./en-titles.ts";
 import { TMDB_BASE, tmdbApiKey } from "./search.ts";
 
 export interface TopViewEntry {
@@ -18,7 +19,7 @@ export interface TopViewEntry {
 }
 
 const TOP_VIEWS_KEY = "views:top";
-const HOME_CACHE_KEY = "home:cache";
+const HOME_CACHE_KEY = "home:cache2";
 const HOME_CACHE_TTL = 10 * 60; // 10 minutes
 const TOP_N = 20;
 
@@ -110,9 +111,12 @@ async function mostWatchedFromViews(env: Env): Promise<any[]> {
   const items: any[] = [];
   for (const entry of top.slice(0, TOP_N)) {
     const details =
-      (await fetchTmdbDetails(env, entry.type, entry.id, "ar")) ||
+      (await fetchTmdbDetails(env, entry.type, entry.id, "ar", "translations")) ||
       (await fetchTmdbDetails(env, entry.type, entry.id, "en-US"));
-    if (details) items.push({ ...details, media_type: entry.type });
+    if (details) {
+      const { translations, ...rest } = details;
+      items.push({ ...rest, media_type: entry.type, title_en: enTitleFromTranslations(details) });
+    }
   }
   if (items.length > 0) return items;
   // Never empty: fall back to TMDB trending.
@@ -121,15 +125,19 @@ async function mostWatchedFromViews(env: Env): Promise<any[]> {
 
 async function trendingFallback(env: Env): Promise<any[]> {
   try {
-    const res = await fetch(
-      `${TMDB_BASE}/trending/all/day?api_key=${encodeURIComponent(tmdbApiKey(env))}&language=ar`,
-      { signal: AbortSignal.timeout(10000) },
-    );
+    const url = (lang: string) =>
+      `${TMDB_BASE}/trending/all/day?api_key=${encodeURIComponent(tmdbApiKey(env))}&language=${lang}`;
+    const [res, enRes] = await Promise.all([
+      fetch(url("ar"), { signal: AbortSignal.timeout(10000) }),
+      fetch(url("en-US"), { signal: AbortSignal.timeout(10000) }).catch(() => null),
+    ]);
     if (!res.ok) return [];
     const data = (await res.json().catch(() => null)) as any;
-    return (data?.results || [])
+    const enData = enRes && enRes.ok ? ((await enRes.json().catch(() => null)) as any) : null;
+    const list = (data?.results || [])
       .filter((i: any) => i.media_type === "movie" || i.media_type === "tv")
       .slice(0, TOP_N);
+    return attachEnTitles(list, enData?.results || []);
   } catch {
     return [];
   }
@@ -138,13 +146,17 @@ async function trendingFallback(env: Env): Promise<any[]> {
 async function topRatedFromTmdb(env: Env): Promise<any[]> {
   const fetchList = async (type: "movie" | "tv"): Promise<any[]> => {
     try {
-      const res = await fetch(
-        `${TMDB_BASE}/${type}/top_rated?api_key=${encodeURIComponent(tmdbApiKey(env))}&language=ar`,
-        { signal: AbortSignal.timeout(10000) },
-      );
+      const url = (lang: string) =>
+        `${TMDB_BASE}/${type}/top_rated?api_key=${encodeURIComponent(tmdbApiKey(env))}&language=${lang}`;
+      const [res, enRes] = await Promise.all([
+        fetch(url("ar"), { signal: AbortSignal.timeout(10000) }),
+        fetch(url("en-US"), { signal: AbortSignal.timeout(10000) }).catch(() => null),
+      ]);
       if (!res.ok) return [];
       const data = (await res.json().catch(() => null)) as any;
-      return (data?.results || []).map((r: any) => ({ ...r, media_type: type }));
+      const enData = enRes && enRes.ok ? ((await enRes.json().catch(() => null)) as any) : null;
+      const list = (data?.results || []).map((r: any) => ({ ...r, media_type: type }));
+      return attachEnTitles(list, enData?.results || [], type);
     } catch {
       return [];
     }

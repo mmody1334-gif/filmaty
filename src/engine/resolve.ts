@@ -252,13 +252,14 @@ export async function fetchTmdbDetails(
   type: "movie" | "tv",
   tmdbId: number,
   language: string,
+  appendToResponse?: string,
 ): Promise<any | null> {
   const key = env.TMDB_KEY;
   if (!key) return null;
   const path = type === "tv" ? "tv" : "movie";
   try {
     const res = await fetch(
-      `${TMDB_BASE}/${path}/${tmdbId}?api_key=${key}&language=${language}`,
+      `${TMDB_BASE}/${path}/${tmdbId}?api_key=${key}&language=${language}${appendToResponse ? `&append_to_response=${appendToResponse}` : ""}`,
       { signal: AbortSignal.timeout(10000) },
     );
     if (!res.ok) return null;

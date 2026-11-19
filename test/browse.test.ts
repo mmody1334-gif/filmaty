@@ -57,7 +57,8 @@ function installMock() {
   globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
     const url = String(input);
     if (url.includes("api.themoviedb.org/3/discover/")) {
-      seen.push(url);
+      // The parallel en-US copy (English titles) is not counted.
+      if (!url.includes("language=en-US")) seen.push(url);
       return jsonResponse({ results: discoverItems, total_pages: 4 });
     }
     return jsonResponse({ results: [] });
