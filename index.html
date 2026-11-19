@@ -93,6 +93,15 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
     }
+    html, body { max-width: 100%; overflow-x: clip; }
+    .platform-dock { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .platform-pill { background: #14141b; border: 1px solid rgba(255,255,255,0.12); color: #e5e5e5; }
+    .platform-pill:hover { border-color: var(--pbrand, #ffffff); background: #1c1c26; color: #ffffff; }
+    .platform-pill.bg-\[\#e50914\] { background: #e50914; border-color: #e50914; color: #ffffff; }
+    .sub-sz-sm video::cue { font-size: 0.9rem; background: rgba(0,0,0,0.72); color: #ffffff; }
+    .sub-sz-md video::cue { font-size: 1.15rem; background: rgba(0,0,0,0.75); color: #ffffff; }
+    .sub-sz-lg video::cue { font-size: 1.45rem; background: rgba(0,0,0,0.82); color: #fde047; }
+    #hoverPreviewLayer { position: fixed; z-index: 45; width: 320px; border-radius: 12px; overflow: hidden; background: #16161c; border: 1px solid rgba(255,255,255,0.22); box-shadow: 0 24px 50px rgba(0,0,0,0.85); pointer-events: auto; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col pb-12">
@@ -111,16 +120,22 @@
           <button type="button" data-nav-filter="marvel" class="nav-filter-link px-3 py-2 rounded-md text-neutral-300 font-semibold hover:text-white transition">مارفل</button>
         </nav>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <button id="profileBtn" type="button" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
-          <span id="profileBtnAvatar" class="w-5 h-5 rounded bg-[#e50914] text-white text-[11px] font-black flex items-center justify-center" aria-hidden="true">👤</span>
-          <span id="profileBtnLabel">دخول يوزر</span>
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <button id="btnMoodPicker" type="button" aria-label="اقترح لي سهرة" title="اقترح لي سهرة" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-[#e50914] text-xs font-bold transition cursor-pointer">
+          <span>🎲</span><span class="hidden sm:inline">سهرة</span>
         </button>
-        <a id="getAppBtn" href="https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk" class="hidden min-h-[44px] items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#e50914] text-white text-xs font-black transition hover:bg-[#f6121d]">
-          <span>📲 التطبيق</span>
+        <button id="btnCalendar" type="button" aria-label="جدول الحلقات والأفلام" title="جدول الحلقات والأفلام" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition cursor-pointer">
+          <span>📅</span><span class="hidden sm:inline">الجدول</span>
+        </button>
+        <button id="profileBtn" type="button" class="min-h-[44px] flex items-center gap-1.5 px-2.5 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition cursor-pointer">
+          <span id="profileBtnAvatar" class="w-5 h-5 rounded bg-[#e50914] text-white text-[11px] font-black flex items-center justify-center shrink-0" aria-hidden="true">👤</span>
+          <span id="profileBtnLabel" class="max-w-[76px] sm:max-w-[140px] truncate">دخول يوزر</span>
+        </button>
+        <a id="getAppBtn" href="https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk" class="hidden min-h-[44px] items-center gap-1.5 px-2.5 sm:px-3.5 rounded-md bg-[#e50914] text-white text-xs font-black transition hover:bg-[#f6121d]">
+          <span>📲</span><span class="hidden sm:inline">التطبيق</span>
         </a>
-        <a href="Tv/" class="min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
-          <span>📺 وضع التلفزيون</span>
+        <a href="Tv/" aria-label="وضع التلفزيون" title="وضع التلفزيون" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 rounded-md bg-[#232323] text-white border border-[#737373] hover:border-white text-xs font-bold transition">
+          <span>📺</span><span class="hidden sm:inline">وضع التلفزيون</span>
         </a>
         <a href="https://t.me/filmatibot" target="_blank" rel="noopener" class="hidden min-h-[44px] flex items-center gap-1.5 px-3 sm:px-3.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white text-xs font-bold transition">
           <span>البوت</span>
@@ -232,69 +247,79 @@
     </nav>
   </aside>
 
-  <!-- Search & Category Filters -->
-  <section class="px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
+  <!-- Cinematic hero carousel (full-bleed directly under transparent header) -->
+  <section id="heroBanner" class="hidden relative w-full h-[62dvh] sm:h-[72dvh] min-h-[420px] max-h-[760px] overflow-hidden bg-[#0b0b0f] mb-4">
+    <img id="heroImg" src="" alt="" fetchpriority="high" class="hero-slide on" />
+    <img id="heroImg2" src="" alt="" class="hero-slide" aria-hidden="true" />
+    <div class="hero-scrim absolute inset-0"></div>
+    <div class="absolute inset-x-0 bottom-0 max-w-7xl mx-auto w-full px-4 sm:px-6 pb-8 sm:pb-14">
+      <div id="heroContent" class="max-w-xl space-y-3">
+        <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-neutral-200">
+          <span class="px-2.5 py-0.5 rounded bg-[#e50914] text-white font-extrabold">مختارات فيلماتي</span>
+          <span id="heroKind" class="px-2 py-0.5 rounded bg-white/10 backdrop-blur"></span>
+          <span id="heroYear"></span>
+          <span id="heroRating" class="text-amber-400 font-extrabold"></span>
+        </div>
+        <h2 id="heroTitle" class="font-black text-white leading-[1.1] drop-shadow-[0_4px_18px_rgba(0,0,0,.7)]" style="font-size: clamp(1.85rem, 5vw, 3.85rem);"></h2>
+        <p id="heroTitleEn" dir="ltr" class="text-neutral-300 font-bold tracking-wide text-sm sm:text-lg" style="text-align:right"></p>
+        <p id="heroOverview" class="text-neutral-200 text-sm sm:text-base line-clamp-3 leading-relaxed"></p>
+        <div class="flex flex-wrap items-center gap-3 pt-1">
+          <button id="heroPlayBtn" type="button" class="min-h-[48px] px-7 rounded-lg bg-[#e50914] hover:bg-[#f6121d] text-white font-black text-base flex items-center gap-2 shadow-lg shadow-red-900/40 transition cursor-pointer">▶ شاهد الآن</button>
+          <button id="heroInfoBtn" type="button" class="min-h-[48px] px-6 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur text-white font-bold text-base flex items-center gap-2 transition cursor-pointer">ⓘ التفاصيل</button>
+        </div>
+      </div>
+      <div id="heroDots" class="flex items-center gap-1.5 mt-5"></div>
+    </div>
+  </section>
+
+  <!-- Search Box & Branded Platform Dock -->
+  <section class="px-4 sm:px-6 pt-3 pb-2 max-w-7xl mx-auto w-full space-y-2.5">
     <div class="relative">
       <label for="searchInput" class="sr-only">ابحث عن فيلم أو مسلسل</label>
       <input
         id="searchInput"
         type="text"
         placeholder="ابحث عن فيلم، مسلسل، Marvel، Netflix..."
-        class="w-full bg-[#1f1f1f] text-white placeholder-neutral-400 rounded-md min-h-[46px] py-2.5 pr-11 pl-12 border border-[#737373] focus:border-white focus:outline-none transition text-sm"
+        class="w-full bg-[#16161c] text-white placeholder-neutral-400 rounded-lg min-h-[48px] py-2.5 pr-11 pl-12 border border-neutral-700 focus:border-white focus:outline-none transition text-sm"
       />
-      <span class="absolute right-3.5 top-3 text-neutral-400 text-base pointer-events-none" aria-hidden="true">🔍</span>
-      <button id="clearSearch" type="button" aria-label="مسح البحث" class="hidden absolute left-2 top-1.5 text-neutral-300 hover:text-white text-sm bg-[#2a2a2a] rounded-full w-8 h-8 flex items-center justify-center">✕</button>
+      <span class="absolute right-3.5 top-3.5 text-neutral-400 text-base pointer-events-none" aria-hidden="true">🔍</span>
+      <button id="clearSearch" type="button" aria-label="مسح البحث" class="hidden absolute left-2 top-2 text-neutral-300 hover:text-white text-sm bg-[#2a2a2a] rounded-full w-8 h-8 flex items-center justify-center cursor-pointer">✕</button>
       <!-- Search suggestions dropdown (stage E) -->
-      <div id="searchSuggest" class="hidden absolute right-0 left-0 top-full mt-2 bg-[#181818] border border-neutral-700 rounded-md shadow-2xl z-40 overflow-hidden"></div>
+      <div id="searchSuggest" class="hidden absolute right-0 left-0 top-full mt-2 bg-[#16161c] border border-neutral-700 rounded-lg shadow-2xl z-40 overflow-hidden"></div>
     </div>
 
-    <!-- Quick Filters -->
-    <div class="flex gap-2 overflow-x-auto scrollbar-hide py-3 mt-1 text-xs font-bold">
-      <button type="button" class="filter-btn active min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#e50914] border border-[#e50914] text-white transition" data-filter="trending">🔥 الأكثر رواجاً</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="movie">🎬 أفلام</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition" data-filter="tv">📺 مسلسلات</button>
+    <!-- Primary Category Pills -->
+    <div class="flex gap-2 overflow-x-auto scrollbar-hide pt-1 text-xs font-bold">
+      <button type="button" class="filter-btn active min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#e50914] border border-[#e50914] text-white transition cursor-pointer" data-filter="trending">🔥 الأكثر رواجاً</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="movie">🎬 أفلام</button>
+      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="tv">📺 مسلسلات</button>
       <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="marvel">🦸‍♂️ مارفل</button>
       <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="netflix-movies">🎬 أفلام نتفليكس</button>
       <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="newest-movies">🆕 أحدث الأفلام</button>
       <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="action-movies">💥 أكشن</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="netflix">🔴 نتفليكس</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="shahid">💚 شاهد</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="watchit">🟠 واتش إت</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="yango">🟣 يانجو بلاي</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="osn">🔵 OSN+</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="showtime">🎬 شوتايم</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="disney">🏰 ديزني+</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="prime">📦 برايم فيديو</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="hbo">🟣 HBO Max</button>
-      <button type="button" class="filter-btn min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-filter="apple">🍎 Apple TV+</button>
+    </div>
+
+    <!-- Branded Streaming Platforms Dock -->
+    <div class="platform-dock scrollbar-hide text-xs font-extrabold">
+      <button type="button" style="--pbrand:#e50914" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="netflix">🔴 نتفليكس</button>
+      <button type="button" style="--pbrand:#10b981" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="shahid">💚 شاهد</button>
+      <button type="button" style="--pbrand:#f59e0b" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="watchit">🟠 واتش إت</button>
+      <button type="button" style="--pbrand:#7c3aed" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="yango">🟣 يانجو بلاي</button>
+      <button type="button" style="--pbrand:#38bdf8" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="osn">🔵 OSN+</button>
+      <button type="button" style="--pbrand:#f43f5e" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="showtime">🎬 شوتايم</button>
+      <button type="button" style="--pbrand:#3b82f6" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="disney">🏰 ديزني+</button>
+      <button type="button" style="--pbrand:#0ea5e9" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="prime">📦 برايم فيديو</button>
+      <button type="button" style="--pbrand:#6366f1" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="hbo">🟣 HBO Max</button>
+      <button type="button" style="--pbrand:#d4d4d8" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="apple">🍎 Apple TV+</button>
+      <button type="button" style="--pbrand:#eab308" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="starzplay">⭐ STARZPLAY</button>
+      <button type="button" style="--pbrand:#a855f7" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="tod">🟣 TOD</button>
+      <button type="button" style="--pbrand:#22c55e" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="hulu">🟢 Hulu</button>
+      <button type="button" style="--pbrand:#2563eb" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="paramount">⛰️ Paramount+</button>
+      <button type="button" style="--pbrand:#f97316" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="crunchyroll">🍥 Crunchyroll</button>
     </div>
   </section>
 
   <!-- Main Content Grid -->
-  <!-- Cinematic hero carousel (full-bleed, under the transparent header) -->
-  <section id="heroBanner" class="hidden relative w-full h-[72vh] min-h-[440px] max-h-[760px] overflow-hidden bg-[#0b0b0f] mb-6">
-    <img id="heroImg" src="" alt="" fetchpriority="high" class="hero-slide on" />
-    <img id="heroImg2" src="" alt="" class="hero-slide" aria-hidden="true" />
-    <div class="hero-scrim absolute inset-0"></div>
-    <div class="absolute inset-x-0 bottom-0 max-w-7xl mx-auto w-full px-4 sm:px-6 pb-12 sm:pb-16">
-      <div id="heroContent" class="max-w-xl space-y-3">
-        <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-neutral-200">
-          <span class="px-2 py-0.5 rounded bg-[#e50914] text-white font-extrabold">مختارات فيلماتي</span>
-          <span id="heroKind" class="px-2 py-0.5 rounded bg-white/10 backdrop-blur"></span>
-          <span id="heroYear"></span>
-          <span id="heroRating" class="text-amber-400 font-extrabold"></span>
-        </div>
-        <h2 id="heroTitle" class="font-black text-white leading-[1.1] drop-shadow-[0_4px_18px_rgba(0,0,0,.7)]" style="font-size: clamp(2rem, 5.2vw, 4rem);"></h2>
-        <p id="heroTitleEn" dir="ltr" class="text-neutral-300 font-bold tracking-wide text-sm sm:text-lg" style="text-align:right"></p>
-        <p id="heroOverview" class="text-neutral-200 text-sm sm:text-base line-clamp-3 leading-relaxed"></p>
-        <div class="flex flex-wrap items-center gap-3 pt-1">
-          <button id="heroPlayBtn" type="button" class="min-h-[48px] px-7 rounded-lg bg-[#e50914] hover:bg-[#f6121d] text-white font-black text-base flex items-center gap-2 shadow-lg shadow-red-900/40 transition">▶ شاهد الآن</button>
-          <button id="heroInfoBtn" type="button" class="min-h-[48px] px-6 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur text-white font-bold text-base flex items-center gap-2 transition">ⓘ التفاصيل</button>
-        </div>
-      </div>
-      <div id="heroDots" class="flex items-center gap-1.5 mt-6"></div>
-    </div>
-  </section>
 
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6">
 
@@ -308,6 +333,8 @@
 
     <!-- Interactive Grid Sort & Genre Filter Bar -->
     <div id="gridFilterBar" class="hidden space-y-2 mb-4"></div>
+    <!-- Instant Search Filter Bar (#19) -->
+    <div id="searchFilterBar" class="hidden space-y-2 mb-4"></div>
 
     <!-- Media Cards Grid -->
     <div id="mediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -353,14 +380,16 @@
             <span id="iframeSpinnerLabel">⏳ جاري تحميل المشغّل...</span>
           </div>
           <div id="seekIndicator" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-sm font-black border border-white/20 pointer-events-none"></div>
+          <div id="gestureHud" class="hidden absolute top-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-black/85 text-white text-xs sm:text-sm font-black border border-white/20 pointer-events-none"></div>
+          <button id="btnSkipIntro" type="button" class="hidden absolute bottom-16 right-4 z-20 min-h-[44px] px-4 py-2 rounded-lg bg-[#16161c]/95 hover:bg-[#e50914] text-white border border-white/40 text-xs font-black shadow-xl transition cursor-pointer">⏭ تخطي المقدمة</button>
           <div id="playerStatus" class="hidden absolute inset-0 flex items-center justify-center bg-black/75 text-white text-sm font-bold px-4 text-center"></div>
         </div>
 
         <!-- Player Controls Bar -->
         <div id="playerToolbar" class="hidden flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#141414] border-t border-neutral-800 text-xs font-bold shrink-0">
           <div id="nativeToolbarGroup" class="flex flex-wrap items-center gap-2">
-            <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">-10 ث ⏪</button>
-            <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">⏩ +10 ث</button>
+            <button id="btnSeekBack" type="button" aria-label="ترجيع 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer">-10 ث ⏪</button>
+            <button id="btnSeekFwd" type="button" aria-label="تقديم 10 ثواني" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer">⏩ +10 ث</button>
             <div class="flex items-center gap-1.5">
               <label for="playerSpeedSelect" class="text-neutral-300">السرعة:</label>
               <select id="playerSpeedSelect" class="min-h-[44px] bg-[#232323] text-white rounded-md px-2.5 py-1.5 border border-[#737373]">
@@ -372,7 +401,45 @@
                 <option value="2">2x</option>
               </select>
             </div>
-            <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition">صورة داخل صورة</button>
+            <div class="relative">
+              <button id="btnSubtitles" type="button" aria-label="إعدادات الترجمة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer">CC ترجمة</button>
+              <div id="subtitleMenu" class="hidden fixed bottom-16 left-4 sm:absolute sm:bottom-full sm:left-0 sm:mb-2 z-50 w-72 max-w-[90vw] p-3 rounded-xl bg-[#16161c] border border-neutral-700 shadow-2xl space-y-2.5 text-xs font-bold">
+                <div class="flex items-center justify-between gap-2 border-b border-neutral-800 pb-1.5">
+                  <span class="text-white font-black">الترجمة المصاحبة (CC)</span>
+                  <button id="subtitleMenuClose" type="button" aria-label="إغلاق قائمة الترجمة" class="min-w-[32px] min-h-[32px] rounded bg-[#232323] text-neutral-300 hover:text-white cursor-pointer">✕</button>
+                </div>
+                <div id="subTracksList" class="space-y-1 max-h-36 overflow-y-auto"></div>
+                <div class="flex items-center justify-between gap-2 pt-1 border-t border-neutral-800">
+                  <span class="text-neutral-400">الحجم:</span>
+                  <div class="flex gap-1">
+                    <button type="button" data-sub-sz="sm" class="sub-sz-opt min-h-[34px] px-2.5 rounded border border-neutral-700 bg-[#232323] text-neutral-200 cursor-pointer">صغير</button>
+                    <button type="button" data-sub-sz="md" class="sub-sz-opt min-h-[34px] px-2.5 rounded border border-[#e50914] bg-[#e50914] text-white cursor-pointer">وسط</button>
+                    <button type="button" data-sub-sz="lg" class="sub-sz-opt min-h-[34px] px-2.5 rounded border border-neutral-700 bg-[#232323] text-neutral-200 cursor-pointer">كبير</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-neutral-400">التوقيت:</span>
+                  <div class="flex items-center gap-1">
+                    <button type="button" data-sub-sync="-0.5" class="sub-sync-btn min-h-[34px] px-2 rounded border border-neutral-700 bg-[#232323] text-neutral-200 cursor-pointer">-0.5ث</button>
+                    <span id="subOffsetVal" dir="ltr" class="min-w-[42px] text-center text-amber-300">0.0s</span>
+                    <button type="button" data-sub-sync="0.5" class="sub-sync-btn min-h-[34px] px-2 rounded border border-neutral-700 bg-[#232323] text-neutral-200 cursor-pointer">+0.5ث</button>
+                  </div>
+                </div>
+                <button id="btnUploadSub" type="button" class="w-full min-h-[40px] px-3 py-1.5 rounded-md bg-[#232323] border border-neutral-700 hover:border-white text-neutral-200 cursor-pointer">📁 تحميل ملف ترجمة (.srt / .vtt)</button>
+                <input id="subFileInput" type="file" accept=".srt,.vtt" class="hidden" />
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <label for="sleepTimerSelect" class="text-neutral-300 hidden sm:inline">النوم:</label>
+              <select id="sleepTimerSelect" aria-label="مؤقت النوم" class="min-h-[44px] bg-[#232323] text-white rounded-md px-2.5 py-1.5 border border-[#737373]">
+                <option value="">⏱ النوم: إيقاف</option>
+                <option value="30">⏱ 30 دقيقة</option>
+                <option value="60">⏱ 60 دقيقة</option>
+                <option value="90">⏱ 90 دقيقة</option>
+                <option value="ep">⏱ نهاية الحلقة</option>
+              </select>
+            </div>
+            <button id="btnPip" type="button" aria-label="صورة داخل صورة" class="min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer">صورة داخل صورة</button>
           </div>
           <div class="flex items-center gap-2">
             <button id="btnNextBackupServer" type="button" aria-label="تجربة سيرفر بديل" class="hidden min-h-[44px] px-3 py-1.5 rounded-md bg-[#232323] text-amber-300 border border-[#737373] hover:border-white transition cursor-pointer">🔄 سيرفر بديل</button>
@@ -401,6 +468,8 @@
               <span id="modalRating" class="px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 font-bold border border-emerald-500/30">⭐ 8.5</span>
               <span id="modalYear" class="text-[#a3a3a3] font-semibold">2026</span>
               <span id="modalKind" class="px-2 py-0.5 rounded bg-[#232323] text-neutral-200 border border-neutral-700 font-semibold">فيلم</span>
+              <span id="modalCert" class="hidden px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black"></span>
+              <span id="modalRuntime" class="hidden px-2 py-0.5 rounded bg-[#232323] text-neutral-300 border border-neutral-700 font-semibold"></span>
             </div>
             <p id="modalStory" class="text-[#e5e5e5] text-xs sm:text-sm mt-2.5 line-clamp-3 leading-relaxed"></p>
           </div>
@@ -494,6 +563,18 @@
           </div>
         </div>
 
+        <!-- Collection Saga Row (#7) -->
+        <div id="collectionWrap" class="hidden pt-3 border-t border-neutral-800">
+          <h4 id="collectionTitle" class="text-sm font-extrabold text-white mb-3">📚 أجزاء السلسلة الكاملة</h4>
+          <div id="collectionRow" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"></div>
+        </div>
+
+        <!-- Cast Row with Clickable Filmography (#7) -->
+        <div id="castWrap" class="hidden pt-3 border-t border-neutral-800">
+          <h4 class="text-sm font-extrabold text-white mb-3">🎭 طاقم التمثيل</h4>
+          <div id="castRow" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"></div>
+        </div>
+
         <!-- Similar titles (stage D) -->
         <div id="similarWrap" class="hidden pt-3 border-t border-neutral-800">
           <h4 class="text-sm font-extrabold text-white mb-3">🎬 أعمال شبه ده</h4>
@@ -503,45 +584,166 @@
     </div>
   </div>
 
-  <!-- Netflix-style Profile / Username Gate & Switcher (cloud synced per username, e.g. megoo) -->
+  <!-- Netflix-style Profile / Username Gate, Family Avatars (#25) & Viewing Stats (#15) -->
   <div id="profileOverlay" class="fixed inset-0 z-[70] bg-[#141414]/98 hidden flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="profileOverlayTitle">
-    <div class="max-w-md w-full bg-[#181818] border border-neutral-700 rounded-xl p-6 shadow-2xl space-y-5">
+    <div class="max-w-lg w-full bg-[#16161c] border border-neutral-700 rounded-xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
       <div class="flex items-start justify-between gap-3">
         <div>
           <h2 id="profileOverlayTitle" class="text-2xl font-black text-white">مين بيتفرج؟</h2>
           <p class="text-xs sm:text-sm text-[#a3a3a3] mt-1 leading-relaxed">اكتب اسم المستخدم (مثال: megoo) لحفظ أفلامك ومسلسلاتك ومكان ما وقفت ومزامنتها مع التلفزيون.</p>
         </div>
-        <button id="profileCloseBtn" type="button" aria-label="إغلاق نافذة الحساب" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition shrink-0">✕</button>
+        <button id="profileCloseBtn" type="button" aria-label="إغلاق نافذة الحساب" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition shrink-0 cursor-pointer">✕</button>
       </div>
 
-      <div id="profileSavedWrap" class="hidden space-y-2">
-        <p class="text-xs font-bold text-neutral-300">حساباتك المحفوظة على الجهاز:</p>
-        <div id="profileSavedUsers" class="flex flex-wrap gap-2"></div>
+      <div class="grid grid-cols-2 gap-2 p-1 rounded-lg bg-[#0b0b0f] border border-neutral-800">
+        <button id="profileTabAccount" type="button" class="min-h-[44px] px-3 rounded-md bg-[#e50914] text-white text-xs font-extrabold transition cursor-pointer">👤 الحساب والمزامنة</button>
+        <button id="profileTabStats" type="button" class="min-h-[44px] px-3 rounded-md text-neutral-300 hover:text-white text-xs font-extrabold transition cursor-pointer">📊 إحصائياتي</button>
       </div>
 
-      <form id="profileForm" class="space-y-3">
-        <div>
-          <label for="profileInput" class="block text-xs font-bold text-neutral-200 mb-1.5">اسم المستخدم</label>
-          <input
-            id="profileInput"
-            type="text"
-            dir="ltr"
-            autocomplete="username"
-            maxlength="32"
-            placeholder="megoo"
-            class="w-full min-h-[46px] px-3.5 py-2.5 rounded-md bg-[#1f1f1f] text-white placeholder-neutral-400 border border-[#737373] focus:border-white focus:outline-none text-sm font-bold"
-          />
+      <div id="profileAccountPanel" class="space-y-4">
+        <div id="profileSavedWrap" class="hidden space-y-2">
+          <p class="text-xs font-bold text-neutral-300">حساباتك المحفوظة على الجهاز:</p>
+          <div id="profileSavedUsers" class="flex flex-wrap gap-2"></div>
         </div>
-        <p id="profileStatus" class="hidden text-xs font-bold text-amber-400"></p>
-        <div class="flex flex-col sm:flex-row gap-2">
-          <button id="profileSubmitBtn" type="submit" class="flex-1 min-h-[46px] px-5 py-2.5 rounded-md bg-[#e50914] hover:bg-red-700 text-white font-black text-sm transition">دخول وحفظ التقدم</button>
-          <button id="profileGuestBtn" type="button" class="min-h-[46px] px-4 py-2.5 rounded-md bg-[#232323] hover:bg-[#333333] text-neutral-200 border border-[#737373] font-bold text-xs transition">تصفح كزائر حالياً</button>
-        </div>
-      </form>
 
-      <button id="profileLogoutBtn" type="button" class="hidden w-full min-h-[44px] px-4 py-2 rounded-md bg-[#232323] text-red-300 border border-red-500/40 hover:border-red-400 text-xs font-bold transition">تسجيل الخروج من الحساب الحالي</button>
+        <div class="space-y-1.5">
+          <p class="text-xs font-bold text-neutral-300">أيقونة العائلة (Avatar):</p>
+          <div id="profileAvatarPicker" class="grid grid-cols-4 sm:grid-cols-8 gap-1.5"></div>
+        </div>
+
+        <form id="profileForm" class="space-y-3">
+          <div>
+            <label for="profileInput" class="block text-xs font-bold text-neutral-200 mb-1.5">اسم المستخدم</label>
+            <input
+              id="profileInput"
+              type="text"
+              dir="ltr"
+              autocomplete="username"
+              maxlength="32"
+              placeholder="megoo"
+              class="w-full min-h-[46px] px-3.5 py-2.5 rounded-md bg-[#1f1f1f] text-white placeholder-neutral-400 border border-[#737373] focus:border-white focus:outline-none text-sm font-bold"
+            />
+          </div>
+          <p id="profileStatus" class="hidden text-xs font-bold text-amber-400"></p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button id="profileSubmitBtn" type="submit" class="flex-1 min-h-[46px] px-5 py-2.5 rounded-md bg-[#e50914] hover:bg-red-700 text-white font-black text-sm transition cursor-pointer">دخول وحفظ التقدم</button>
+            <button id="profileGuestBtn" type="button" class="min-h-[46px] px-4 py-2.5 rounded-md bg-[#232323] hover:bg-[#333333] text-neutral-200 border border-[#737373] font-bold text-xs transition cursor-pointer">تصفح كزائر حالياً</button>
+          </div>
+        </form>
+
+        <div class="pt-2 border-t border-neutral-800 space-y-2">
+          <p class="text-xs font-bold text-neutral-400">نسخة احتياطية كاملة للمشاهدة والقائمة (JSON):</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="profileExportBtn" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] border border-neutral-700 hover:border-white text-neutral-200 text-xs font-bold transition cursor-pointer">⬇ تصدير نسخة</button>
+            <button id="profileImportBtn" type="button" class="min-h-[44px] px-3 py-2 rounded-md bg-[#232323] border border-neutral-700 hover:border-white text-neutral-200 text-xs font-bold transition cursor-pointer">⬆ استيراد نسخة</button>
+            <input id="profileImportInput" type="file" accept=".json,application/json" class="hidden" />
+          </div>
+        </div>
+
+        <button id="profileLogoutBtn" type="button" class="hidden w-full min-h-[44px] px-4 py-2 rounded-md bg-[#232323] text-red-300 border border-red-500/40 hover:border-red-400 text-xs font-bold transition cursor-pointer">تسجيل الخروج من الحساب الحالي</button>
+      </div>
+
+      <div id="profileStatsPanel" class="hidden space-y-4">
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="p-3 rounded-lg bg-[#0b0b0f] border border-neutral-800">
+            <div class="text-[11px] text-neutral-400 font-bold">🎬 أفلام مكتملة</div>
+            <div id="statMovies" class="text-2xl font-black text-white mt-1">0</div>
+          </div>
+          <div class="p-3 rounded-lg bg-[#0b0b0f] border border-neutral-800">
+            <div class="text-[11px] text-neutral-400 font-bold">📺 حلقات مشاهدة</div>
+            <div id="statEpisodes" class="text-2xl font-black text-white mt-1">0</div>
+          </div>
+          <div class="p-3 rounded-lg bg-[#0b0b0f] border border-neutral-800">
+            <div class="text-[11px] text-neutral-400 font-bold">⏱️ ساعات مشاهدة</div>
+            <div id="statHours" class="text-2xl font-black text-amber-400 mt-1">0</div>
+          </div>
+          <div class="p-3 rounded-lg bg-[#0b0b0f] border border-neutral-800">
+            <div class="text-[11px] text-neutral-400 font-bold">❤️ في قائمتي</div>
+            <div id="statMyList" class="text-2xl font-black text-[#e50914] mt-1">0</div>
+          </div>
+        </div>
+        <div class="p-3 rounded-lg bg-[#0b0b0f] border border-neutral-800 space-y-2">
+          <p class="text-xs font-bold text-neutral-300">🎭 التصنيفات المفضلة لديك</p>
+          <div id="statGenres" class="flex flex-wrap gap-1.5 text-xs font-bold text-neutral-300"></div>
+        </div>
+      </div>
     </div>
   </div>
+
+  <!-- Mood & Duration Picker Modal (#10) -->
+  <div id="moodModal" class="fixed inset-0 z-[72] bg-black/85 hidden flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="moodModalTitle">
+    <div class="max-w-lg w-full bg-[#16161c] border border-neutral-700 rounded-xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="moodModalTitle" class="text-xl font-black text-white">🎲 اقترح لي سهرة الليلة</h2>
+          <p class="text-xs text-[#a3a3a3] mt-1">اختر مزاجك والوقت المتاح لنختار لك أفضل عمل مناسب.</p>
+        </div>
+        <button id="moodCloseBtn" type="button" aria-label="إغلاق مقترح السهرة" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition cursor-pointer">✕</button>
+      </div>
+      <div class="space-y-3 text-xs font-bold">
+        <div>
+          <span class="block text-neutral-300 mb-1.5">المود / النوع:</span>
+          <div id="moodGenrePills" class="flex flex-wrap gap-1.5">
+            <button type="button" data-mood-genre="28" class="mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border bg-[#e50914] border-[#e50914] text-white cursor-pointer">💥 حماس وأكشن</button>
+            <button type="button" data-mood-genre="35" class="mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border bg-[#232323] border-neutral-700 text-neutral-200 cursor-pointer">😂 كوميديا خفيفة</button>
+            <button type="button" data-mood-genre="27" class="mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border bg-[#232323] border-neutral-700 text-neutral-200 cursor-pointer">👻 رعب وإثارة</button>
+            <button type="button" data-mood-genre="18" class="mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border bg-[#232323] border-neutral-700 text-neutral-200 cursor-pointer">🎭 دراما عميقة</button>
+            <button type="button" data-mood-genre="80" class="mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border bg-[#232323] border-neutral-700 text-neutral-200 cursor-pointer">🕵️ جريمة وغموض</button>
+            <button type="button" data-mood-genre="16" class="mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border bg-[#232323] border-neutral-700 text-neutral-200 cursor-pointer">🎨 عائلي وأنيميشن</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div>
+            <label for="moodTypeSelect" class="block text-neutral-300 mb-1">الصيغة</label>
+            <select id="moodTypeSelect" class="w-full min-h-[44px] px-2.5 rounded-md bg-[#232323] border border-neutral-700 text-white">
+              <option value="movie">🎬 أفلام</option>
+              <option value="tv">📺 مسلسلات</option>
+            </select>
+          </div>
+          <div>
+            <label for="moodRuntimeSelect" class="block text-neutral-300 mb-1">المدة</label>
+            <select id="moodRuntimeSelect" class="w-full min-h-[44px] px-2.5 rounded-md bg-[#232323] border border-neutral-700 text-white">
+              <option value="">أي مدة</option>
+              <option value="95">سهرة سريعة (≤95د)</option>
+              <option value="130">متوسط (≤130د)</option>
+            </select>
+          </div>
+          <div>
+            <label for="moodRatingSelect" class="block text-neutral-300 mb-1">أقل تقييم</label>
+            <select id="moodRatingSelect" class="w-full min-h-[44px] px-2.5 rounded-md bg-[#232323] border border-neutral-700 text-white">
+              <option value="7.0">★ 7.0+</option>
+              <option value="7.5">★ 7.5+</option>
+              <option value="8.0">★ 8.0+</option>
+            </select>
+          </div>
+        </div>
+        <button id="moodPickBtn" type="button" class="w-full min-h-[46px] px-4 py-2.5 rounded-md bg-[#e50914] hover:bg-[#f6121d] text-white font-black text-sm transition cursor-pointer">🎲 اقترح لي عملاً الآن</button>
+      </div>
+      <div id="moodResultBox" class="hidden pt-2 border-t border-neutral-800"></div>
+    </div>
+  </div>
+
+  <!-- Release & Episode Calendar Modal (#17) -->
+  <div id="calendarModal" class="fixed inset-0 z-[72] bg-black/85 hidden flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="calendarModalTitle">
+    <div class="max-w-3xl w-full bg-[#16161c] border border-neutral-700 rounded-xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto max-h-[88dvh] flex flex-col">
+      <div class="flex items-start justify-between gap-3 shrink-0">
+        <div>
+          <h2 id="calendarModalTitle" class="text-xl font-black text-white">📅 جدول الحلقات والأفلام القادمة</h2>
+          <p class="text-xs text-[#a3a3a3] mt-1">تابع حلقات اليوم وأفلام السينما القريبة ومواعيد مسلسلات قائمتك.</p>
+        </div>
+        <button id="calendarCloseBtn" type="button" aria-label="إغلاق الجدول" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition cursor-pointer">✕</button>
+      </div>
+      <div class="flex gap-2 overflow-x-auto scrollbar-hide text-xs font-bold shrink-0">
+        <button type="button" data-cal-tab="today" class="cal-tab-btn min-h-[44px] whitespace-nowrap px-4 rounded-md bg-[#e50914] text-white border border-[#e50914] cursor-pointer">🔴 حلقات اليوم</button>
+        <button type="button" data-cal-tab="upcoming" class="cal-tab-btn min-h-[44px] whitespace-nowrap px-4 rounded-md bg-[#232323] text-neutral-200 border border-neutral-700 cursor-pointer">🎬 أفلام قادمة</button>
+        <button type="button" data-cal-tab="mylist" class="cal-tab-btn min-h-[44px] whitespace-nowrap px-4 rounded-md bg-[#232323] text-neutral-200 border border-neutral-700 cursor-pointer">❤️ مسلسلات قائمتي</button>
+      </div>
+      <div id="calendarContent" class="overflow-y-auto flex-1 space-y-2.5 pr-1"></div>
+    </div>
+  </div>
+
+  <!-- Desktop-only Sandboxed Silent Hover Trailer Preview (#18) -->
+  <div id="hoverPreviewLayer" class="hidden" aria-hidden="true"></div>
 
   <script>
     const API_BASE = 'https://filmaty.hudhaifa-bio.workers.dev';
@@ -650,6 +852,14 @@
     const ACTIVE_USER_KEY = 'filmaty:user:v1';
     const USERS_LIST_KEY = 'filmaty:users-list:v1';
     const USER_SNAPSHOT_PREFIX = 'filmaty:user-snapshot:v1:';
+    const AVATAR_KEY = 'filmaty:avatar:v1';
+    const PROFILE_AVATARS = ['🎬', '🍿', '👑', '🚀', '🦁', '🦉', '🌟', '📺'];
+    const STAT_GENRE_NAMES = {
+      28: 'أكشن', 12: 'مغامرات', 16: 'أنيميشن', 35: 'كوميديا', 80: 'جريمة',
+      99: 'وثائقي', 18: 'دراما', 10751: 'عائلي', 14: 'فانتازيا', 36: 'تاريخي',
+      27: 'رعب', 10402: 'موسيقى', 9648: 'غموض', 10749: 'رومانسي', 878: 'خيال علمي',
+      53: 'تشويق', 10752: 'حرب', 37: 'ويسترن', 10759: 'أكشن ومغامرة', 10765: 'فانتازيا وخيال',
+    };
     const MAX_PROGRESS_ITEMS = 25;
     const MAX_MYLIST_ITEMS = 60;
     const MAX_HISTORY_ITEMS = 40;
@@ -659,6 +869,16 @@
     let personalRecs = [];
     let profileSyncTimer = null;
     let clearedProgressKeys = new Set();
+
+    function readAvatarStore() {
+      try { return (localStorage.getItem(AVATAR_KEY) || '').trim(); } catch (e) { return ''; }
+    }
+    function saveAvatarStore(avatar) {
+      try {
+        if (avatar) localStorage.setItem(AVATAR_KEY, avatar);
+        else localStorage.removeItem(AVATAR_KEY);
+      } catch (e) {}
+    }
 
     function clientNormalizeUsername(raw) {
       if (typeof raw !== 'string') return null;
@@ -700,6 +920,7 @@
       if (!activeUser) return;
       const snap = {
         updatedAt: Date.now(),
+        avatar: readAvatarStore(),
         progress: readProgressStore(),
         watched: readWatchedStore(),
         myList: readMyListStore(),
@@ -718,6 +939,7 @@
         localStorage.removeItem(MYLIST_KEY);
         localStorage.removeItem(REMOVED_MYLIST_KEY);
         localStorage.removeItem(HISTORY_KEY);
+        localStorage.removeItem(AVATAR_KEY);
       } catch (e) {}
       clearedProgressKeys.clear();
     }
@@ -729,14 +951,17 @@
         localStorage.setItem(MYLIST_KEY, JSON.stringify(profile.myList || {}));
         localStorage.setItem(REMOVED_MYLIST_KEY, JSON.stringify(profile.removedMyList || {}));
         localStorage.setItem(HISTORY_KEY, JSON.stringify(Array.isArray(profile.history) ? profile.history : []));
+        if (profile.avatar) saveAvatarStore(profile.avatar);
       } catch (e) {}
       clearedProgressKeys.clear();
       saveLocalUserSnapshot();
     }
     function buildProfileSyncPayload(username) {
+      const av = readAvatarStore();
       return {
         username,
         updatedAt: Date.now(),
+        ...(av ? { avatar: av } : {}),
         progress: readProgressStore(),
         watched: readWatchedStore(),
         myList: readMyListStore(),
@@ -773,7 +998,8 @@
     }
     function updateProfileBadges() {
       const text = activeUser || 'دخول يوزر';
-      const initial = activeUser ? activeUser.slice(0, 1).toUpperCase() : '👤';
+      const customAv = readAvatarStore();
+      const initial = customAv || (activeUser ? activeUser.slice(0, 1).toUpperCase() : '👤');
       [['profileBtnAvatar', 'profileBtnLabel'], ['watchProfileAvatar', 'watchProfileLabel']].forEach(([avId, lblId]) => {
         const av = document.getElementById(avId);
         const lbl = document.getElementById(lblId);
@@ -826,7 +1052,7 @@
     function recordHistoryEntry(type, id, s, e, meta) {
       if (!type || !id) return;
       const list = readHistoryStore().filter((en) => !(en.type === type && Number(en.id) === Number(id)));
-      list.unshift({
+      const entry = {
         type,
         id: Number(id),
         s: type === 'tv' ? (Number(s) || 1) : 0,
@@ -835,7 +1061,14 @@
         poster: (meta && meta.poster) || '',
         kind: (meta && meta.kind) || type,
         at: Date.now(),
-      });
+      };
+      if (meta && Array.isArray(meta.genreIds) && meta.genreIds.length) {
+        entry.genreIds = meta.genreIds.slice(0, 8);
+      }
+      if (meta && Number(meta.runtime) > 0) {
+        entry.runtime = Math.round(Number(meta.runtime));
+      }
+      list.unshift(entry);
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY_ITEMS))); } catch (err) {}
       scheduleProfileSync();
     }
@@ -957,6 +1190,7 @@
       mediaGrid.classList.add('hidden');
       document.getElementById('gridHeader').classList.add('hidden');
       document.getElementById('gridFilterBar')?.classList.add('hidden');
+      document.getElementById('searchFilterBar')?.classList.add('hidden');
       document.getElementById('loadMoreWrap')?.remove();
       browseState = null;
       loadMoreObserver?.disconnect();
@@ -1140,6 +1374,7 @@
         ? '<div class="text-center py-12 text-[#a3a3a3] text-sm font-bold">لا توجد أعمال في هذه السنة.</div>'
         : '';
       sectionsEl.innerHTML = `
+        <div id="myListAlertsWrap"></div>
         ${continueSectionHtml(getContinueItems())}
         ${myListSectionHtml(getMyListItems())}
         ${historySectionHtml(getHistoryItems())}
@@ -1158,6 +1393,7 @@
         <div id="homeExtraRows" class="space-y-9"></div>
       `;
       renderExtraRows();
+      loadMyListEpisodeAlerts();
       sectionsEl.querySelectorAll('.home-year-chip').forEach((btn) => {
         btn.addEventListener('click', () => {
           homeYearFilter = btn.dataset.year;
@@ -1205,6 +1441,8 @@
       { key: 'watchit', badge: 'WATCH IT', title: 'توب 10 الشهر في مصر', browseParams: { type: 'movie', alsoTv: '1', collection: 'watchit', sort: 'popular', page: '1' }, browseTitle: '🟠 واتش إت' },
     ];
 
+    const egyptTop10Filter = { netflix: 'all', shahid: 'all', yango: 'all', watchit: 'all' };
+
     function top10PlatformCardHtml(item) {
       const title = (item.title || item.name || 'بدون عنوان').replace(/"/g, '&quot;');
       const date = item.release_date || item.first_air_date || '';
@@ -1215,7 +1453,7 @@
       const kind = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
       const href = cardHref(mediaType, item.id);
       return `
-        <a href="${href}" class="pcard w-32 sm:w-40 lg:w-44" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
+        <a href="${href}" data-media-type="${mediaType}" data-media-id="${item.id}" data-media-title="${title}" class="pcard w-32 sm:w-40 lg:w-44" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
           <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
             <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
             <span class="top10-ribbon">TOP 10</span>
@@ -1230,29 +1468,63 @@
       `;
     }
 
+    function getTop10ItemsForKind(egyptTop10, platKey, kind) {
+      if (!egyptTop10) return [];
+      if (kind === 'movie' || kind === 'tv') {
+        const typed = egyptTop10.platformsByType && egyptTop10.platformsByType[platKey] && egyptTop10.platformsByType[platKey][kind];
+        if (Array.isArray(typed)) return typed.slice(0, 10);
+        return ((egyptTop10.platforms && egyptTop10.platforms[platKey]) || [])
+          .filter((i) => (i.media_type === 'tv' || (!i.media_type && i.name) ? 'tv' : 'movie') === kind)
+          .slice(0, 10);
+      }
+      return ((egyptTop10.platforms && egyptTop10.platforms[platKey]) || []).slice(0, 10);
+    }
+
+    function renderTop10TrackHtml(items) {
+      if (!items.length) {
+        return '<div class="py-8 px-4 text-xs font-bold text-[#a3a3a3]">لا توجد أعمال مطابقة في هذا التصنيف حالياً.</div>';
+      }
+      return items.map((item, idx) =>
+        `<div class="top10"><span class="top10-num" aria-hidden="true">${idx + 1}</span>${top10PlatformCardHtml(item)}</div>`
+      ).join('');
+    }
+
     function egyptTop10SectionsHtml(egyptTop10) {
       if (!egyptTop10 || !egyptTop10.platforms) return '';
       const dateLabel = egyptTop10.date ? ` • ${escHtml(egyptTop10.date)}` : '';
       const datePill = `<span class="px-2 py-0.5 rounded-full bg-[#232323] border border-neutral-700 text-neutral-300 text-[11px] font-bold">🇪🇬 تحديث يومي${dateLabel}</span>`;
       return EGYPT_TOP10_PLATFORMS.map((p) => {
-        const items = (egyptTop10.platforms[p.key] || []).slice(0, 10);
-        if (!items.length) return '';
-        const cards = items.map((item, idx) =>
-          `<div class="top10"><span class="top10-num" aria-hidden="true">${idx + 1}</span>${top10PlatformCardHtml(item)}</div>`
-        ).join('');
+        const activeKind = egyptTop10Filter[p.key] || 'all';
+        const allItems = (egyptTop10.platforms[p.key] || []).slice(0, 10);
+        if (!allItems.length) return '';
+        const items = getTop10ItemsForKind(egyptTop10, p.key, activeKind);
+        const tabs = [
+          { id: 'all', label: 'الكل' },
+          { id: 'movie', label: 'أفلام' },
+          { id: 'tv', label: 'مسلسلات' },
+        ].map((t) => {
+          const isAct = activeKind === t.id;
+          const cls = isAct
+            ? 'bg-[#e50914] text-white border-[#e50914]'
+            : 'bg-[#16161c] text-neutral-300 border-neutral-700 hover:border-white';
+          return `<button type="button" data-top10-plat="${p.key}" data-top10-kind="${t.id}" class="top10-tab min-h-[44px] sm:min-h-[34px] px-2.5 rounded-md border text-[11px] font-extrabold transition cursor-pointer ${cls}">${t.label}</button>`;
+        }).join('');
         return `
           <section class="top10-eg" data-platform="${p.key}">
-            <div class="row-title items-center">
+            <div class="row-title items-center flex-wrap">
               <div class="flex flex-wrap items-center gap-2 min-w-0">
                 <span class="top10-badge">${p.badge}</span>
                 <h3 class="text-white">${p.title}</h3>
                 ${datePill}
+                <div class="inline-flex items-center gap-1" role="group" aria-label="تصفية ${p.badge}">
+                  ${tabs}
+                </div>
               </div>
               <button type="button" class="row-more min-h-[44px] inline-flex items-center px-2 cursor-pointer" data-top10-more="${p.key}">عرض الكل ‹</button>
             </div>
             <div class="row-wrap">
               <button type="button" class="row-arrow prev" aria-label="السابق" onclick="scrollRow(this, 1)">›</button>
-              <div class="row-track scrollbar-hide">${cards}</div>
+              <div class="row-track scrollbar-hide" data-top10-track="${p.key}">${renderTop10TrackHtml(items)}</div>
               <button type="button" class="row-arrow next" aria-label="التالي" onclick="scrollRow(this, -1)">‹</button>
             </div>
           </section>
@@ -1351,6 +1623,25 @@
     }
 
     document.addEventListener('click', (e) => {
+      const top10TabBtn = e.target.closest('[data-top10-plat]');
+      if (top10TabBtn && homeData && homeData.egyptTop10) {
+        const plat = top10TabBtn.dataset.top10Plat;
+        const kind = top10TabBtn.dataset.top10Kind || 'all';
+        egyptTop10Filter[plat] = kind;
+        const sec = top10TabBtn.closest('.top10-eg');
+        if (sec) {
+          sec.querySelectorAll('[data-top10-plat]').forEach((b) => {
+            const act = b.dataset.top10Kind === kind;
+            b.className = `top10-tab min-h-[44px] sm:min-h-[34px] px-2.5 rounded-md border text-[11px] font-extrabold transition cursor-pointer ${act ? 'bg-[#e50914] text-white border-[#e50914]' : 'bg-[#16161c] text-neutral-300 border-neutral-700 hover:border-white'}`;
+          });
+          const track = sec.querySelector(`[data-top10-track="${plat}"]`);
+          if (track) {
+            track.innerHTML = renderTop10TrackHtml(getTop10ItemsForKind(homeData.egyptTop10, plat, kind));
+            track.scrollTo({ left: 0 });
+          }
+        }
+        return;
+      }
       const top10Btn = e.target.closest('[data-top10-more]');
       if (top10Btn) {
         const p = EGYPT_TOP10_PLATFORMS.find((x) => x.key === top10Btn.dataset.top10More);
@@ -1367,6 +1658,76 @@
       loadBrowse({ ...row.params }, row.title);
     });
 
+    async function loadMyListEpisodeAlerts() {
+      const wrap = document.getElementById('myListAlertsWrap');
+      if (!wrap) return;
+      const tvShows = getMyListItems().filter((i) => i.type === 'tv').slice(0, 6);
+      if (!tvShows.length) { wrap.innerHTML = ''; return; }
+      const CACHE_K = 'filmaty:mylist-alerts:v1';
+      let cachedMap = {};
+      try {
+        const raw = JSON.parse(sessionStorage.getItem(CACHE_K) || 'null');
+        if (raw && (Date.now() - (raw.at || 0)) < 30 * 60_000 && raw.items) cachedMap = raw.items;
+      } catch (e) {}
+
+      const nowMs = Date.now();
+      const missing = tvShows.filter((s) => !cachedMap[s.id]);
+      if (missing.length) {
+        await Promise.all(missing.map(async (s) => {
+          const det = await fetchTmdbJson(`/tv/${s.id}`);
+          if (det) {
+            cachedMap[s.id] = {
+              id: s.id,
+              title: det.name || s.title || '',
+              poster_path: det.poster_path || '',
+              last: det.last_episode_to_air || null,
+              next: det.next_episode_to_air || null,
+            };
+          }
+        }));
+        try { sessionStorage.setItem(CACHE_K, JSON.stringify({ at: nowMs, items: cachedMap })); } catch (e) {}
+      }
+
+      const alerts = [];
+      for (const s of tvShows) {
+        const info = cachedMap[s.id];
+        if (!info) continue;
+        const last = info.last;
+        const next = info.next;
+        const lastMs = last && last.air_date ? Date.parse(last.air_date) : 0;
+        const nextMs = next && next.air_date ? Date.parse(next.air_date) : 0;
+        if (lastMs && (nowMs - lastMs) >= -86400_000 && (nowMs - lastMs) <= 14 * 86400_000) {
+          alerts.push({ id: s.id, title: info.title || s.title, poster: info.poster_path ? `${IMG_BASE}${info.poster_path}` : s.poster, s: last.season_number || 1, e: last.episode_number || 1, airDate: last.air_date, kindLabel: 'حلقة جديدة' });
+        } else if (nextMs && (nextMs - nowMs) >= 0 && (nextMs - nowMs) <= 3 * 86400_000) {
+          alerts.push({ id: s.id, title: info.title || s.title, poster: info.poster_path ? `${IMG_BASE}${info.poster_path}` : s.poster, s: next.season_number || 1, e: next.episode_number || 1, airDate: next.air_date, kindLabel: 'تُعرض قريباً' });
+        }
+      }
+      if (!alerts.length) { wrap.innerHTML = ''; return; }
+      wrap.innerHTML = `
+        <section class="p-3 sm:p-4 rounded-xl bg-[#16161c] border border-[#e50914]/40 space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-sm sm:text-base font-black text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#e50914]" aria-hidden="true"></span>
+              <span>🔔 حلقات جديدة من قائمتك</span>
+            </h3>
+            <span class="text-[11px] font-bold text-neutral-400">${alerts.length} تنبيه</span>
+          </div>
+          <div class="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+            ${alerts.map((a) => `
+              <a href="?tv=${a.id}&s=${a.s}&e=${a.e}" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${a.id}, 'tv', ${a.s}, ${a.e});}" class="shrink-0 flex items-center gap-2.5 min-w-[230px] max-w-[280px] min-h-[64px] p-2 rounded-lg bg-[#0b0b0f] border border-neutral-800 hover:border-[#e50914] transition">
+                <img src="${a.poster || 'https://placehold.co/92x138/181818/a3a3a3?text=TV'}" alt="${escHtml(a.title)}" loading="lazy" class="w-11 h-16 object-cover rounded shrink-0 bg-neutral-900" />
+                <div class="min-w-0 flex-1">
+                  <span class="inline-block px-1.5 py-0.5 rounded bg-[#e50914]/20 text-red-300 text-[10px] font-black mb-0.5">${a.kindLabel} • م${a.s} ح${a.e}</span>
+                  <div class="text-xs font-extrabold text-white truncate">${escHtml(a.title)}</div>
+                  <div class="text-[11px] text-neutral-400 font-semibold">${escHtml(a.airDate || '')}</div>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </section>
+      `;
+    }
+
     function homeCardHtml(item, rankNum = 0) {
       const title = (item.title || item.name || 'بدون عنوان').replace(/"/g, '&quot;');
       const date = item.release_date || item.first_air_date || '';
@@ -1380,7 +1741,7 @@
         ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#e50914] text-white text-[11px] font-black shadow pointer-events-none">#${rankNum}</span>`
         : '';
       return `
-        <a href="${href}" class="pcard w-32 sm:w-40 lg:w-44" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
+        <a href="${href}" data-media-type="${mediaType}" data-media-id="${item.id}" data-media-title="${title}" class="pcard w-32 sm:w-40 lg:w-44" onclick="if(!isModifiedCardClick(event)){event.preventDefault();openDetails(${item.id}, '${mediaType}');}">
           <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
             <img src="${poster}" alt="${title}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
             ${rank}
@@ -1681,8 +2042,93 @@
       loadHome();
     });
 
-    // Search via the Worker: TMDB in Arabic + English merged, with a
-    // provider fallback when TMDB returns nothing.
+    // Search via the Worker + Instant Search Filter Bar (#19).
+    let lastSearchRaw = [];
+    let lastSearchQuery = '';
+    let searchFilterState = { type: 'all', rating: 0, year: '', sort: 'relevance' };
+
+    function renderSearchFilterBar() {
+      const bar = document.getElementById('searchFilterBar');
+      if (!bar) return;
+      if (!lastSearchRaw.length) {
+        bar.classList.add('hidden');
+        bar.innerHTML = '';
+        return;
+      }
+      bar.classList.remove('hidden');
+      const chipCls = (on) => on
+        ? 'bg-[#e50914] border-[#e50914] text-white'
+        : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white';
+      const typeBtns = [
+        { k: 'all', l: 'الكل' },
+        { k: 'movie', l: '🎬 أفلام' },
+        { k: 'tv', l: '📺 مسلسلات' },
+      ].map((t) => `<button type="button" data-sf-type="${t.k}" class="sf-type-btn min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-md border transition cursor-pointer ${chipCls(searchFilterState.type === t.k)}">${t.l}</button>`).join('');
+      const rateBtns = [
+        { v: 0, l: 'أي تقييم' },
+        { v: 6, l: '★ 6+' },
+        { v: 7, l: '★ 7+' },
+        { v: 8, l: '★ 8+' },
+      ].map((r) => `<button type="button" data-sf-rate="${r.v}" class="sf-rate-btn min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-md border transition cursor-pointer ${chipCls(searchFilterState.rating === r.v)}">${r.l}</button>`).join('');
+      const sortBtns = [
+        { k: 'relevance', l: '🎯 الأكثر صلة' },
+        { k: 'rating', l: '⭐ التقييم' },
+        { k: 'newest', l: '🆕 الأحدث' },
+      ].map((s) => `<button type="button" data-sf-sort="${s.k}" class="sf-sort-btn min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-md border transition cursor-pointer ${chipCls(searchFilterState.sort === s.k)}">${s.l}</button>`).join('');
+      const years = ['', '2026', '2025', '2024', '2023', '2022', '2021', '2020'];
+      const yearOpts = years.map((y) => `<option value="${y}" ${searchFilterState.year === y ? 'selected' : ''}>${y ? y : 'كل السنوات'}</option>`).join('');
+
+      bar.innerHTML = `
+        <div class="flex flex-wrap items-center gap-2 text-xs font-bold">
+          ${typeBtns}
+          <span class="text-neutral-600 hidden sm:inline">|</span>
+          ${rateBtns}
+          <span class="text-neutral-600 hidden sm:inline">|</span>
+          ${sortBtns}
+          <select id="sfYearSelect" aria-label="تصفية حسب السنة" class="min-h-[44px] px-3 rounded-md bg-[#232323] border border-[#737373] text-white cursor-pointer">${yearOpts}</select>
+        </div>
+      `;
+
+      bar.querySelectorAll('.sf-type-btn').forEach((b) => b.addEventListener('click', () => {
+        searchFilterState.type = b.dataset.sfType || 'all';
+        renderSearchFilterBar();
+        applySearchFilters();
+      }));
+      bar.querySelectorAll('.sf-rate-btn').forEach((b) => b.addEventListener('click', () => {
+        searchFilterState.rating = Number(b.dataset.sfRate) || 0;
+        renderSearchFilterBar();
+        applySearchFilters();
+      }));
+      bar.querySelectorAll('.sf-sort-btn').forEach((b) => b.addEventListener('click', () => {
+        searchFilterState.sort = b.dataset.sfSort || 'relevance';
+        renderSearchFilterBar();
+        applySearchFilters();
+      }));
+      document.getElementById('sfYearSelect')?.addEventListener('change', (e) => {
+        searchFilterState.year = e.target.value || '';
+        applySearchFilters();
+      });
+    }
+
+    function applySearchFilters() {
+      let list = lastSearchRaw.slice();
+      if (searchFilterState.type !== 'all') {
+        list = list.filter((i) => (i.media_type || (i.name ? 'tv' : 'movie')) === searchFilterState.type);
+      }
+      if (searchFilterState.rating > 0) {
+        list = list.filter((i) => Number(i.vote_average || 0) >= searchFilterState.rating);
+      }
+      if (searchFilterState.year) {
+        list = list.filter((i) => (i.release_date || i.first_air_date || '').startsWith(searchFilterState.year));
+      }
+      if (searchFilterState.sort === 'rating') {
+        list.sort((a, b) => Number(b.vote_average || 0) - Number(a.vote_average || 0));
+      } else if (searchFilterState.sort === 'newest') {
+        list.sort((a, b) => String(b.release_date || b.first_air_date || '').localeCompare(String(a.release_date || a.first_air_date || '')));
+      }
+      renderCards(list, `🔍 نتائج البحث عن: "${escHtml(lastSearchQuery)}"`);
+    }
+
     async function executeSearch(query) {
       saveRecentSearch(query);
       hideSuggest();
@@ -1693,8 +2139,13 @@
       try {
         const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
-        renderCards(data.results || [], `🔍 نتائج البحث عن: "${query}"`);
+        lastSearchRaw = data.results || [];
+        lastSearchQuery = query;
+        searchFilterState = { type: 'all', rating: 0, year: '', sort: 'relevance' };
+        renderSearchFilterBar();
+        applySearchFilters();
       } catch (e) {
+        document.getElementById('searchFilterBar')?.classList.add('hidden');
         showError('تعذر إتمام البحث. حاول مرة أخرى.');
       }
     }
@@ -1994,6 +2445,7 @@
     async function loadBrowse(params, title, baseTitle = title) {
       const seq = ++browseReqId;
       browseState = null;
+      document.getElementById('searchFilterBar')?.classList.add('hidden');
       renderLoading();
       try {
         const startPage = Number(params.page) || 1;
@@ -2186,8 +2638,9 @@
           ? `<span class="text-blue-400 font-semibold">${item.provider} ↗</span>`
           : `<span>${year ? kind : ''}</span>`;
 
+        const dataAttrs = item.providerUrl ? '' : ` data-media-type="${mediaType}" data-media-id="${item.id}" data-media-title="${safeTitle}"`;
         return `
-          <a ${linkAttrs} class="block group cursor-pointer bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200">
+          <a ${linkAttrs}${dataAttrs} class="block group cursor-pointer bg-[#181818] rounded-md overflow-hidden border border-neutral-800 hover:border-neutral-400 sm:hover:scale-[1.03] transition duration-200">
             <div class="relative aspect-[2/3] bg-neutral-900 overflow-hidden pointer-events-none">
               <img src="${poster}" alt="${safeTitle}" loading="lazy" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
               <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-amber-400 text-[11px] font-extrabold">★ ${rating}</span>
@@ -2343,6 +2796,25 @@
         modalRating.innerText = `★ ${rating}`;
         modalYear.innerText = year;
         modalKind.innerText = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+        const certEl = document.getElementById('modalCert');
+        if (certEl) { certEl.innerText = ''; certEl.classList.add('hidden'); }
+        const rtEl = document.getElementById('modalRuntime');
+        if (rtEl) {
+          let rtText = '';
+          if (mediaType === 'movie' && Number(currentItem.runtime) > 0) {
+            const mins = Number(currentItem.runtime);
+            const hrs = Math.floor(mins / 60);
+            const rem = mins % 60;
+            rtText = hrs > 0 ? `${hrs}س ${rem ? rem + 'د' : ''}`.trim() : `${mins}د`;
+          } else if (mediaType === 'tv' && Number(currentItem.number_of_seasons) > 0) {
+            const sc = currentItem.number_of_seasons;
+            const ec = currentItem.number_of_episodes;
+            rtText = `${sc} ${sc === 1 ? 'موسم' : 'مواسم'}${ec ? ` • ${ec} حلقة` : ''}`;
+          }
+          rtEl.innerText = rtText;
+          rtEl.classList.toggle('hidden', !rtText);
+        }
+        skipIntroDismissedForCurrent = false;
         modalStory.innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
 
         const backdropWrap = document.getElementById('modalBackdropWrap');
@@ -2398,28 +2870,118 @@
       }
     }
 
-    // Trailer + similar titles (stage D): fetched from TMDB after the
-    // details open. The trailer plays in the same iframe (YouTube is
-    // trusted, so no sandbox — embedwave re-adds its sandbox on play).
-    // A sequence guard drops stale responses when the user opens
-    // another title before the fetch lands.
+    // Trailer, certification, saga collection, cast filmography & similar (#7, #22).
     let trailerKey = null;
     let trailerLoadSeq = 0;
+    const seasonDetailsCache = new Map();
+
+    function mapAgeCertificationLabel(raw) {
+      const c = String(raw || '').trim().toUpperCase();
+      if (!c) return '';
+      if (['G', 'TV-G', 'TV-Y', 'U', 'ALL'].includes(c)) return 'عائلي';
+      if (['PG', 'TV-PG', 'TV-Y7', '10', '10+'].includes(c)) return '+10';
+      if (['PG-13', 'TV-14', '12', '12+', '13', '13+', '14', '14+'].includes(c)) return '+13';
+      if (['15', '15+', '16', '16+'].includes(c)) return '+16';
+      if (['R', 'NC-17', 'TV-MA', '18', '18+', 'X'].includes(c)) return '+18';
+      return c;
+    }
+
+    function extractCertification(mediaType, data) {
+      if (!data) return '';
+      if (mediaType === 'movie') {
+        const list = data.results || [];
+        const pick = list.find((r) => r.iso_3166_1 === 'EG') || list.find((r) => r.iso_3166_1 === 'US') || list[0];
+        const entry = (pick && pick.release_dates || []).find((x) => x.certification);
+        return mapAgeCertificationLabel(entry ? entry.certification : '');
+      }
+      const list = data.results || [];
+      const pick = list.find((r) => r.iso_3166_1 === 'EG') || list.find((r) => r.iso_3166_1 === 'US') || list[0];
+      return mapAgeCertificationLabel(pick ? pick.rating : '');
+    }
+
+    async function openPersonFilmography(personId, personName) {
+      const data = await fetchTmdbJson(`/person/${personId}/combined_credits`);
+      if (!data) { showToast('تعذر تحميل أعمال الممثل'); return; }
+      const seen = new Set();
+      const items = [...(data.cast || []), ...(data.crew || [])]
+        .filter((it) => {
+          if (!it || !it.id || !it.poster_path || (it.media_type !== 'movie' && it.media_type !== 'tv')) return false;
+          const k = `${it.media_type}:${it.id}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        })
+        .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+        .slice(0, 40);
+      closeModal.click();
+      clearActiveFilters();
+      showGridView();
+      document.getElementById('gridFilterBar')?.classList.add('hidden');
+      document.getElementById('searchFilterBar')?.classList.add('hidden');
+      renderCards(items, `🎭 أعمال: ${escHtml(personName || 'فنان')}`);
+      window.scrollTo({ top: 0 });
+    }
+
     async function loadTrailerAndSimilar(id, mediaType) {
       const loadId = ++trailerLoadSeq;
       trailerKey = null;
       const btn = document.getElementById('btnTrailer');
       const wrap = document.getElementById('similarWrap');
       const row = document.getElementById('similarRow');
+      const colWrap = document.getElementById('collectionWrap');
+      const colRow = document.getElementById('collectionRow');
+      const castWrap = document.getElementById('castWrap');
+      const castRow = document.getElementById('castRow');
+      const certEl = document.getElementById('modalCert');
       btn.classList.add('hidden');
       wrap.classList.add('hidden');
       row.innerHTML = '';
+      if (colWrap) colWrap.classList.add('hidden');
+      if (colRow) colRow.innerHTML = '';
+      if (castWrap) castWrap.classList.add('hidden');
+      if (castRow) castRow.innerHTML = '';
       try {
-        const [videos, similar] = await Promise.all([
+        const colId = mediaType === 'movie' && currentItem && currentItem.belongs_to_collection ? currentItem.belongs_to_collection.id : null;
+        const [videos, similar, credits, certData, colData] = await Promise.all([
           fetchTmdbJson(`/${mediaType}/${id}/videos`, { lang: 'en-US' }),
           fetchTmdbJson(`/${mediaType}/${id}/similar`),
+          fetchTmdbJson(`/${mediaType}/${id}/credits`),
+          fetchTmdbJson(`/${mediaType}/${id}/${mediaType === 'movie' ? 'release_dates' : 'content_ratings'}`),
+          colId ? fetchTmdbJson(`/collection/${colId}`) : Promise.resolve(null),
         ]);
         if (loadId !== trailerLoadSeq) return;
+        const certLabel = extractCertification(mediaType, certData);
+        if (certEl && certLabel) {
+          certEl.innerText = certLabel;
+          certEl.classList.remove('hidden');
+        }
+        if (colWrap && colRow && colData && Array.isArray(colData.parts) && colData.parts.length > 1) {
+          const titleEl = document.getElementById('collectionTitle');
+          if (titleEl) titleEl.innerText = `📚 ${colData.name || 'أجزاء السلسلة الكاملة'}`;
+          const parts = colData.parts.slice().sort((a, b) => String(a.release_date || '9999').localeCompare(String(b.release_date || '9999')));
+          colRow.innerHTML = parts.map((p) => homeCardHtml({ ...p, media_type: 'movie' }, 0)).join('');
+          colWrap.classList.remove('hidden');
+        }
+        if (castWrap && castRow && credits && Array.isArray(credits.cast)) {
+          const actors = credits.cast.slice(0, 14);
+          if (actors.length) {
+            castRow.innerHTML = '';
+            actors.forEach((c) => {
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.className = 'shrink-0 w-24 text-center p-2 rounded-lg bg-[#14141b] border border-neutral-800 hover:border-[#e50914] transition cursor-pointer';
+              const pic = c.profile_path ? `${API_BASE}/img/w185${c.profile_path}` : 'https://placehold.co/150x150/181818/a3a3a3?text=★';
+              b.innerHTML = `
+                <img src="${pic}" alt="${escHtml(c.name || '')}" loading="lazy" class="w-14 h-14 mx-auto rounded-full object-cover bg-neutral-900 border border-neutral-700" />
+                <div class="text-[11px] font-extrabold text-white truncate mt-1.5">${escHtml(c.name || '')}</div>
+                <div class="text-[10px] text-neutral-400 truncate">${escHtml(c.character || '')}</div>
+              `;
+              b.addEventListener('click', () => openPersonFilmography(c.id, c.name));
+              castRow.appendChild(b);
+            });
+            castWrap.classList.remove('hidden');
+          }
+        }
         const trailer = (videos?.results || []).find((v) => v.site === 'YouTube' && v.type === 'Trailer');
         if (trailer) { trailerKey = trailer.key; btn.classList.remove('hidden'); }
         const items = (similar?.results || []).slice(0, 10);
@@ -2428,6 +2990,17 @@
           wrap.classList.remove('hidden');
         }
       } catch (e) {}
+    }
+
+    async function fetchSeasonEpisodes(tvId, sNum, seqCheck = null) {
+      const key = `${tvId}:${sNum}`;
+      if (seasonDetailsCache.has(key)) return seasonDetailsCache.get(key);
+      const data = await fetchTmdbJson(`/tv/${tvId}/season/${sNum}`);
+      if (data && Array.isArray(data.episodes)) {
+        seasonDetailsCache.set(key, data);
+      }
+      if (seqCheck && currentItem && currentItem.id !== seqCheck) return null;
+      return data;
     }
 
     function setupSeriesSeasons(tv, wantSeason = null, wantEpisode = null) {
@@ -2441,32 +3014,83 @@
       selectedSeason = matched ? matched.season_number : (seasons[0]?.season_number || 1);
       seasonSelect.value = String(selectedSeason);
       const currentSeasonObj = seasons.find((s) => s.season_number === selectedSeason) || seasons[0];
-      renderEpisodes(currentSeasonObj?.episode_count || 10, wantEpisode || 1);
+      const epCount = currentSeasonObj?.episode_count || 10;
+      renderEpisodes(epCount, wantEpisode || 1);
+      fetchSeasonEpisodes(tv.id, selectedSeason, tv.id).then((seasonData) => {
+        if (seasonData && currentItem && currentItem.id === tv.id && selectedSeason === Number(seasonSelect.value)) {
+          renderEpisodes(epCount, selectedEpisode, seasonData);
+        }
+      });
 
       seasonSelect.onchange = (e) => {
         selectedSeason = Number(e.target.value);
         const s = seasons.find(x => x.season_number === selectedSeason);
-        renderEpisodes(s?.episode_count || 10, 1);
+        const cnt = s?.episode_count || 10;
+        renderEpisodes(cnt, 1);
+        fetchSeasonEpisodes(tv.id, selectedSeason, tv.id).then((seasonData) => {
+          if (seasonData && currentItem && currentItem.id === tv.id && selectedSeason === Number(seasonSelect.value)) {
+            renderEpisodes(cnt, selectedEpisode, seasonData);
+          }
+        });
         syncUrlWithModal('replace');
         if (currentItem) prefetchResolve('tv', currentItem.id, selectedSeason, selectedEpisode);
       };
     }
 
-    function renderEpisodes(count, wantEpisode = 1) {
+    function renderEpisodes(count, wantEpisode = 1, seasonData = null) {
       const targetEp = Number(wantEpisode) || 1;
       selectedEpisode = targetEp >= 1 && targetEp <= count ? targetEp : 1;
       currentSeasonEpisodeCount = count;
-      episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => {
-        const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
-        const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
-        const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
-        const active = epNum === selectedEpisode;
-        return `
-        <button type="button" class="ep-btn relative overflow-hidden min-h-[44px] ${active ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-[#737373] text-neutral-200'} rounded-md py-1.5 text-xs font-bold border hover:border-white transition" onclick="selectEpisode(${epNum}, this)">
-          ${watched ? '✓ ' : ''}حلقة ${epNum}
-          ${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}
-        </button>
-      `; }).join('');
+      if (!seasonData && currentItem) {
+        seasonData = seasonDetailsCache.get(`${currentItem.id}:${selectedSeason}`) || null;
+      }
+      const epList = seasonData && Array.isArray(seasonData.episodes) ? seasonData.episodes : null;
+      const epMap = new Map();
+      if (epList) epList.forEach((ep) => { if (ep && ep.episode_number) epMap.set(Number(ep.episode_number), ep); });
+
+      if (epMap.size > 0) {
+        episodesGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto pr-1';
+        episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => {
+          const epInfo = epMap.get(epNum);
+          const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
+          const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
+          const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
+          const active = epNum === selectedEpisode;
+          const still = epInfo && epInfo.still_path ? `${API_BASE}/img/w300${epInfo.still_path}` : 'https://placehold.co/300x169/16161c/737373?text=Episode';
+          const epTitle = epInfo && epInfo.name ? epInfo.name : `حلقة ${epNum}`;
+          const epRt = epInfo && epInfo.runtime ? `${epInfo.runtime}د` : '';
+          const epOv = epInfo && epInfo.overview ? epInfo.overview : '';
+          return `
+            <button type="button" data-episode="${epNum}" class="ep-btn text-right relative overflow-hidden min-h-[76px] p-2 rounded-lg border transition cursor-pointer flex gap-2.5 items-start ${active ? 'bg-[#e50914]/25 border-[#e50914] text-white' : 'bg-[#232323] border-neutral-700 text-neutral-200 hover:border-white'}" onclick="selectEpisode(${epNum}, this)">
+              <div class="relative w-24 h-14 rounded overflow-hidden shrink-0 bg-neutral-900 pointer-events-none">
+                <img src="${still}" alt="" loading="lazy" class="w-full h-full object-cover" />
+                <span class="absolute top-1 right-1 px-1 py-0.5 rounded bg-black/80 text-[10px] font-black text-white">${epNum}</span>
+                ${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}
+              </div>
+              <div class="min-w-0 flex-1 pointer-events-none">
+                <div class="flex items-center justify-between gap-1">
+                  <span class="text-xs font-extrabold truncate">${watched ? '✓ ' : ''}${escHtml(epTitle)}</span>
+                  ${epRt ? `<span class="text-[10px] text-neutral-400 font-bold shrink-0">${escHtml(epRt)}</span>` : ''}
+                </div>
+                ${epOv ? `<p class="text-[11px] text-neutral-400 line-clamp-2 mt-0.5 leading-snug">${escHtml(epOv)}</p>` : ''}
+              </div>
+            </button>
+          `;
+        }).join('');
+      } else {
+        episodesGrid.className = 'grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-44 overflow-y-auto pr-1';
+        episodesGrid.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(epNum => {
+          const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
+          const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
+          const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
+          const active = epNum === selectedEpisode;
+          return `
+          <button type="button" data-episode="${epNum}" class="ep-btn relative overflow-hidden min-h-[44px] ${active ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-[#737373] text-neutral-200'} rounded-md py-1.5 text-xs font-bold border hover:border-white transition cursor-pointer" onclick="selectEpisode(${epNum}, this)">
+            ${watched ? '✓ ' : ''}حلقة ${epNum}
+            ${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}
+          </button>
+        `; }).join('');
+      }
       if (currentItem) {
         const k = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
         syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
@@ -2476,13 +3100,14 @@
 
     function selectEpisode(epNum, btn) {
       selectedEpisode = epNum;
+      skipIntroDismissedForCurrent = false;
       clearAutoNext();
       document.querySelectorAll('.ep-btn').forEach(b => {
-        b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
-        b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+        b.classList.remove('bg-[#e50914]', 'bg-[#e50914]/25', 'border-[#e50914]', 'text-white');
+        b.classList.add('bg-[#232323]', 'text-neutral-200');
       });
-      btn.classList.remove('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
-      btn.classList.add('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+      btn.classList.remove('bg-[#232323]', 'text-neutral-200');
+      btn.classList.add('bg-[#e50914]/25', 'border-[#e50914]', 'text-white');
       if (currentItem) {
         const k = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
         syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
@@ -2573,12 +3198,47 @@
       if (sp) sp.classList.add('hidden');
     }
 
+    const PREF_SERVER_KEY = 'filmaty:pref-server:v1';
+    let skipIntroDismissedForCurrent = false;
+    let sleepTimerId = null;
+    let sleepMode = '';
+    let nativeBrightness = 1;
+    let activeSubBlobUrl = '';
+    let activeSubRawVtt = '';
+    let subOffsetSeconds = 0;
+    let subFontSize = 'md';
+
+    function readPrefServerMap() {
+      try { return JSON.parse(localStorage.getItem(PREF_SERVER_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function savePrefServer(type, name) {
+      if (!type || !name) return;
+      const m = readPrefServerMap();
+      m[type] = name;
+      try { localStorage.setItem(PREF_SERVER_KEY, JSON.stringify(m)); } catch (e) {}
+    }
+
+    function clearNativeSubtitles() {
+      if (activeSubBlobUrl) {
+        try { URL.revokeObjectURL(activeSubBlobUrl); } catch (e) {}
+        activeSubBlobUrl = '';
+      }
+      activeSubRawVtt = '';
+      videoNative.querySelectorAll('track').forEach((tr) => tr.remove());
+    }
+
     function resetPlayer() {
       trackProgress(true);
       clearAutoNext();
       nativeActive = false;
       usingDirectCdn = false;
       clearNativePlayTimeout();
+      clearNativeSubtitles();
+      document.getElementById('subtitleMenu')?.classList.add('hidden');
+      document.getElementById('btnSkipIntro')?.classList.add('hidden');
+      document.getElementById('gestureHud')?.classList.add('hidden');
+      videoNative.style.filter = '';
+      nativeBrightness = 1;
       videoNative.pause();
       videoNative.removeAttribute('src');
       videoNative.load();
@@ -2683,7 +3343,14 @@
       hideIframeSpinner();
       fallbackFromDirectToProxyOrNext(false);
     });
-    videoNative.addEventListener('playing', () => { clearNativePlayTimeout(); hideIframeSpinner(); });
+    videoNative.addEventListener('playing', () => {
+      clearNativePlayTimeout();
+      hideIframeSpinner();
+      if (currentItem) {
+        const srv = selectedServer();
+        if (srv && !isEmbedServer(srv)) savePrefServer(currentItem.media_type === 'tv' ? 'tv' : 'movie', srv.name);
+      }
+    });
     videoNative.addEventListener('loadeddata', hideIframeSpinner);
     videoNative.addEventListener('canplay', () => {
       hideIframeSpinner();
@@ -2702,7 +3369,18 @@
     function currentProgressMeta() {
       if (!currentItem) return null;
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
-      return { type, s: type === 'tv' ? selectedSeason : 0, e: type === 'tv' ? selectedEpisode : 0, title: currentItem.title || currentItem.name || '', poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '', kind: type };
+      const gIds = Array.isArray(currentItem.genres) ? currentItem.genres.map((g) => g.id).filter(Boolean) : [];
+      const rt = Number(currentItem.runtime) || (Array.isArray(currentItem.episode_run_time) && Number(currentItem.episode_run_time[0])) || 0;
+      return {
+        type,
+        s: type === 'tv' ? selectedSeason : 0,
+        e: type === 'tv' ? selectedEpisode : 0,
+        title: currentItem.title || currentItem.name || '',
+        poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '',
+        kind: type,
+        ...(gIds.length ? { genreIds: gIds } : {}),
+        ...(rt > 0 ? { runtime: Math.round(rt) } : {}),
+      };
     }
     function applyPendingResumeSeek() {
       if (pendingResume == null) return;
@@ -2723,13 +3401,25 @@
       if (Number.isFinite(d) && d > 0 && t >= d - 30) { markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e, meta); updateResumeButton(); return; }
       saveProgressEntry(meta.type, currentItem.id, meta.s, meta.e, t, d, meta);
     }
-    videoNative.addEventListener('timeupdate', () => trackProgress(false));
+    videoNative.addEventListener('timeupdate', () => {
+      trackProgress(false);
+      const skipBtn = document.getElementById('btnSkipIntro');
+      if (skipBtn) {
+        const showSkip = nativeActive && currentItem && currentItem.media_type === 'tv' && !skipIntroDismissedForCurrent && videoNative.currentTime >= 5 && videoNative.currentTime <= 150;
+        skipBtn.classList.toggle('hidden', !showSkip);
+      }
+    });
     videoNative.addEventListener('pause', () => trackProgress(true));
     videoNative.addEventListener('seeked', () => trackProgress(true));
     videoNative.addEventListener('ended', () => {
       const meta = currentProgressMeta();
       if (meta) markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e, meta);
       updateResumeButton();
+      if (sleepMode === 'ep') {
+        clearSleepTimer();
+        showToast('انتهت الحلقة: تم إيقاف التشغيل حسب مؤقت النوم 💤');
+        return;
+      }
       armAutoNext();
     });
     document.addEventListener('pagehide', () => {
@@ -2870,6 +3560,9 @@
           captureCurrentPlaybackTime();
           selectedServerIdx = idx;
           selectedQualityIdx = 0;
+          if (currentItem && !isEmbedServer(server)) {
+            savePrefServer(currentItem.media_type === 'tv' ? 'tv' : 'movie', server.name);
+          }
           renderServerControls();
           playSelected();
         });
@@ -2939,6 +3632,7 @@
       videoNative.classList.remove('hidden');
       hidePlayerStatus();
       updatePlayerToolbarVisibility(false);
+      loadSubtitlesForCurrentMedia();
       armNativePlayTimeout();
       videoNative.play().catch(() => {});
     }
@@ -3138,11 +3832,258 @@
       }
     });
 
-    // Double-tap seek on mobile touchscreens without blocking native controls.
+    // Subtitles (#8), Skip Intro & Sleep Timer (#11), Mobile Vertical Gestures (#14).
+    function clearSleepTimer() {
+      clearTimeout(sleepTimerId);
+      sleepTimerId = null;
+      sleepMode = '';
+      const sel = document.getElementById('sleepTimerSelect');
+      if (sel) sel.value = '';
+    }
+
+    document.getElementById('btnSkipIntro')?.addEventListener('click', () => {
+      skipIntroDismissedForCurrent = true;
+      document.getElementById('btnSkipIntro')?.classList.add('hidden');
+      seekNativeBy(85);
+    });
+
+    document.getElementById('sleepTimerSelect')?.addEventListener('change', (e) => {
+      const val = e.target.value || '';
+      clearTimeout(sleepTimerId);
+      sleepTimerId = null;
+      sleepMode = val;
+      if (!val) {
+        showToast('تم إيقاف مؤقت النوم');
+        return;
+      }
+      if (val === 'ep') {
+        showToast('سيتم إيقاف التشغيل عند نهاية الحلقة الحالية ⏱');
+        return;
+      }
+      const mins = Number(val);
+      if (mins > 0) {
+        sleepTimerId = setTimeout(() => {
+          if (!videoNative.paused) videoNative.pause();
+          clearSleepTimer();
+          showToast('تم إيقاف التشغيل حسب مؤقت النوم 💤');
+        }, mins * 60_000);
+        showToast(`سيتم إيقاف التشغيل تلقائياً بعد ${mins} دقيقة ⏱`);
+      }
+    });
+
+    function clientSrtToVtt(raw) {
+      const clean = String(raw || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+      if (!clean) return 'WEBVTT\n\n';
+      if (/^WEBVTT\b/i.test(clean)) return clean + '\n';
+      const lines = clean.split('\n');
+      const out = ['WEBVTT', ''];
+      for (let i = 0; i < lines.length; i++) {
+        if (/^\d+$/.test(lines[i].trim()) && /-->/.test(lines[i + 1] || '')) continue;
+        out.push(lines[i].includes('-->') ? lines[i].replace(/(\d{1,2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2') : lines[i]);
+      }
+      return out.join('\n') + '\n';
+    }
+
+    function vttSecToStamp(sec) {
+      const s = Math.max(0, sec);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const rem = (s % 60).toFixed(3).padStart(6, '0');
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${rem}`;
+    }
+
+    function vttStampToSec(str) {
+      const p = str.trim().split(':');
+      if (p.length === 3) return Number(p[0]) * 3600 + Number(p[1]) * 60 + Number(p[2]);
+      if (p.length === 2) return Number(p[0]) * 60 + Number(p[1]);
+      return 0;
+    }
+
+    function shiftVttTimestamps(vtt, deltaSec) {
+      if (!deltaSec) return vtt;
+      return vtt.replace(/(\d{1,2}:\d{2}(?::\d{2})?\.\d{3})\s+-->\s+(\d{1,2}:\d{2}(?::\d{2})?\.\d{3})/g, (_, a, b) =>
+        `${vttSecToStamp(vttStampToSec(a) + deltaSec)} --> ${vttSecToStamp(vttStampToSec(b) + deltaSec)}`
+      );
+    }
+
+    function applySubFontClass() {
+      playerContainer.classList.remove('sub-sz-sm', 'sub-sz-md', 'sub-sz-lg');
+      playerContainer.classList.add(`sub-sz-${subFontSize}`);
+      document.querySelectorAll('.sub-sz-opt').forEach((b) => {
+        const on = b.dataset.subSz === subFontSize;
+        b.className = `sub-sz-opt min-h-[34px] px-2.5 rounded border cursor-pointer ${on ? 'border-[#e50914] bg-[#e50914] text-white' : 'border-neutral-700 bg-[#232323] text-neutral-200'}`;
+      });
+    }
+
+    function renderActiveVttTrack(vttText, label = 'الترجمة') {
+      activeSubRawVtt = vttText;
+      if (activeSubBlobUrl) {
+        try { URL.revokeObjectURL(activeSubBlobUrl); } catch (e) {}
+      }
+      videoNative.querySelectorAll('track').forEach((tr) => tr.remove());
+      const shifted = shiftVttTimestamps(vttText, subOffsetSeconds);
+      activeSubBlobUrl = URL.createObjectURL(new Blob([shifted], { type: 'text/vtt' }));
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.label = label;
+      track.srclang = 'ar';
+      track.src = activeSubBlobUrl;
+      track.default = true;
+      videoNative.appendChild(track);
+      setTimeout(() => {
+        for (let i = 0; i < videoNative.textTracks.length; i++) {
+          videoNative.textTracks[i].mode = i === videoNative.textTracks.length - 1 ? 'showing' : 'disabled';
+        }
+      }, 30);
+    }
+
+    async function loadSubtitlesForCurrentMedia() {
+      const listEl = document.getElementById('subTracksList');
+      if (!listEl || !currentItem) return;
+      subOffsetSeconds = 0;
+      const offEl = document.getElementById('subOffsetVal');
+      if (offEl) offEl.innerText = '0.0s';
+      applySubFontClass();
+      listEl.innerHTML = '<div class="text-neutral-400 py-1">⏳ جاري البحث عن ملفات الترجمة...</div>';
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      const qs = new URLSearchParams({ type, id: String(currentItem.id) });
+      if (type === 'tv') { qs.set('s', String(selectedSeason)); qs.set('e', String(selectedEpisode)); }
+      try {
+        const res = await fetch(`${API_BASE}/api/subtitles?${qs.toString()}`);
+        const data = await res.json();
+        const tracks = (data && Array.isArray(data.tracks)) ? data.tracks : [];
+        listEl.innerHTML = '';
+        const offBtn = document.createElement('button');
+        offBtn.type = 'button';
+        offBtn.className = 'w-full text-right px-2.5 py-2 rounded bg-[#232323] hover:bg-neutral-700 text-neutral-200 cursor-pointer';
+        offBtn.textContent = '🚫 بدون ترجمة';
+        offBtn.addEventListener('click', () => {
+          clearNativeSubtitles();
+          showToast('تم إيقاف الترجمة');
+        });
+        listEl.appendChild(offBtn);
+
+        if (!tracks.length) {
+          const emptyNote = document.createElement('div');
+          emptyNote.className = 'text-[11px] text-neutral-400 px-1 py-1';
+          emptyNote.textContent = 'لم تتوفر ترجمات تلقائية، يمكنك رفع ملف .srt من جهازك بالأسفل.';
+          listEl.appendChild(emptyNote);
+          return;
+        }
+        tracks.forEach((tr) => {
+          const tb = document.createElement('button');
+          tb.type = 'button';
+          tb.className = 'w-full text-right px-2.5 py-2 rounded bg-[#232323] border border-neutral-700 hover:border-[#e50914] text-white cursor-pointer flex items-center justify-between';
+          tb.innerHTML = `<span>${escHtml(tr.label)}</span><span class="text-[10px] text-neutral-400">${escHtml(tr.langCode || '')}</span>`;
+          tb.addEventListener('click', async () => {
+            showToast('⏳ جاري تحميل الترجمة...');
+            try {
+              const sRes = await fetch(tr.proxyUrl);
+              if (!sRes.ok) throw new Error('sub_err');
+              const vtt = await sRes.text();
+              renderActiveVttTrack(vtt, tr.label);
+              document.getElementById('subtitleMenu')?.classList.add('hidden');
+              showToast(`تم تفعيل: ${tr.label}`);
+            } catch (err) {
+              showToast('تعذر تحميل ملف الترجمة');
+            }
+          });
+          listEl.appendChild(tb);
+        });
+      } catch (err) {
+        listEl.innerHTML = '<div class="text-[11px] text-neutral-400 py-1">تعذر جلب الترجمات الآن.</div>';
+      }
+    }
+
+    document.getElementById('btnSubtitles')?.addEventListener('click', () => {
+      document.getElementById('subtitleMenu')?.classList.toggle('hidden');
+    });
+    document.getElementById('subtitleMenuClose')?.addEventListener('click', () => {
+      document.getElementById('subtitleMenu')?.classList.add('hidden');
+    });
+    document.querySelectorAll('.sub-sz-opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        subFontSize = btn.dataset.subSz || 'md';
+        applySubFontClass();
+      });
+    });
+    document.querySelectorAll('.sub-sync-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        subOffsetSeconds = Number((subOffsetSeconds + Number(btn.dataset.subSync || 0)).toFixed(1));
+        const el = document.getElementById('subOffsetVal');
+        if (el) el.innerText = `${subOffsetSeconds > 0 ? '+' : ''}${subOffsetSeconds.toFixed(1)}s`;
+        if (activeSubRawVtt) renderActiveVttTrack(activeSubRawVtt);
+      });
+    });
+    document.getElementById('btnUploadSub')?.addEventListener('click', () => {
+      document.getElementById('subFileInput')?.click();
+    });
+    document.getElementById('subFileInput')?.addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      const vtt = clientSrtToVtt(await f.text());
+      renderActiveVttTrack(vtt, f.name);
+      document.getElementById('subtitleMenu')?.classList.add('hidden');
+      showToast(`تم تحميل الترجمة: ${f.name}`);
+    });
+
+    // Double-tap seek & vertical swipe volume (right) / brightness (left) gestures (#14).
     let lastTapTime = 0;
     let lastTapSide = null;
+    let swipeState = null;
+    let gestureHudTimer = null;
+
+    function showGestureHud(msg) {
+      const hud = document.getElementById('gestureHud');
+      if (!hud) return;
+      hud.innerText = msg;
+      hud.classList.remove('hidden');
+      clearTimeout(gestureHudTimer);
+      gestureHudTimer = setTimeout(() => hud.classList.add('hidden'), 850);
+    }
+
+    videoNative.addEventListener('touchstart', (e) => {
+      if (!nativeActive || !e.touches || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const rect = videoNative.getBoundingClientRect();
+      if (!rect.width || t.clientY > rect.bottom - 52) { swipeState = null; return; }
+      const relX = (t.clientX - rect.left) / rect.width;
+      swipeState = {
+        x: t.clientX,
+        y: t.clientY,
+        side: relX >= 0.5 ? 'vol' : 'bright',
+        startVol: videoNative.volume,
+        startBright: nativeBrightness,
+        moved: false,
+      };
+    }, { passive: true });
+
+    videoNative.addEventListener('touchmove', (e) => {
+      if (!nativeActive || !swipeState || !e.touches || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - swipeState.x;
+      const dy = swipeState.y - t.clientY;
+      if (!swipeState.moved && Math.abs(dy) > 20 && Math.abs(dy) > Math.abs(dx) * 1.4) {
+        swipeState.moved = true;
+      }
+      if (!swipeState.moved) return;
+      e.preventDefault();
+      if (swipeState.side === 'vol') {
+        const nextVol = Math.max(0, Math.min(1, swipeState.startVol + dy / 220));
+        videoNative.volume = nextVol;
+        showGestureHud(`🔊 الصوت ${Math.round(nextVol * 100)}%`);
+      } else {
+        nativeBrightness = Math.max(0.35, Math.min(1.25, swipeState.startBright + dy / 220));
+        videoNative.style.filter = `brightness(${nativeBrightness.toFixed(2)})`;
+        showGestureHud(`☀️ السطوع ${Math.round(((nativeBrightness - 0.35) / 0.9) * 100)}%`);
+      }
+    }, { passive: false });
+
     videoNative.addEventListener('touchend', (e) => {
-      if (!nativeActive || !e.changedTouches || !e.changedTouches.length) return;
+      const wasDrag = swipeState && swipeState.moved;
+      swipeState = null;
+      if (wasDrag || !nativeActive || !e.changedTouches || !e.changedTouches.length) return;
       const touch = e.changedTouches[0];
       const rect = videoNative.getBoundingClientRect();
       if (!rect.width) return;
@@ -3162,8 +4103,15 @@
       }
     }, { passive: true });
 
-    // Keyboard shortcuts when the watch page or profile overlay is open.
+    // Keyboard shortcuts when modals, overlays or watch page are open.
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const moodEl = document.getElementById('moodModal');
+        if (moodEl && !moodEl.classList.contains('hidden')) { closeMoodModal(); return; }
+        const calEl = document.getElementById('calendarModal');
+        if (calEl && !calEl.classList.contains('hidden')) { closeCalendarModal(); return; }
+        hideHoverPreview();
+      }
       const profileOverlayEl = document.getElementById('profileOverlay');
       if (profileOverlayEl && !profileOverlayEl.classList.contains('hidden')) {
         if (e.key === 'Escape') closeProfileOverlay();
@@ -3228,10 +4176,14 @@
       const e = type === 'tv' ? selectedEpisode : undefined;
       const key = resolveKey(type, currentItem.id, s, e);
       recordViewOnce(type, currentItem.id, s, e);
+      const gIds = Array.isArray(currentItem.genres) ? currentItem.genres.map((g) => g.id).filter(Boolean) : [];
+      const rt = Number(currentItem.runtime) || (Array.isArray(currentItem.episode_run_time) && Number(currentItem.episode_run_time[0])) || 0;
       recordHistoryEntry(type, currentItem.id, s || 0, e || 0, {
         title: currentItem.title || currentItem.name || '',
         poster: currentItem.poster_path ? `${IMG_BASE}${currentItem.poster_path}` : '',
         kind: type,
+        ...(gIds.length ? { genreIds: gIds } : {}),
+        ...(rt > 0 ? { runtime: Math.round(rt) } : {}),
       });
       hideModalBackdrop();
       playerContainer.classList.remove('hidden');
@@ -3242,6 +4194,11 @@
       currentServers = (resolved && Array.isArray(resolved.servers))
         ? resolved.servers
         : buildClientEmbedFallbacks(type, currentItem.id, s || 1, e || 1);
+      const prefSrvName = readPrefServerMap()[type];
+      if (prefSrvName && currentServers.length > 1) {
+        const prefIdx = currentServers.findIndex((srv) => srv && srv.name === prefSrvName && !isEmbedServer(srv));
+        if (prefIdx >= 0) selectedServerIdx = prefIdx;
+      }
       document.getElementById('downloadPicker').classList.add('hidden');
       document.getElementById('botCodePanel').classList.add('hidden');
       renderServerControls();
@@ -3542,6 +4499,7 @@
     btnOpenInBot.addEventListener('click', openBotRequest);
 
     closeModal.addEventListener('click', () => {
+      clearSleepTimer();
       trackProgress(true);
       syncProfileToCloud(false);
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -3587,6 +4545,97 @@
       profileStatus.classList.remove('hidden');
     }
 
+    function switchProfileTab(tab) {
+      const isStats = tab === 'stats';
+      document.getElementById('profileAccountPanel')?.classList.toggle('hidden', isStats);
+      document.getElementById('profileStatsPanel')?.classList.toggle('hidden', !isStats);
+      const tAcc = document.getElementById('profileTabAccount');
+      const tSt = document.getElementById('profileTabStats');
+      if (tAcc) tAcc.className = `min-h-[44px] px-3 rounded-md text-xs font-extrabold transition cursor-pointer ${!isStats ? 'bg-[#e50914] text-white' : 'text-neutral-300 hover:text-white'}`;
+      if (tSt) tSt.className = `min-h-[44px] px-3 rounded-md text-xs font-extrabold transition cursor-pointer ${isStats ? 'bg-[#e50914] text-white' : 'text-neutral-300 hover:text-white'}`;
+      if (isStats) renderProfileStats();
+    }
+
+    function renderAvatarPicker() {
+      const host = document.getElementById('profileAvatarPicker');
+      if (!host) return;
+      const current = readAvatarStore();
+      host.innerHTML = '';
+      PROFILE_AVATARS.forEach((em) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const on = current === em;
+        b.className = `min-h-[44px] rounded-md border text-lg flex items-center justify-center transition cursor-pointer ${on ? 'bg-[#e50914]/25 border-[#e50914] scale-105' : 'bg-[#232323] border-neutral-700 hover:border-white'}`;
+        b.textContent = em;
+        b.setAttribute('aria-label', `اختيار أيقونة ${em}`);
+        b.addEventListener('click', () => {
+          saveAvatarStore(on ? '' : em);
+          updateProfileBadges();
+          renderAvatarPicker();
+          scheduleProfileSync();
+          showToast(on ? 'تم استعادة الحرف الافتراضي' : `تم اختيار أيقونة ${em}`);
+        });
+        host.appendChild(b);
+      });
+    }
+
+    function renderProfileStats() {
+      const watched = readWatchedStore();
+      const history = readHistoryStore();
+      const progress = readProgressStore();
+      const myList = Object.values(readMyListStore());
+      const watchedKeys = Object.keys(watched);
+      const movieKeys = watchedKeys.filter((k) => k.startsWith('movie:'));
+      const epKeys = watchedKeys.filter((k) => k.startsWith('tv:'));
+
+      const movieCount = Math.max(movieKeys.length, history.filter((h) => h.type === 'movie').length);
+      const epCount = Math.max(epKeys.length, history.filter((h) => h.type === 'tv').length);
+
+      let totalMin = 0;
+      const countedTitles = new Set();
+      history.forEach((h) => {
+        const tk = `${h.type}:${h.id}`;
+        countedTitles.add(tk);
+        totalMin += Number(h.runtime) > 0 ? Number(h.runtime) : (h.type === 'movie' ? 105 : 45);
+      });
+      watchedKeys.forEach((k) => {
+        const [tp, tid] = k.split(':');
+        if (tp === 'tv') totalMin += 45;
+        else if (!countedTitles.has(`movie:${tid}`)) totalMin += 105;
+      });
+      Object.values(progress).forEach((p) => {
+        if (p && p.t > 60) totalMin += Math.round(p.t / 60);
+      });
+
+      const genreCounts = {};
+      history.forEach((h) => {
+        if (Array.isArray(h.genreIds)) {
+          h.genreIds.forEach((gid) => { genreCounts[gid] = (genreCounts[gid] || 0) + 1; });
+        }
+      });
+
+      const elMov = document.getElementById('statMovies');
+      const elEp = document.getElementById('statEpisodes');
+      const elHrs = document.getElementById('statHours');
+      const elList = document.getElementById('statMyList');
+      const elGen = document.getElementById('statGenres');
+      if (elMov) elMov.textContent = String(movieCount);
+      if (elEp) elEp.textContent = String(epCount);
+      if (elHrs) elHrs.textContent = String((totalMin / 60).toFixed(1));
+      if (elList) elList.textContent = String(myList.length);
+      if (elGen) {
+        const sorted = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        if (sorted.length) {
+          elGen.innerHTML = sorted.map(([gid, cnt]) => {
+            const nm = STAT_GENRE_NAMES[Number(gid)] || `تصنيف ${gid}`;
+            return `<span class="px-2.5 py-1 rounded-md bg-[#232323] border border-neutral-700 text-neutral-200">${escHtml(nm)} (${cnt})</span>`;
+          }).join('');
+        } else {
+          elGen.innerHTML = '<span class="text-[#a3a3a3] font-semibold">شاهد أفلاماً أو مسلسلات ليظهر ذوقك السينمائي المفضل هنا.</span>';
+        }
+      }
+    }
+
     function renderSavedProfileButtons() {
       if (!profileSavedWrap || !profileSavedUsers) return;
       const users = readSavedUsersList();
@@ -3599,12 +4648,13 @@
         users.forEach((u) => {
           const b = document.createElement('button');
           b.type = 'button';
-          b.className = 'profile-saved-btn min-h-[44px] px-3.5 py-2 rounded-md border text-xs font-bold flex items-center gap-2 transition ' + (u === activeUser
+          b.className = 'profile-saved-btn min-h-[44px] px-3.5 py-2 rounded-md border text-xs font-bold flex items-center gap-2 transition cursor-pointer ' + (u === activeUser
             ? 'bg-[#e50914] border-[#e50914] text-white'
             : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white');
           const av = document.createElement('span');
           av.className = 'w-5 h-5 rounded bg-black/40 text-white text-[11px] font-black flex items-center justify-center';
-          av.textContent = u.slice(0, 1).toUpperCase();
+          const snapAv = u === activeUser ? readAvatarStore() : (readLocalUserSnapshot(u)?.avatar || '');
+          av.textContent = snapAv || u.slice(0, 1).toUpperCase();
           const nameSpan = document.createElement('span');
           nameSpan.dir = 'ltr';
           nameSpan.textContent = u;
@@ -3619,7 +4669,9 @@
 
     function openProfileOverlay() {
       setProfileStatus('');
+      switchProfileTab('account');
       renderSavedProfileButtons();
+      renderAvatarPicker();
       if (profileInput) profileInput.value = activeUser || '';
       if (profileOverlay) profileOverlay.classList.remove('hidden');
       if (profileInput) setTimeout(() => profileInput.focus(), 40);
@@ -3639,8 +4691,10 @@
     }
 
     function readCurrentMediaBundle() {
+      const av = readAvatarStore();
       return {
         updatedAt: Date.now(),
+        ...(av ? { avatar: av } : {}),
         progress: readProgressStore(),
         watched: readWatchedStore(),
         myList: readMyListStore(),
@@ -3748,6 +4802,301 @@
       }
     }
 
+    document.getElementById('profileTabAccount')?.addEventListener('click', () => switchProfileTab('account'));
+    document.getElementById('profileTabStats')?.addEventListener('click', () => switchProfileTab('stats'));
+    document.getElementById('profileExportBtn')?.addEventListener('click', () => {
+      const payload = { version: 1, exportedAt: new Date().toISOString(), username: activeUser || 'guest', profile: readCurrentMediaBundle() };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `filmaty-backup-${activeUser || 'guest'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast('تم تصدير النسخة الاحتياطية بنجاح');
+    });
+    document.getElementById('profileImportBtn')?.addEventListener('click', () => {
+      document.getElementById('profileImportInput')?.click();
+    });
+    document.getElementById('profileImportInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const parsed = JSON.parse(await file.text());
+        const bundle = parsed && parsed.profile ? parsed.profile : parsed;
+        if (!bundle || typeof bundle !== 'object') throw new Error('bad');
+        const cur = readCurrentMediaBundle();
+        const merged = {
+          updatedAt: Date.now(),
+          avatar: bundle.avatar || cur.avatar,
+          progress: { ...cur.progress, ...(bundle.progress || {}) },
+          watched: { ...cur.watched, ...(bundle.watched || {}) },
+          myList: { ...cur.myList, ...(bundle.myList || {}) },
+          removedMyList: { ...cur.removedMyList, ...(bundle.removedMyList || {}) },
+          history: [...(Array.isArray(bundle.history) ? bundle.history : []), ...cur.history].slice(0, MAX_HISTORY_ITEMS),
+        };
+        writeProfileToLocalStores(merged);
+        updateProfileBadges();
+        renderAvatarPicker();
+        refreshOpenItemProgressUi();
+        if (homeData) renderHomeSections();
+        if (activeUser) await syncProfileToCloud(false);
+        showToast('تم استيراد النسخة الاحتياطية ودمجها ✅');
+      } catch (err) {
+        showToast('ملف النسخة غير صالح');
+      }
+    });
+
+    // Mood & Duration Picker (#10)
+    const moodModal = document.getElementById('moodModal');
+    let selectedMoodGenre = '28';
+    let moodPool = [];
+    let moodCursor = 0;
+
+    function openMoodModal() {
+      if (moodModal) moodModal.classList.remove('hidden');
+    }
+    function closeMoodModal() {
+      if (moodModal) moodModal.classList.add('hidden');
+    }
+    document.getElementById('btnMoodPicker')?.addEventListener('click', openMoodModal);
+    document.getElementById('moodCloseBtn')?.addEventListener('click', closeMoodModal);
+    document.querySelectorAll('.mood-genre-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        selectedMoodGenre = btn.dataset.moodGenre || '28';
+        document.querySelectorAll('.mood-genre-btn').forEach((b) => {
+          const on = b === btn;
+          b.className = `mood-genre-btn min-h-[44px] px-3 py-1.5 rounded-md border cursor-pointer ${on ? 'bg-[#e50914] border-[#e50914] text-white' : 'bg-[#232323] border-neutral-700 text-neutral-200'}`;
+        });
+        moodPool = [];
+      });
+    });
+
+    function renderMoodCard(item) {
+      const box = document.getElementById('moodResultBox');
+      if (!box) return;
+      box.classList.remove('hidden');
+      if (!item) {
+        box.innerHTML = '<p class="text-xs text-[#a3a3a3] font-bold text-center py-4">لم نجد نتائج مطابقة. جرّب تخفيف الفلتر.</p>';
+        return;
+      }
+      const mType = item.media_type === 'tv' || (!item.media_type && item.name) ? 'tv' : 'movie';
+      const title = item.title || item.name || '';
+      const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'https://placehold.co/185x278/181818/a3a3a3?text=No+Poster';
+      const yr = (item.release_date || item.first_air_date || '').slice(0, 4);
+      const rt = item.vote_average ? item.vote_average.toFixed(1) : '7.0';
+      box.innerHTML = `
+        <div class="flex gap-3 p-3 rounded-lg bg-[#0b0b0f] border border-neutral-800">
+          <img src="${poster}" alt="${escHtml(title)}" class="w-20 h-28 object-cover rounded-md shrink-0 bg-neutral-900" />
+          <div class="min-w-0 flex-1 space-y-1.5">
+            <div class="flex items-center gap-2 text-[11px] font-bold">
+              <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ ${rt}</span>
+              ${yr ? `<span class="text-neutral-400">${escHtml(yr)}</span>` : ''}
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-white truncate">${escHtml(title)}</h3>
+            <p class="text-xs text-neutral-300 line-clamp-2 leading-relaxed">${escHtml(item.overview || 'عمل مميز جاهز لمشاهدتك.')}</p>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button id="moodWatchNowBtn" type="button" class="min-h-[44px] px-4 rounded-md bg-[#e50914] hover:bg-[#f6121d] text-white text-xs font-black cursor-pointer">▶ شاهد الآن</button>
+              <button id="moodAnotherBtn" type="button" class="min-h-[44px] px-3 rounded-md bg-[#232323] border border-neutral-700 hover:border-white text-neutral-200 text-xs font-bold cursor-pointer">🎲 اقتراح آخر</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('moodWatchNowBtn')?.addEventListener('click', () => {
+        closeMoodModal();
+        openDetails(item.id, mType);
+      });
+      document.getElementById('moodAnotherBtn')?.addEventListener('click', () => {
+        if (!moodPool.length) return;
+        moodCursor = (moodCursor + 1) % moodPool.length;
+        renderMoodCard(moodPool[moodCursor]);
+      });
+    }
+
+    document.getElementById('moodPickBtn')?.addEventListener('click', async () => {
+      const mType = document.getElementById('moodTypeSelect')?.value || 'movie';
+      const maxRt = document.getElementById('moodRuntimeSelect')?.value || '';
+      const minR = document.getElementById('moodRatingSelect')?.value || '7.0';
+      const qs = new URLSearchParams({ type: mType, genre: selectedMoodGenre, min_rating: minR, sort: 'popular', page: '1' });
+      if (maxRt && mType === 'movie') qs.set('max_runtime', maxRt);
+      const box = document.getElementById('moodResultBox');
+      if (box) { box.classList.remove('hidden'); box.innerHTML = '<div class="py-6 text-center text-xs text-neutral-300 font-bold">⏳ جاري اختيار سهرة مثالية لك...</div>'; }
+      try {
+        const res = await fetch(`${API_BASE}/api/browse?${qs.toString()}`);
+        const data = await res.json();
+        moodPool = (data.results || []).slice(0, 15);
+        moodCursor = moodPool.length ? Math.floor(Math.random() * Math.min(moodPool.length, 6)) : 0;
+        renderMoodCard(moodPool[moodCursor] || null);
+      } catch (e) {
+        renderMoodCard(null);
+      }
+    });
+
+    // Release & Episode Calendar (#17)
+    const calendarModal = document.getElementById('calendarModal');
+    let calendarTab = 'today';
+
+    function openCalendarModal() {
+      if (calendarModal) calendarModal.classList.remove('hidden');
+      loadCalendarTab(calendarTab);
+    }
+    function closeCalendarModal() {
+      if (calendarModal) calendarModal.classList.add('hidden');
+    }
+    document.getElementById('btnCalendar')?.addEventListener('click', openCalendarModal);
+    document.getElementById('calendarCloseBtn')?.addEventListener('click', closeCalendarModal);
+
+    async function loadCalendarTab(tab) {
+      calendarTab = tab;
+      document.querySelectorAll('.cal-tab-btn').forEach((b) => {
+        const on = b.dataset.calTab === tab;
+        b.className = `cal-tab-btn min-h-[44px] whitespace-nowrap px-4 rounded-md border cursor-pointer ${on ? 'bg-[#e50914] text-white border-[#e50914]' : 'bg-[#232323] text-neutral-200 border-neutral-700'}`;
+      });
+      const host = document.getElementById('calendarContent');
+      if (!host) return;
+      host.innerHTML = '<div class="py-8 text-center text-xs font-bold text-neutral-300">⏳ جاري تحميل الجدول...</div>';
+      try {
+        if (tab === 'today' || tab === 'upcoming') {
+          const path = tab === 'today' ? '/tv/airing_today' : '/movie/upcoming';
+          const mType = tab === 'today' ? 'tv' : 'movie';
+          const data = await fetchTmdbJson(path);
+          const list = (data && data.results ? data.results : []).slice(0, 18);
+          if (!list.length) { host.innerHTML = '<p class="text-xs text-[#a3a3a3] text-center py-8">لا توجد عناصر متاحة حالياً.</p>'; return; }
+          host.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">${list.map((it) => {
+            const title = it.title || it.name || '';
+            const date = it.first_air_date || it.release_date || 'اليوم';
+            const poster = it.poster_path ? `${IMG_BASE}${it.poster_path}` : 'https://placehold.co/92x138/181818/a3a3a3?text=TV';
+            return `
+              <a href="${cardHref(mType, it.id)}" onclick="if(!isModifiedCardClick(event)){event.preventDefault();closeCalendarModal();openDetails(${it.id}, '${mType}');}" class="flex items-center gap-3 p-2.5 rounded-lg bg-[#0b0b0f] border border-neutral-800 hover:border-[#e50914] transition">
+                <img src="${poster}" alt="${escHtml(title)}" loading="lazy" class="w-12 h-16 object-cover rounded shrink-0 bg-neutral-900" />
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-extrabold text-white truncate">${escHtml(title)}</div>
+                  <div class="text-[11px] text-amber-400 font-bold mt-0.5">${escHtml(date)} • ★ ${(it.vote_average || 0).toFixed(1)}</div>
+                </div>
+              </a>
+            `;
+          }).join('')}</div>`;
+          return;
+        }
+        const shows = getMyListItems().filter((i) => i.type === 'tv').slice(0, 10);
+        if (!shows.length) {
+          host.innerHTML = '<p class="text-xs text-[#a3a3a3] text-center py-8 font-bold">أضف مسلسلات إلى قائمتك لمتابعة مواعيد حلقاتها القادمة هنا.</p>';
+          return;
+        }
+        const rows = await Promise.all(shows.map(async (s) => {
+          const det = await fetchTmdbJson(`/tv/${s.id}`);
+          return { s, det };
+        }));
+        host.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">${rows.map(({ s, det }) => {
+          const next = det && det.next_episode_to_air;
+          const last = det && det.last_episode_to_air;
+          const sub = next ? `القادمة: م${next.season_number} ح${next.episode_number} (${next.air_date})` : (last ? `آخر حلقة: م${last.season_number} ح${last.episode_number} (${last.air_date})` : 'مكتمل / لا توجد مواعيد جديدة');
+          const goS = (next || last)?.season_number || 1;
+          const goE = (next || last)?.episode_number || 1;
+          return `
+            <a href="?tv=${s.id}&s=${goS}&e=${goE}" onclick="if(!isModifiedCardClick(event)){event.preventDefault();closeCalendarModal();openDetails(${s.id}, 'tv', ${goS}, ${goE});}" class="flex items-center gap-3 p-2.5 rounded-lg bg-[#0b0b0f] border border-neutral-800 hover:border-[#e50914] transition">
+              <img src="${s.poster || 'https://placehold.co/92x138/181818/a3a3a3?text=TV'}" alt="${escHtml(s.title)}" class="w-12 h-16 object-cover rounded shrink-0 bg-neutral-900" />
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-extrabold text-white truncate">${escHtml(s.title)}</div>
+                <div class="text-[11px] text-emerald-400 font-bold mt-0.5">${escHtml(sub)}</div>
+              </div>
+            </a>
+          `;
+        }).join('')}</div>`;
+      } catch (e) {
+        host.innerHTML = '<p class="text-xs text-red-400 text-center py-8 font-bold">تعذر تحميل البيانات الآن.</p>';
+      }
+    }
+    document.querySelectorAll('.cal-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => loadCalendarTab(btn.dataset.calTab || 'today'));
+    });
+
+    // Desktop-only Sandboxed Silent Hover Trailer Preview (#18)
+    const hoverPreviewLayer = document.getElementById('hoverPreviewLayer');
+    const hoverTrailerCache = new Map();
+    let hoverTimer = null;
+    let hoverActiveKey = '';
+
+    function hideHoverPreview() {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+      hoverActiveKey = '';
+      if (hoverPreviewLayer) {
+        hoverPreviewLayer.classList.add('hidden');
+        hoverPreviewLayer.innerHTML = '';
+      }
+    }
+
+    async function fetchHoverTrailerKey(mType, id) {
+      const k = `${mType}:${id}`;
+      if (hoverTrailerCache.has(k)) return hoverTrailerCache.get(k);
+      const data = await fetchTmdbJson(`/${mType}/${id}/videos`, { lang: 'en-US' });
+      const vids = (data && data.results) || [];
+      const pick = vids.find((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')) || vids.find((v) => v.site === 'YouTube');
+      const ytKey = pick && /^[A-Za-z0-9_-]{6,20}$/.test(pick.key) ? pick.key : '';
+      hoverTrailerCache.set(k, ytKey);
+      return ytKey;
+    }
+
+    if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      document.addEventListener('pointerenter', (e) => {
+        if (window.innerWidth < 1024 || !mediaModal.classList.contains('hidden')) return;
+        const card = e.target && e.target.closest ? e.target.closest('[data-media-id]') : null;
+        if (!card || !hoverPreviewLayer) return;
+        const mType = card.dataset.mediaType;
+        const mId = Number(card.dataset.mediaId);
+        const mTitle = card.dataset.mediaTitle || '';
+        if (!mId || (mType !== 'movie' && mType !== 'tv')) return;
+        const key = `${mType}:${mId}`;
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(async () => {
+          if (window.innerWidth < 1024 || !mediaModal.classList.contains('hidden')) return;
+          const rect = card.getBoundingClientRect();
+          if (rect.width === 0 || rect.bottom < 0 || rect.top > window.innerHeight) return;
+          hoverActiveKey = key;
+          const ytKey = await fetchHoverTrailerKey(mType, mId);
+          if (!ytKey || hoverActiveKey !== key || !mediaModal.classList.contains('hidden')) return;
+          const leftPos = Math.max(12, Math.min(rect.left + (rect.width - 320) / 2, window.innerWidth - 332));
+          const topPos = Math.max(74, Math.min(rect.top, window.innerHeight - 235));
+          hoverPreviewLayer.style.left = `${Math.round(leftPos)}px`;
+          hoverPreviewLayer.style.top = `${Math.round(topPos)}px`;
+          hoverPreviewLayer.innerHTML = '';
+          const wrap = document.createElement('div');
+          wrap.className = 'relative aspect-video w-full bg-black';
+          const ifr = document.createElement('iframe');
+          ifr.className = 'w-full h-full pointer-events-none';
+          ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+          ifr.setAttribute('frameborder', '0');
+          ifr.src = `https://www.youtube.com/embed/${encodeURIComponent(ytKey)}?autoplay=1&mute=1&controls=0&rel=0&playsinline=1`;
+          wrap.appendChild(ifr);
+          const bar = document.createElement('div');
+          bar.className = 'flex items-center justify-between gap-2 px-3 py-2 bg-[#16161c] border-t border-neutral-800';
+          bar.innerHTML = `<span class="text-xs font-extrabold text-white truncate">${escHtml(mTitle)}</span><button type="button" class="px-2.5 py-1 rounded bg-[#e50914] text-white text-[11px] font-black shrink-0 cursor-pointer">▶ فتح</button>`;
+          bar.querySelector('button').addEventListener('click', () => {
+            hideHoverPreview();
+            openDetails(mId, mType);
+          });
+          hoverPreviewLayer.appendChild(wrap);
+          hoverPreviewLayer.appendChild(bar);
+          hoverPreviewLayer.classList.remove('hidden');
+        }, 1200);
+      }, true);
+
+      document.addEventListener('pointerleave', (e) => {
+        const card = e.target && e.target.closest ? e.target.closest('[data-media-id]') : null;
+        if (!card) return;
+        const to = e.relatedTarget;
+        if (hoverPreviewLayer && to && hoverPreviewLayer.contains(to)) return;
+        if (card && to && card.contains(to)) return;
+        hideHoverPreview();
+      }, true);
+      hoverPreviewLayer?.addEventListener('pointerleave', hideHoverPreview);
+      window.addEventListener('scroll', hideHoverPreview, { passive: true });
+    }
+
     document.getElementById('profileBtn')?.addEventListener('click', openProfileOverlay);
     document.getElementById('watchProfileBtn')?.addEventListener('click', openProfileOverlay);
     document.getElementById('profileCloseBtn')?.addEventListener('click', closeProfileOverlay);
@@ -3834,6 +5183,17 @@
     });
 
     window.__filmatyHandleBack = function() {
+      const moodEl = document.getElementById('moodModal');
+      if (moodEl && !moodEl.classList.contains('hidden')) {
+        closeMoodModal();
+        return true;
+      }
+      const calEl = document.getElementById('calendarModal');
+      if (calEl && !calEl.classList.contains('hidden')) {
+        closeCalendarModal();
+        return true;
+      }
+      hideHoverPreview();
       const prof = document.getElementById('profileOverlay');
       if (prof && !prof.classList.contains('hidden')) {
         closeProfileOverlay();

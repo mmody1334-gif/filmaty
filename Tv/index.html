@@ -144,6 +144,10 @@
         <p class="text-xs font-extrabold text-slate-300">حساباتك المحفوظة:</p>
         <div id="tvSavedUsersRow" class="flex flex-wrap gap-2"></div>
       </div>
+      <div class="space-y-1.5 text-right">
+        <p class="text-xs font-extrabold text-slate-300">أيقونة العائلة:</p>
+        <div id="tvAvatarPicker" class="flex flex-wrap gap-2"></div>
+      </div>
       <form id="tvProfileForm" class="space-y-3 text-right">
         <label for="tvProfileInput" class="block text-xs font-bold text-slate-300">اسم المستخدم</label>
         <input id="tvProfileInput" type="text" dir="ltr" maxlength="32" placeholder="megoo" autocomplete="username"
@@ -230,6 +234,8 @@
             <span id="tvRating" class="px-3 py-1 rounded-xl bg-black/60 text-amber-400 border border-amber-500/20"></span>
             <span id="tvYear" class="px-3 py-1 rounded-xl bg-black/60 text-slate-300 border border-white/10"></span>
             <span id="tvKind" class="px-3 py-1 rounded-xl bg-black/60 text-slate-300 border border-white/10"></span>
+            <span id="tvCert" class="hidden px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black"></span>
+            <span id="tvRuntime" class="hidden px-3 py-1 rounded-xl bg-black/60 text-slate-300 border border-white/10"></span>
           </div>
           <p id="tvStory" class="text-slate-300 text-base leading-relaxed"></p>
           <div id="tvSeriesControls" class="hidden space-y-3">
@@ -294,6 +300,8 @@
             <button id="tvTogglePlay" type="button" class="tv-focus px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition">إيقاف / تشغيل</button>
             <button id="tvSeekFwd" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">+10 ث</button>
             <button id="tvMuteBtn" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">كتم</button>
+            <button id="tvSkipIntroBtn" type="button" class="tv-focus hidden px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-extrabold transition">⏭ تخطي المقدمة</button>
+            <button id="tvSleepBtn" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">⏱ النوم: إيقاف</button>
             <button id="tvNextEpBtn" type="button" class="tv-focus hidden px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-extrabold transition">الحلقة التالية</button>
             <button id="tvQuickServersBtn" type="button" class="tv-focus px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold border border-slate-700 transition">السيرفر والجودة</button>
           </div>
@@ -471,10 +479,23 @@
       const next = [username, ...readSavedUsersList().filter((u) => u !== username)].slice(0, 10);
       try { localStorage.setItem(USERS_LIST_KEY, JSON.stringify(next)); } catch (e) {}
     }
+    const TV_AVATAR_KEY = 'filmaty:avatar:v1';
+    const TV_AVATARS = ['🎬', '🍿', '👑', '🚀', '🦁', '🦉', '🌟', '📺'];
+    function readTvAvatarStore() {
+      try { return (localStorage.getItem(TV_AVATAR_KEY) || '').trim(); } catch (e) { return ''; }
+    }
+    function saveTvAvatarStore(av) {
+      try {
+        if (av) localStorage.setItem(TV_AVATAR_KEY, av);
+        else localStorage.removeItem(TV_AVATAR_KEY);
+      } catch (e) {}
+    }
     function saveTvUserSnapshot() {
       if (!activeTvUser) return;
+      const av = readTvAvatarStore();
       const snap = {
         updatedAt: Date.now(),
+        ...(av ? { avatar: av } : {}),
         progress: readProgressStore(),
         watched: readWatchedStore(),
         myList: readMyListStore(),
@@ -493,6 +514,7 @@
         localStorage.removeItem(MYLIST_KEY);
         localStorage.removeItem(REMOVED_MYLIST_KEY);
         localStorage.removeItem(HISTORY_KEY);
+        localStorage.removeItem(TV_AVATAR_KEY);
       } catch (e) {}
       clearedProgressKeys.clear();
     }
@@ -504,6 +526,7 @@
         localStorage.setItem(MYLIST_KEY, JSON.stringify(profile.myList || {}));
         localStorage.setItem(REMOVED_MYLIST_KEY, JSON.stringify(profile.removedMyList || {}));
         localStorage.setItem(HISTORY_KEY, JSON.stringify(Array.isArray(profile.history) ? profile.history : []));
+        if (profile.avatar) saveTvAvatarStore(profile.avatar);
       } catch (e) {}
       clearedProgressKeys.clear();
       saveTvUserSnapshot();
@@ -512,9 +535,11 @@
       const user = targetUser || activeTvUser;
       if (!user) return null;
       saveTvUserSnapshot();
+      const av = readTvAvatarStore();
       const payload = {
         username: user,
         updatedAt: Date.now(),
+        ...(av ? { avatar: av } : {}),
         progress: readProgressStore(),
         watched: readWatchedStore(),
         myList: readMyListStore(),
@@ -545,7 +570,8 @@
     }
     function updateTvProfileBadge() {
       const lbl = document.getElementById('tvProfileBtnLabel');
-      if (lbl) lbl.textContent = activeTvUser ? `👤 ${activeTvUser}` : '👤 دخول يوزر';
+      const av = readTvAvatarStore() || '👤';
+      if (lbl) lbl.textContent = activeTvUser ? `${av} ${activeTvUser}` : `${av} دخول يوزر`;
     }
 
     function getProgress(type, id, s, e) {
@@ -1219,23 +1245,54 @@
       { key: 'watchit', badge: 'WATCH IT', title: 'توب 10 الشهر في مصر' },
     ];
 
+    const tvEgyptTop10Filter = { netflix: 'all', shahid: 'all', yango: 'all', watchit: 'all' };
+
+    function getTvTop10ItemsForKind(egyptTop10, platKey, kind) {
+      if (!egyptTop10) return [];
+      if (kind === 'movie' || kind === 'tv') {
+        const typed = egyptTop10.platformsByType && egyptTop10.platformsByType[platKey] && egyptTop10.platformsByType[platKey][kind];
+        if (Array.isArray(typed)) return typed.slice(0, 10);
+        return ((egyptTop10.platforms && egyptTop10.platforms[platKey]) || [])
+          .filter((i) => (i.media_type === 'tv' || (!i.media_type && i.name) ? 'tv' : 'movie') === kind)
+          .slice(0, 10);
+      }
+      return ((egyptTop10.platforms && egyptTop10.platforms[platKey]) || []).slice(0, 10);
+    }
+
+    function tvTop10StripHtml(items) {
+      if (!items.length) {
+        return '<div class="py-6 px-4 text-sm font-bold text-slate-400">لا توجد أعمال مطابقة في هذا التصنيف حالياً.</div>';
+      }
+      return items.map((it, idx) =>
+        `<div class="tv-top10"><span class="tv-top10-num" aria-hidden="true">${idx + 1}</span><div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(it, '', 'TOP 10')}</div></div>`
+      ).join('');
+    }
+
     function tvEgyptTop10SectionsHtml(egyptTop10) {
       if (!egyptTop10 || !egyptTop10.platforms) return '';
       const dateStr = egyptTop10.date ? ` • ${escHtml(egyptTop10.date)}` : '';
       return TV_EGYPT_TOP10_PLATFORMS.map((p) => {
-        const items = (egyptTop10.platforms[p.key] || []).slice(0, 10);
-        if (!items.length) return '';
-        const strip = items.map((it, idx) =>
-          `<div class="tv-top10"><span class="tv-top10-num" aria-hidden="true">${idx + 1}</span><div class="shrink-0 w-40 md:w-48 snap-start">${cardHtml(it, '', 'TOP 10')}</div></div>`
-        ).join('');
+        const activeKind = tvEgyptTop10Filter[p.key] || 'all';
+        const allItems = (egyptTop10.platforms[p.key] || []).slice(0, 10);
+        if (!allItems.length) return '';
+        const items = getTvTop10ItemsForKind(egyptTop10, p.key, activeKind);
+        const tabs = [
+          { id: 'all', label: 'الكل' },
+          { id: 'movie', label: 'أفلام' },
+          { id: 'tv', label: 'مسلسلات' },
+        ].map((t) => {
+          const act = activeKind === t.id;
+          return `<button type="button" data-tv-top10-plat="${p.key}" data-tv-top10-kind="${t.id}" class="tv-top10-tab tv-focus px-3 py-1.5 rounded-lg border text-xs font-extrabold transition ${act ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-white'}">${t.label}</button>`;
+        }).join('');
         return `
           <section class="tv-top10-eg" data-platform="${p.key}">
             <div class="flex flex-wrap items-center gap-2.5 mb-3 px-1">
               <span class="tv-top10-badge">${p.badge}</span>
               <h2 class="text-xl md:text-2xl font-extrabold text-white">${p.title}</h2>
               <span class="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold">🇪🇬 تحديث يومي${dateStr}</span>
+              <div class="inline-flex items-center gap-1.5">${tabs}</div>
             </div>
-            <div class="tv-row flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x">${strip}</div>
+            <div class="tv-row flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x" data-tv-top10-track="${p.key}">${tvTop10StripHtml(items)}</div>
           </section>
         `;
       }).join('');
@@ -1257,6 +1314,24 @@
       renderHero((tvHomeSnapshot.mostWatched || [])[0] || (tvHomeSnapshot.topRated || [])[0] || null);
       bindCards(tvHome);
       bindContinueCards(tvHome);
+      tvHome.querySelectorAll('[data-tv-top10-plat]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const plat = btn.dataset.tvTop10Plat;
+          const kind = btn.dataset.tvTop10Kind || 'all';
+          tvEgyptTop10Filter[plat] = kind;
+          const sec = btn.closest('.tv-top10-eg');
+          if (!sec || !tvHomeSnapshot?.egyptTop10) return;
+          sec.querySelectorAll('[data-tv-top10-plat]').forEach((b) => {
+            const act = b.dataset.tvTop10Kind === kind;
+            b.className = `tv-top10-tab tv-focus px-3 py-1.5 rounded-lg border text-xs font-extrabold transition ${act ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-white'}`;
+          });
+          const track = sec.querySelector(`[data-tv-top10-track="${plat}"]`);
+          if (track) {
+            track.innerHTML = tvTop10StripHtml(getTvTop10ItemsForKind(tvHomeSnapshot.egyptTop10, plat, kind));
+            bindCards(track);
+          }
+        });
+      });
     }
 
     async function loadHome() {
@@ -1675,6 +1750,25 @@
         document.getElementById('tvRating').innerText = `⭐ ${rating}`;
         document.getElementById('tvYear').innerText = year;
         document.getElementById('tvKind').innerText = mediaType === 'tv' ? 'مسلسل' : 'فيلم';
+        const tvCertEl = document.getElementById('tvCert');
+        if (tvCertEl) { tvCertEl.innerText = ''; tvCertEl.classList.add('hidden'); }
+        const tvRtEl = document.getElementById('tvRuntime');
+        if (tvRtEl) {
+          let rtText = '';
+          if (mediaType === 'movie' && Number(currentItem.runtime) > 0) {
+            const mins = Number(currentItem.runtime);
+            const hrs = Math.floor(mins / 60);
+            const rem = mins % 60;
+            rtText = hrs > 0 ? `${hrs}س ${rem ? rem + 'د' : ''}`.trim() : `${mins}د`;
+          } else if (mediaType === 'tv' && Number(currentItem.number_of_seasons) > 0) {
+            const sc = currentItem.number_of_seasons;
+            const ec = currentItem.number_of_episodes;
+            rtText = `${sc} ${sc === 1 ? 'موسم' : 'مواسم'}${ec ? ` • ${ec} حلقة` : ''}`;
+          }
+          tvRtEl.innerText = rtText;
+          tvRtEl.classList.toggle('hidden', !rtText);
+        }
+        tvSkipIntroDismissed = false;
         document.getElementById('tvStory').innerText = currentItem.overview || 'لا يتوفر وصف مختصر لهذا العمل حالياً.';
         const backdrop = currentItem.backdrop_path ? `${IMG_BACKDROP}${currentItem.backdrop_path}` : '';
         const backdropWrap = document.getElementById('tvBackdropWrap');
@@ -1716,21 +1810,50 @@
     // embedwave re-adds its sandbox on play).
     let tvTrailerKey = null;
     let tvTrailerLoadSeq = 0;
+    const tvSeasonDetailsCache = new Map();
+
+    function mapTvAgeCert(raw) {
+      const c = String(raw || '').trim().toUpperCase();
+      if (!c) return '';
+      if (['G', 'TV-G', 'TV-Y', 'U', 'ALL'].includes(c)) return 'عائلي';
+      if (['PG', 'TV-PG', 'TV-Y7', '10', '10+'].includes(c)) return '+10';
+      if (['PG-13', 'TV-14', '12', '12+', '13', '13+', '14', '14+'].includes(c)) return '+13';
+      if (['15', '15+', '16', '16+'].includes(c)) return '+16';
+      if (['R', 'NC-17', 'TV-MA', '18', '18+', 'X'].includes(c)) return '+18';
+      return c;
+    }
+
+    function extractTvCertification(mediaType, data) {
+      if (!data) return '';
+      const list = data.results || [];
+      const pick = list.find((r) => r.iso_3166_1 === 'EG') || list.find((r) => r.iso_3166_1 === 'US') || list[0];
+      if (!pick) return '';
+      if (mediaType === 'movie') {
+        const entry = (pick.release_dates || []).find((x) => x.certification);
+        return mapTvAgeCert(entry ? entry.certification : '');
+      }
+      return mapTvAgeCert(pick.rating || '');
+    }
+
     async function loadTvTrailerAndSimilar(id, mediaType) {
       const loadId = ++tvTrailerLoadSeq;
       tvTrailerKey = null;
       const btn = document.getElementById('tvTrailer');
       const wrap = document.getElementById('tvSimilarWrap');
       const row = document.getElementById('tvSimilarRow');
+      const certEl = document.getElementById('tvCert');
       btn.classList.add('hidden');
       wrap.classList.add('hidden');
       row.innerHTML = '';
       try {
-        const [videos, similar] = await Promise.all([
+        const [videos, similar, certData] = await Promise.all([
           fetchTvTmdbJson(`/${mediaType}/${id}/videos`, { lang: 'en-US' }),
           fetchTvTmdbJson(`/${mediaType}/${id}/similar`),
+          fetchTvTmdbJson(`/${mediaType}/${id}/${mediaType === 'movie' ? 'release_dates' : 'content_ratings'}`),
         ]);
         if (loadId !== tvTrailerLoadSeq) return;
+        const cert = extractTvCertification(mediaType, certData);
+        if (certEl && cert) { certEl.innerText = cert; certEl.classList.remove('hidden'); }
         const trailer = (videos?.results || []).find((v) => v.site === 'YouTube' && v.type === 'Trailer');
         if (trailer) { tvTrailerKey = trailer.key; btn.classList.remove('hidden'); }
         const items = (similar?.results || []).slice(0, 10);
@@ -1742,6 +1865,14 @@
       } catch (e) {}
     }
 
+    async function fetchTvSeasonData(tvId, sNum) {
+      const k = `${tvId}:${sNum}`;
+      if (tvSeasonDetailsCache.has(k)) return tvSeasonDetailsCache.get(k);
+      const data = await fetchTvTmdbJson(`/tv/${tvId}/season/${sNum}`);
+      if (data && Array.isArray(data.episodes)) tvSeasonDetailsCache.set(k, data);
+      return data;
+    }
+
     function setupSeasons(tv, wantSeason = null, wantEpisode = null) {
       const seasons = (tv.seasons || []).filter((s) => s.season_number > 0);
       selectedSeason = (wantSeason && seasons.some((s) => s.season_number === wantSeason))
@@ -1751,7 +1882,11 @@
         <button data-season="${s.season_number}" class="tv-season tv-focus ${s.season_number === selectedSeason ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-5 py-3 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">الموسم ${s.season_number}</button>
       `).join('');
       const current = seasons.find((s) => s.season_number === selectedSeason);
-      renderEpisodes(current?.episode_count || 10, wantEpisode);
+      const initCnt = current?.episode_count || 10;
+      renderEpisodes(initCnt, wantEpisode);
+      fetchTvSeasonData(tv.id, selectedSeason).then((sd) => {
+        if (sd && currentItem && currentItem.id === tv.id) renderEpisodes(initCnt, selectedEpisode, sd);
+      });
       document.querySelectorAll('.tv-season').forEach((btn) => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.tv-season').forEach((b) => {
@@ -1762,22 +1897,36 @@
           btn.classList.add('bg-red-600', 'text-white');
           selectedSeason = Number(btn.dataset.season);
           const s = seasons.find((x) => x.season_number === selectedSeason);
-          renderEpisodes(s?.episode_count || 10);
+          const cnt = s?.episode_count || 10;
+          renderEpisodes(cnt);
+          fetchTvSeasonData(tv.id, selectedSeason).then((sd) => {
+            if (sd && currentItem && currentItem.id === tv.id) renderEpisodes(cnt, selectedEpisode, sd);
+          });
           closeTvPlayerWrap(false);
           document.getElementById('tvServerWrap').classList.add('hidden');
         });
       });
     }
 
-    function renderEpisodes(count, wantEpisode = 1) {
+    function renderEpisodes(count, wantEpisode = 1, seasonData = null) {
       selectedEpisode = wantEpisode && wantEpisode >= 1 && wantEpisode <= count ? wantEpisode : 1;
       currentSeasonEpisodeCount = count;
+      if (!seasonData && currentItem) {
+        seasonData = tvSeasonDetailsCache.get(`${currentItem.id}:${selectedSeason}`) || null;
+      }
+      const epMap = new Map();
+      if (seasonData && Array.isArray(seasonData.episodes)) {
+        seasonData.episodes.forEach((ep) => { if (ep && ep.episode_number) epMap.set(Number(ep.episode_number), ep); });
+      }
       document.getElementById('tvEpisodes').innerHTML = Array.from({ length: count }, (_, i) => i + 1).map((epNum) => {
         const watched = currentItem && isWatched('tv', currentItem.id, selectedSeason, epNum);
         const prog = currentItem ? getProgress('tv', currentItem.id, selectedSeason, epNum) : null;
         const pct = prog && prog.d > 0 ? Math.min(100, Math.round((prog.t / prog.d) * 100)) : 0;
+        const epMeta = epMap.get(epNum);
+        const epName = epMeta && epMeta.name && epMeta.name !== `Episode ${epNum}` ? ` • ${escHtml(epMeta.name)}` : '';
+        const epRt = epMeta && epMeta.runtime ? ` (${epMeta.runtime}د)` : '';
         return `
-        <button data-ep="${epNum}" class="tv-ep tv-focus relative overflow-hidden ${epNum === selectedEpisode ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-4 py-2.5 text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition">${watched ? '✓ ' : ''}حلقة ${epNum}${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}</button>
+        <button data-ep="${epNum}" class="tv-ep tv-focus relative overflow-hidden ${epNum === selectedEpisode ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'} rounded-xl px-4 py-2.5 text-sm md:text-base font-bold border border-brand-border hover:bg-red-600 hover:text-white transition max-w-full truncate">${watched ? '✓ ' : ''}ح${epNum}${epName}${epRt}${pct > 0 ? `<span class="absolute bottom-0 right-0 h-1 bg-emerald-400" style="width:${pct}%"></span>` : ''}</button>
       `; }).join('');
       document.querySelectorAll('.tv-ep').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -1788,6 +1937,7 @@
           btn.classList.remove('bg-slate-800', 'text-slate-300');
           btn.classList.add('bg-red-600', 'text-white');
           selectedEpisode = Number(btn.dataset.ep);
+          tvSkipIntroDismissed = false;
           updateTvResumeButton();
           clearTvAutoNext();
           // Tap an episode: it plays by itself, fullscreen, best quality.
@@ -1798,6 +1948,7 @@
     }
 
     function closeOverlay() {
+      clearTvSleepTimer();
       trackProgress(true);
       syncTvProfileToCloud(false);
       closeTvPlayerWrap(false);
@@ -1930,7 +2081,62 @@
       if (!nativeActive) return;
       fallbackTvDirectOrNext('⚠️ المصدر المباشر مش شغال - جاري تجربة مصدر آخر...');
     });
-    tvVideo.addEventListener('playing', clearNativePlayTimeout);
+    const TV_PREF_SERVER_KEY = 'filmaty:pref-server:v1';
+    let tvSkipIntroDismissed = false;
+    let tvSleepTimerId = null;
+    let tvSleepMode = '';
+    const TV_SLEEP_STEPS = ['', '30', '60', '90', 'ep'];
+    const TV_SLEEP_LABELS = { '': '⏱ النوم: إيقاف', '30': '⏱ النوم: 30د', '60': '⏱ النوم: 60د', '90': '⏱ النوم: 90د', ep: '⏱ نهاية الحلقة' };
+
+    function readTvPrefServerMap() {
+      try { return JSON.parse(localStorage.getItem(TV_PREF_SERVER_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function saveTvPrefServer(type, name) {
+      if (!type || !name) return;
+      const m = readTvPrefServerMap();
+      m[type] = name;
+      try { localStorage.setItem(TV_PREF_SERVER_KEY, JSON.stringify(m)); } catch (e) {}
+    }
+    function clearTvSleepTimer() {
+      clearTimeout(tvSleepTimerId);
+      tvSleepTimerId = null;
+      tvSleepMode = '';
+      const b = document.getElementById('tvSleepBtn');
+      if (b) b.innerText = TV_SLEEP_LABELS[''];
+    }
+    document.getElementById('tvSkipIntroBtn')?.addEventListener('click', () => {
+      tvSkipIntroDismissed = true;
+      document.getElementById('tvSkipIntroBtn')?.classList.add('hidden');
+      if (nativeActive && Number.isFinite(tvVideo.duration)) {
+        tvVideo.currentTime = Math.min(tvVideo.duration - 5, (tvVideo.currentTime || 0) + 85);
+      } else if (nativeActive) {
+        tvVideo.currentTime = (tvVideo.currentTime || 0) + 85;
+      }
+    });
+    document.getElementById('tvSleepBtn')?.addEventListener('click', () => {
+      const idx = (TV_SLEEP_STEPS.indexOf(tvSleepMode) + 1) % TV_SLEEP_STEPS.length;
+      const next = TV_SLEEP_STEPS[idx];
+      clearTimeout(tvSleepTimerId);
+      tvSleepTimerId = null;
+      tvSleepMode = next;
+      const b = document.getElementById('tvSleepBtn');
+      if (b) b.innerText = TV_SLEEP_LABELS[next];
+      const mins = Number(next);
+      if (mins > 0) {
+        tvSleepTimerId = setTimeout(() => {
+          if (!tvVideo.paused) tvVideo.pause();
+          clearTvSleepTimer();
+        }, mins * 60_000);
+      }
+    });
+
+    tvVideo.addEventListener('playing', () => {
+      clearNativePlayTimeout();
+      if (currentItem) {
+        const srv = selectedServer();
+        if (srv && !isEmbedServer(srv)) saveTvPrefServer(currentItem.media_type === 'tv' ? 'tv' : 'movie', srv.name);
+      }
+    });
     tvVideo.addEventListener('play', updateTvHudState);
     tvVideo.addEventListener('pause', updateTvHudState);
     tvVideo.addEventListener('volumechange', updateTvHudState);
@@ -1966,13 +2172,24 @@
       if (Number.isFinite(d) && d > 0 && t >= d - 30) { markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e, meta); updateTvResumeButton(); return; }
       saveProgressEntry(meta.type, currentItem.id, meta.s, meta.e, t, d, meta);
     }
-    tvVideo.addEventListener('timeupdate', () => trackProgress(false));
+    tvVideo.addEventListener('timeupdate', () => {
+      trackProgress(false);
+      const sk = document.getElementById('tvSkipIntroBtn');
+      if (sk) {
+        const show = nativeActive && currentItem && currentItem.media_type === 'tv' && !tvSkipIntroDismissed && tvVideo.currentTime >= 5 && tvVideo.currentTime <= 150;
+        sk.classList.toggle('hidden', !show);
+      }
+    });
     tvVideo.addEventListener('pause', () => trackProgress(true));
     tvVideo.addEventListener('seeked', () => trackProgress(true));
     tvVideo.addEventListener('ended', () => {
       const meta = currentProgressMeta();
       if (meta) markWatchedEntry(meta.type, currentItem.id, meta.s, meta.e, meta);
       updateTvResumeButton();
+      if (tvSleepMode === 'ep') {
+        clearTvSleepTimer();
+        return;
+      }
       armTvAutoNext();
     });
     document.addEventListener('pagehide', () => {
@@ -2082,6 +2299,10 @@
           captureTvResume();
           selectedServerIdx = Number(btn.dataset.server);
           selectedQualityIdx = 0;
+          const srv = selectedServer();
+          if (currentItem && srv && !isEmbedServer(srv)) {
+            saveTvPrefServer(currentItem.media_type === 'tv' ? 'tv' : 'movie', srv.name);
+          }
           renderServerControls();
           playActiveStream();
         });
@@ -2179,6 +2400,11 @@
       currentServers = buildTvEmbedFallbacks(type, currentItem.id, s || 1, e || 1);
       selectedServerIdx = 0;
       selectedQualityIdx = 0;
+      const prefSrv = readTvPrefServerMap()[type];
+      if (prefSrv && currentServers.length > 1) {
+        const prefIdx = currentServers.findIndex((s) => s && s.name === prefSrv && !isEmbedServer(s));
+        if (prefIdx >= 0) selectedServerIdx = prefIdx;
+      }
       renderServerControls();
       playActiveStream();
       enterFullscreen();
@@ -2214,6 +2440,11 @@
       }
       selectedServerIdx = 0;
       selectedQualityIdx = 0;
+      const prefSrv = readTvPrefServerMap()[type];
+      if (prefSrv && currentServers.length > 1) {
+        const prefIdx = currentServers.findIndex((s) => s && s.name === prefSrv && !isEmbedServer(s));
+        if (prefIdx >= 0) selectedServerIdx = prefIdx;
+      }
       renderServerControls();
       playActiveStream();
       enterFullscreen();
@@ -2351,7 +2582,8 @@
             : 'bg-slate-800 border-[#737373] text-slate-200 hover:border-white');
           const av = document.createElement('span');
           av.className = 'w-6 h-6 rounded bg-black/40 text-white text-xs font-black flex items-center justify-center';
-          av.textContent = u.slice(0, 1).toUpperCase();
+          const snapAv = u === activeTvUser ? readTvAvatarStore() : (readTvUserSnapshot(u)?.avatar || '');
+          av.textContent = snapAv || u.slice(0, 1).toUpperCase();
           const nameSpan = document.createElement('span');
           nameSpan.dir = 'ltr';
           nameSpan.textContent = u;
@@ -2364,9 +2596,32 @@
       if (tvProfileLogoutBtn) tvProfileLogoutBtn.classList.toggle('hidden', !activeTvUser);
     }
 
+    function renderTvAvatarPicker() {
+      const host = document.getElementById('tvAvatarPicker');
+      if (!host) return;
+      const cur = readTvAvatarStore();
+      host.innerHTML = '';
+      TV_AVATARS.forEach((em) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const on = cur === em;
+        b.className = `tv-focus w-11 h-11 rounded-xl border text-xl flex items-center justify-center transition ${on ? 'bg-red-600/30 border-red-500 scale-105' : 'bg-slate-800 border-slate-700 hover:border-white'}`;
+        b.textContent = em;
+        b.setAttribute('aria-label', `أيقونة ${em}`);
+        b.addEventListener('click', () => {
+          saveTvAvatarStore(on ? '' : em);
+          updateTvProfileBadge();
+          renderTvAvatarPicker();
+          scheduleTvProfileSync();
+        });
+        host.appendChild(b);
+      });
+    }
+
     function openTvProfileOverlay() {
       setTvProfileStatus('');
       renderTvSavedProfileButtons();
+      renderTvAvatarPicker();
       if (tvProfileInput) tvProfileInput.value = activeTvUser || '';
       if (tvProfileOverlay) tvProfileOverlay.classList.remove('hidden');
       const first = (tvSavedUsersRow && tvSavedUsersRow.querySelector('.tv-focus')) || tvProfileInput;

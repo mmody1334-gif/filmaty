@@ -11,6 +11,7 @@ import type { Env } from "../env.ts";
 import { fetchTmdbDetails } from "./resolve.ts";
 import { attachEnTitles, enTitleFromTranslations } from "./en-titles.ts";
 import { TMDB_BASE, tmdbApiKey } from "./search.ts";
+import { recordViewD1, topViewedFromD1 } from "./db.ts";
 
 export interface TopViewEntry {
   type: "movie" | "tv";
@@ -32,14 +33,16 @@ export async function recordView(
   type: "movie" | "tv",
   id: number,
 ): Promise<{ count: number; top: TopViewEntry[] }> {
-  let count = 0;
+  const d1Count = await recordViewD1(env, type, id).catch(() => null);
+  let kvCount = 0;
   try {
     const raw = await env.CACHE?.get(viewCounterKey(type, id));
-    count = (raw ? Number.parseInt(raw, 10) || 0 : 0) + 1;
-    await env.CACHE?.put(viewCounterKey(type, id), String(count));
+    kvCount = (raw ? Number.parseInt(raw, 10) || 0 : 0) + 1;
+    await env.CACHE?.put(viewCounterKey(type, id), String(kvCount));
   } catch {
-    /* KV unavailable: count stays 0, top list unchanged below */
+    /* KV unavailable: keep D1 count if present */
   }
+  const count = Math.max(kvCount, d1Count || 0);
 
   let top: TopViewEntry[] = [];
   try {
@@ -102,11 +105,16 @@ async function buildHome(env: Env): Promise<HomeData> {
 
 async function mostWatchedFromViews(env: Env): Promise<any[]> {
   let top: TopViewEntry[] = [];
-  try {
-    const raw = await env.CACHE?.get(TOP_VIEWS_KEY);
-    top = raw ? (JSON.parse(raw) as TopViewEntry[]) : [];
-  } catch {
-    top = [];
+  const d1Rows = await topViewedFromD1(env, TOP_N).catch(() => null);
+  if (d1Rows && d1Rows.length > 0) {
+    top = d1Rows.map((r) => ({ type: r.type, id: r.id, count: r.count }));
+  } else {
+    try {
+      const raw = await env.CACHE?.get(TOP_VIEWS_KEY);
+      top = raw ? (JSON.parse(raw) as TopViewEntry[]) : [];
+    } catch {
+      top = [];
+    }
   }
   const items: any[] = [];
   for (const entry of top.slice(0, TOP_N)) {

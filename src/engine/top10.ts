@@ -9,6 +9,7 @@ export interface EgyptTop10Payload {
   date: string;
   updatedAt: string;
   platforms: Record<EgyptTop10PlatformKey, any[]>;
+  platformsByType: Record<EgyptTop10PlatformKey, { movie: any[]; tv: any[] }>;
 }
 
 interface DiscoverSource {
@@ -24,7 +25,7 @@ export function cairoDateKey(now = new Date()): string {
 }
 
 export function top10CacheKey(date: string): string {
-  return `top10eg:v1:${date}`;
+  return `top10eg:v2:${date}`;
 }
 
 async function fetchDiscoverList(
@@ -65,28 +66,45 @@ function dedupeAndSortByPopularity(items: any[]): any[] {
   return [...map.values()].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
 }
 
+function fillAndRank(primary: any[], pad: any[]): any[] {
+  const out = [...primary];
+  if (out.length < 10 && pad.length) {
+    const seen = new Set(out.map((i) => `${i.media_type}:${i.id}`));
+    for (const item of pad) {
+      if (out.length >= 10) break;
+      const key = `${item.media_type}:${item.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(item);
+      }
+    }
+  }
+  return out.slice(0, 10).map((item, idx) => ({ ...item, rank: idx + 1 }));
+}
+
 async function buildPlatformTop10(
   env: Env,
   sources: DiscoverSource[],
   padSource?: DiscoverSource,
-): Promise<any[]> {
+): Promise<{ all: any[]; movie: any[]; tv: any[] }> {
   const primaryLists = await Promise.all(sources.map((s) => fetchSourceWithEnTitles(env, s)));
-  let ranked = dedupeAndSortByPopularity(primaryLists.flat());
+  const flatPrimary = primaryLists.flat();
+  const rankedAll = dedupeAndSortByPopularity(flatPrimary);
+  const padItems = padSource
+    ? dedupeAndSortByPopularity(await fetchSourceWithEnTitles(env, padSource))
+    : [];
 
-  if (ranked.length < 10 && padSource) {
-    const padItems = dedupeAndSortByPopularity(await fetchSourceWithEnTitles(env, padSource));
-    const seen = new Set(ranked.map((i) => `${i.media_type}:${i.id}`));
-    for (const item of padItems) {
-      if (ranked.length >= 10) break;
-      const key = `${item.media_type}:${item.id}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        ranked.push(item);
-      }
-    }
-  }
-
-  return ranked.slice(0, 10).map((item, idx) => ({ ...item, rank: idx + 1 }));
+  return {
+    all: fillAndRank(rankedAll, padItems),
+    movie: fillAndRank(
+      rankedAll.filter((i) => i.media_type === "movie"),
+      padItems.filter((i) => i.media_type === "movie"),
+    ),
+    tv: fillAndRank(
+      rankedAll.filter((i) => i.media_type === "tv"),
+      padItems.filter((i) => i.media_type === "tv"),
+    ),
+  };
 }
 
 export async function getEgyptTop10(env: Env, now = new Date()): Promise<EgyptTop10Payload> {
@@ -97,7 +115,7 @@ export async function getEgyptTop10(env: Env, now = new Date()): Promise<EgyptTo
     const cached = await env.CACHE?.get(key);
     if (cached) {
       const parsed = JSON.parse(cached) as EgyptTop10Payload;
-      if (parsed && parsed.date === date && parsed.platforms) {
+      if (parsed && parsed.date === date && parsed.platforms && parsed.platformsByType) {
         return parsed;
       }
     }
@@ -170,10 +188,21 @@ export async function getEgyptTop10(env: Env, now = new Date()): Promise<EgyptTo
     region: "EG",
     date,
     updatedAt: now.toISOString(),
-    platforms: { netflix, shahid, yango, watchit },
+    platforms: {
+      netflix: netflix.all,
+      shahid: shahid.all,
+      yango: yango.all,
+      watchit: watchit.all,
+    },
+    platformsByType: {
+      netflix: { movie: netflix.movie, tv: netflix.tv },
+      shahid: { movie: shahid.movie, tv: shahid.tv },
+      yango: { movie: yango.movie, tv: yango.tv },
+      watchit: { movie: watchit.movie, tv: watchit.tv },
+    },
   };
 
-  if (netflix.length || shahid.length || yango.length || watchit.length) {
+  if (netflix.all.length || shahid.all.length || yango.all.length || watchit.all.length) {
     try {
       await env.CACHE?.put(key, JSON.stringify(payload), { expirationTtl: TOP10_CACHE_TTL });
     } catch {

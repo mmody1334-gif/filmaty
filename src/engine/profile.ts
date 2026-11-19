@@ -33,11 +33,14 @@ export interface ProfileHistoryEntry {
   poster: string;
   kind: string;
   at: number;
+  genreIds?: number[];
+  runtime?: number;
 }
 
 export interface UserProfileData {
   username: string;
   updatedAt: number;
+  avatar?: string;
   progress: Record<string, ProfileProgressEntry>;
   watched: Record<string, number>;
   myList: Record<string, ProfileMyListEntry>;
@@ -180,6 +183,12 @@ function sanitizeRemovedMyListMap(raw: unknown): Record<string, number> {
   return out;
 }
 
+function sanitizeAvatar(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const cleaned = raw.replace(/[<>"'`]/g, "").trim().slice(0, 16);
+  return cleaned || undefined;
+}
+
 function sanitizeHistoryList(raw: unknown): ProfileHistoryEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: ProfileHistoryEntry[] = [];
@@ -192,7 +201,7 @@ function sanitizeHistoryList(raw: unknown): ProfileHistoryEntry[] {
     const s = rec.type === "tv" ? nonNegInt(rec.s) : 0;
     const e = rec.type === "tv" ? nonNegInt(rec.e) : 0;
     const at = Number(rec.at);
-    out.push({
+    const entry: ProfileHistoryEntry = {
       type: rec.type,
       id,
       s,
@@ -201,7 +210,17 @@ function sanitizeHistoryList(raw: unknown): ProfileHistoryEntry[] {
       poster: clipStr(rec.poster, 400),
       kind: clipStr(rec.kind, 32) || rec.type,
       at: Number.isFinite(at) && at > 0 ? at : Date.now(),
-    });
+    };
+    if (Array.isArray(rec.genreIds)) {
+      const genres = rec.genreIds
+        .map((g) => posInt(g))
+        .filter((g): g is number => Boolean(g))
+        .slice(0, 8);
+      if (genres.length) entry.genreIds = genres;
+    }
+    const rt = posInt(rec.runtime);
+    if (rt && rt <= 600) entry.runtime = rt;
+    out.push(entry);
   }
   return out;
 }
@@ -211,6 +230,7 @@ function sanitizeStoredProfile(username: string, raw: unknown): UserProfileData 
   const rec = raw as Record<string, unknown>;
   const storedUpdatedAt = Number(rec.updatedAt);
   const clean = mergeProfileData(emptyProfile(username), {
+    avatar: sanitizeAvatar(rec.avatar),
     progress: sanitizeProgressMap(rec.progress),
     watched: sanitizeWatchedMap(rec.watched),
     myList: sanitizeMyListMap(rec.myList),
@@ -315,9 +335,12 @@ export function mergeProfileData(
     .sort((a, b) => b.at - a.at)
     .slice(0, MAX_HISTORY);
 
+  const avatar = sanitizeAvatar(incoming.avatar) || sanitizeAvatar(existing.avatar);
+
   return {
     username: existing.username,
     updatedAt: Math.max(existing.updatedAt || 0, Number(incoming.updatedAt) || 0, now),
+    ...(avatar ? { avatar } : {}),
     progress: progressCapped,
     watched: watchedCapped,
     myList: myListCapped,

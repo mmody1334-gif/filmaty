@@ -24,6 +24,9 @@ import {
   browseTitles,
 } from "./engine/browse.ts";
 import { getEgyptTop10 } from "./engine/top10.ts";
+import { archiveResolvedStreamD1 } from "./engine/db.ts";
+import { handleApiSubtitles } from "./engine/subtitles.ts";
+import { handleApiTmdbProxy } from "./engine/tmdb-proxy.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
 import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
@@ -64,7 +67,7 @@ export default {
     // Resolve a TMDB title to a direct mp4 stream (ad-free native player
     // + direct download). GET /api/resolve?type=movie|tv&id=123&s=1&e=2
     if (url.pathname === "/api/resolve" && request.method === "GET") {
-      return await handleApiResolve(request, env, url);
+      return await handleApiResolve(request, env, url, ctx);
     }
 
     if (url.pathname === "/api/bot-code" && request.method === "POST") {
@@ -106,6 +109,10 @@ export default {
 
     if (url.pathname === "/api/top10-egypt" && request.method === "GET") {
       return handleApiTop10Egypt(request, env);
+    }
+
+    if (url.pathname === "/api/subtitles" && request.method === "GET") {
+      return handleApiSubtitles(env, url);
     }
 
     if (url.pathname === "/api/view" && request.method === "POST") {
@@ -323,6 +330,24 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
     }
     year = parsedYear;
   }
+  const minRatingRaw = url.searchParams.get("min_rating");
+  let minRating: number | undefined;
+  if (minRatingRaw !== null && minRatingRaw !== "") {
+    const parsedRating = Number(minRatingRaw);
+    if (!Number.isFinite(parsedRating) || parsedRating <= 0 || parsedRating > 10) {
+      return jsonResponse({ ok: false, error: "invalid min_rating" }, 400);
+    }
+    minRating = parsedRating;
+  }
+  const maxRuntimeRaw = url.searchParams.get("max_runtime");
+  let maxRuntime: number | undefined;
+  if (maxRuntimeRaw !== null && maxRuntimeRaw !== "") {
+    const parsedRt = Number(maxRuntimeRaw);
+    if (!Number.isInteger(parsedRt) || parsedRt < 15 || parsedRt > 400) {
+      return jsonResponse({ ok: false, error: "invalid max_runtime" }, 400);
+    }
+    maxRuntime = parsedRt;
+  }
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
   if (!(await checkResolveRateLimit(env, ip, "browse", 300))) {
     return jsonResponse({ ok: false, error: "rate_limited" }, 429);
@@ -336,6 +361,8 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
     collection: (collection as (typeof BROWSE_COLLECTIONS)[number]) || undefined,
     genre,
     year,
+    minRating,
+    maxRuntime,
   });
   return new Response(JSON.stringify({ ok: true, results, total_pages }), {
     status: 200,
@@ -347,79 +374,14 @@ async function handleApiBrowse(request: Request, env: Env, url: URL): Promise<Re
   });
 }
 
-const TMDB_PROXY_PATH_RE =
-  /^\/(?:tv\/airing_today|movie\/upcoming|(?:movie|tv)\/\d+(?:\/(?:videos|similar|recommendations))?|tv\/\d+\/season\/\d+)$/;
-const TMDB_PROXY_DETAILS_RE = /^\/(?:movie|tv)\/\d+$/;
-
 // GET /api/tmdb?path=/movie/upcoming&lang=ar&append=translations
 // Allowlisted TMDB proxy with KV caching so WebApp/TV never hit TMDB blocks.
 async function handleApiTmdb(request: Request, env: Env, url: URL): Promise<Response> {
-  const path = (url.searchParams.get("path") || "").trim();
-  if (!TMDB_PROXY_PATH_RE.test(path)) {
-    return jsonResponse({ ok: false, error: "invalid path" }, 400);
-  }
-  const lang = url.searchParams.get("lang") || "ar";
-  if (lang !== "ar" && lang !== "en-US") {
-    return jsonResponse({ ok: false, error: "invalid lang" }, 400);
-  }
-  const appendRaw = url.searchParams.get("append");
-  let append = "";
-  if (appendRaw !== null && appendRaw !== "") {
-    if (appendRaw !== "translations" || !TMDB_PROXY_DETAILS_RE.test(path)) {
-      return jsonResponse({ ok: false, error: "invalid append" }, 400);
-    }
-    append = "translations";
-  }
-
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
   if (!(await checkResolveRateLimit(env, ip, "tmdb", 300))) {
     return jsonResponse({ ok: false, error: "rate_limited" }, 429);
   }
-
-  const cacheKey = `tmdb1:${path}:${lang}:${append}`;
-  try {
-    const cached = await env.CACHE?.get(cacheKey);
-    if (cached) {
-      return new Response(cached, {
-        status: 200,
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "public, max-age=300",
-          ...corsHeaders(),
-        },
-      });
-    }
-  } catch {
-    /* ignore KV read error */
-  }
-
-  const upstream = `${TMDB_BASE}${path}?api_key=${tmdbApiKey(env)}&language=${lang}${
-    append ? `&append_to_response=${append}` : ""
-  }`;
-  try {
-    const res = await fetch(upstream, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) {
-      return jsonResponse({ ok: false, error: "tmdb_error" }, 502);
-    }
-    const text = await res.text();
-    const isList = path === "/tv/airing_today" || path === "/movie/upcoming";
-    const ttl = isList ? 1800 : 7200;
-    try {
-      await env.CACHE?.put(cacheKey, text, { expirationTtl: ttl });
-    } catch {
-      /* ignore KV write error */
-    }
-    return new Response(text, {
-      status: 200,
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "public, max-age=300",
-        ...corsHeaders(),
-      },
-    });
-  } catch {
-    return jsonResponse({ ok: false, error: "tmdb_unreachable" }, 502);
-  }
+  return handleApiTmdbProxy(request, env, url);
 }
 
 // GET /api/top10-egypt -> Daily cached Top 10 in Egypt for Netflix, Shahid, Yango Play, WATCH IT.
@@ -670,7 +632,12 @@ async function checkResolveRateLimit(
   }
 }
 
-async function handleApiResolve(request: Request, env: Env, url: URL): Promise<Response> {
+async function handleApiResolve(
+  request: Request,
+  env: Env,
+  url: URL,
+  ctx?: ExecutionContext,
+): Promise<Response> {
   const type = url.searchParams.get("type");
   const idRaw = url.searchParams.get("id");
   const id = idRaw ? Number(idRaw) : Number.NaN;
@@ -752,6 +719,16 @@ async function handleApiResolve(request: Request, env: Env, url: URL): Promise<R
 
   // Top-level fields stay the default: best quality of the first server.
   const best = servers[0].qualities[0];
+  ctx?.waitUntil?.(
+    archiveResolvedStreamD1(env, {
+      type,
+      id,
+      s: seasonNum,
+      e: episodeNum,
+      title: resolved.title,
+      servers: resolved.servers,
+    }).catch(() => false),
+  );
   return jsonResponse(
     {
       ok: true,

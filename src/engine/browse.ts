@@ -74,6 +74,9 @@ export interface BrowseParams {
   genre?: BrowseGenre;
   // Optional release year filter (primary_release_year / first_air_date_year).
   year?: number;
+  // Optional minimum TMDB vote average (e.g. 6.5, 7.5, 8.0) and maximum runtime (minutes).
+  minRating?: number;
+  maxRuntime?: number;
   // Optional TMDB company ids (comma-separated) for brand discovery
   // ("429" = DC Comics, "2" = Disney, "3" = Pixar). Used by the search
   // engine's brand layer; mutually exclusive with `collection`.
@@ -92,7 +95,9 @@ function browseCacheKey(p: BrowseParams): string {
   const origin = p.origin ? `:origin:${p.origin}` : "";
   const genre = p.genre ? `:g:${p.genre}` : "";
   const year = p.year ? `:y:${p.year}` : "";
-  return `browse4:${p.type}:${scope}:${p.sort}:${p.page}${origin}${genre}${year}`;
+  const minR = p.minRating ? `:r:${p.minRating}` : "";
+  const maxRt = p.maxRuntime ? `:rt:${p.maxRuntime}` : "";
+  return `browse4:${p.type}:${scope}:${p.sort}:${p.page}${origin}${genre}${year}${minR}${maxRt}`;
 }
 
 function browseUrl(env: Env, p: BrowseParams, language = "ar"): string {
@@ -139,6 +144,12 @@ function browseUrl(env: Env, p: BrowseParams, language = "ar"): string {
       String(p.year),
     );
   }
+  if (p.minRating && p.minRating > 0) {
+    u.searchParams.set("vote_average.gte", String(p.minRating));
+  }
+  if (p.maxRuntime && p.maxRuntime > 0) {
+    u.searchParams.set("with_runtime.lte", String(p.maxRuntime));
+  }
   if (p.sort === "top_rated") {
     u.searchParams.set("sort_by", "vote_average.desc");
     u.searchParams.set("vote_count.gte", "300");
@@ -154,6 +165,9 @@ function browseUrl(env: Env, p: BrowseParams, language = "ar"): string {
     u.searchParams.set("vote_count.gte", "20");
   } else {
     u.searchParams.set("sort_by", "popularity.desc");
+    if (p.minRating && p.minRating > 0) {
+      u.searchParams.set("vote_count.gte", "50");
+    }
   }
   return u.toString();
 }
