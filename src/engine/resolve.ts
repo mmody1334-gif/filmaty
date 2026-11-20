@@ -304,7 +304,7 @@ export async function resolveByTmdb(
   // Bumped to dl2: after the stale-cache fix — the dl: entries cached
   // before it can hold a time-bound direct link (Laroza 2h, downet
   // ~24h) for 6h and must not be reused.
-  const cacheKey = `dl2:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  const cacheKey = `dl3:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
@@ -594,6 +594,7 @@ export async function resolveServersByTmdb(
   season?: number,
   episode?: number,
 ): Promise<ResolvedMulti | null> {
+  // srv11/dl3: dubbed sources are now dropped; old entries may hold dubs.
   // Bumped to srv10: after the stale-cache fix — the srv9: entries
   // cached before it can hold an Akwam resolve whose downet link is
   // near/past its expiry (links carry a fixed expiry timestamp, the
@@ -604,7 +605,7 @@ export async function resolveServersByTmdb(
   // resolve that ran out of the Worker's subrequest budget mid-loop,
   // e.g. حب متنكر cached as "no download" because Laroza's details
   // came back empty and round 3 never ran.)
-  const cacheKey = `srv10:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  const cacheKey = `srv11:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await env.CACHE?.get(cacheKey);
