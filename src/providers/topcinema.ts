@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class TopCinemaProvider implements Provider {
@@ -36,6 +36,7 @@ export class TopCinemaProvider implements Provider {
       while ((m = linkRegex.exec(html))) {
         const url = m[1];
         const rawTitle = m[2].trim();
+        if (isDubbed(rawTitle)) continue;
 
         if (!rawTitle || seen.has(url)) continue;
         if (url.includes("/category/") || url.includes("/tag/") || url.includes("/search/")) continue;

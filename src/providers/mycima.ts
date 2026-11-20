@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class MyCimaProvider implements Provider {
@@ -35,6 +35,7 @@ export class MyCimaProvider implements Provider {
         const itemHtml = m[0];
         const url = m[1];
         const rawTitle = m[2] || "";
+        if (isDubbed(rawTitle)) continue;
 
         if (!rawTitle) continue;
         if (!isRelevant(rawTitle, trimmed)) continue;

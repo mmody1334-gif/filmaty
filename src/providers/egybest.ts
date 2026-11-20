@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, normalizeArabic, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, normalizeArabic, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, SeasonGroup, SourceLink, ResolvedStream } from "./types.ts";
 
 export const EGYBEST_BASE = "https://iegybest.cimawbas.tv";
@@ -40,6 +40,7 @@ export class EgyBestProvider implements Provider {
         const fullUrl = lm[1];
         const vid = lm[2];
         const rawTitle = lm[3].trim();
+        if (isDubbed(rawTitle)) continue;
         if (seen.has(fullUrl)) continue;
         seen.add(fullUrl);
 

@@ -422,3 +422,12 @@ export function isRelevant(title: string, query: string): boolean {
 
   return computeSimilarity(query, title) >= 0.45;
 }
+
+// Dubbed releases (Arabic/Turkish dubs etc.). Filmaty always plays the
+// original audio, so providers drop these at search time and episode
+// lists skip them. The raw title must be checked: cleanTitle strips the
+// marker, which used to let a dub merge with (and replace) the original.
+const DUB_RE = /(مدبلج|مدبلجة|مدبلجه|مدبلجين|دبلجة|دبلجه|بالدبلجة|\bdubbed\b|\bdub\b|arabic\s*dub|nordub)/i;
+export function isDubbed(raw: string | undefined | null): boolean {
+  return !!raw && DUB_RE.test(raw);
+}

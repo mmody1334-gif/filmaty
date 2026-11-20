@@ -3332,6 +3332,76 @@
       tryNextQualityOrFallback();
     }
 
+    // Per-server watchdog. A native server gets 25s (all its qualities,
+    // direct + proxy together) to start playing; if it doesn't, or it
+    // stalls for 20s mid-play, we jump to the next server instead of
+    // spinning forever (Laroza's dead nodes did exactly that).
+    // Embed servers run in an iframe we can't observe, so they are not
+    // auto-skipped — the "سيرفر بديل" button stays for those.
+    const SERVER_START_MS = 25000;
+    const SERVER_STALL_MS = 20000;
+    let serverStartTimer = null;
+    let serverStallTimer = null;
+    let watchedServerIdx = -1;
+    let triedServerIdx = new Set();
+
+    function clearServerWatchdogs() {
+      if (serverStartTimer) { clearTimeout(serverStartTimer); serverStartTimer = null; }
+      if (serverStallTimer) { clearTimeout(serverStallTimer); serverStallTimer = null; }
+    }
+
+    function resetServerWatchdogState() {
+      clearServerWatchdogs();
+      watchedServerIdx = -1;
+      triedServerIdx = new Set();
+    }
+
+    function armServerStartWatchdog() {
+      if (watchedServerIdx === selectedServerIdx && serverStartTimer) return; // same server, budget already running
+      clearServerWatchdogs();
+      watchedServerIdx = selectedServerIdx;
+      serverStartTimer = setTimeout(() => {
+        serverStartTimer = null;
+        if (!nativeActive || selectedServerIdx !== watchedServerIdx) return;
+        if (videoNative.readyState < 3) skipToNextServer('⏱️ السيرفر ما اشتغلش خلال 25 ثانية');
+      }, SERVER_START_MS);
+    }
+
+    function armServerStallWatchdog() {
+      if (serverStallTimer || !nativeActive) return;
+      const idx = selectedServerIdx;
+      serverStallTimer = setTimeout(() => {
+        serverStallTimer = null;
+        if (!nativeActive || selectedServerIdx !== idx) return;
+        if (videoNative.readyState < 3) skipToNextServer('⚠️ السيرفر وقف أكتر من 20 ثانية');
+      }, SERVER_STALL_MS);
+    }
+
+    function skipToNextServer(reason) {
+      clearServerWatchdogs();
+      clearNativePlayTimeout();
+      if (!currentServers || !currentServers.length) return;
+      triedServerIdx.add(selectedServerIdx);
+      let next = -1;
+      for (let i = 1; i <= currentServers.length; i++) {
+        const j = (selectedServerIdx + i) % currentServers.length;
+        if (!triedServerIdx.has(j)) { next = j; break; }
+      }
+      if (next < 0) {
+        nativeActive = false;
+        videoNative.pause();
+        hideIframeSpinner();
+        showPlayerStatus('⚠️ جربنا كل السيرفرات ومفيش واحد اشتغل دلوقتي. جرّب تاني بعد شوية.');
+        return;
+      }
+      captureCurrentPlaybackTime();
+      selectedServerIdx = next;
+      selectedQualityIdx = 0;
+      renderServerControls();
+      showToast(`${reason} — جاري التحويل إلى: ${currentServers[next].name}`);
+      playSelected();
+    }
+
     function clearNativePlayTimeout() {
       if (nativePlayTimer) { clearTimeout(nativePlayTimer); nativePlayTimer = null; }
     }
@@ -3358,6 +3428,7 @@
     });
     videoNative.addEventListener('playing', () => {
       clearNativePlayTimeout();
+      clearServerWatchdogs();
       hideIframeSpinner();
       if (currentItem) {
         const srv = selectedServer();
@@ -3370,7 +3441,12 @@
       applyPendingResumeSeek();
     });
     videoNative.addEventListener('waiting', () => {
-      if (nativeActive) showIframeSpinner('⏳ جاري التحميل...');
+      if (!nativeActive) return;
+      showIframeSpinner('⏳ جاري التحميل...');
+      if (!serverStartTimer) armServerStallWatchdog();
+    });
+    videoNative.addEventListener('timeupdate', () => {
+      if (serverStallTimer && videoNative.readyState >= 3) { clearTimeout(serverStallTimer); serverStallTimer = null; }
     });
     videoIframe.addEventListener('load', hideIframeSpinner);
 
@@ -3621,6 +3697,7 @@
         // In the Android app the shell blocks popups/redirects/ad hosts
         // natively, so the player runs unsandboxed (sandbox-detecting
         // embeds then work too).
+        clearServerWatchdogs();
         if (IN_APP) videoIframe.removeAttribute('sandbox');
         else videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
         showIframeSpinner();
@@ -3647,6 +3724,7 @@
       updatePlayerToolbarVisibility(false);
       loadSubtitlesForCurrentMedia();
       armNativePlayTimeout();
+      armServerStartWatchdog();
       videoNative.play().catch(() => {});
     }
 
@@ -3961,6 +4039,7 @@
       const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
       const qs = new URLSearchParams({ type, id: String(currentItem.id) });
       if (type === 'tv') { qs.set('s', String(selectedSeason)); qs.set('e', String(selectedEpisode)); }
+      const mediaKey = currentSubMediaKey();
       try {
         const res = await fetch(`${API_BASE}/api/subtitles?${qs.toString()}`);
         const data = await res.json();
@@ -3972,6 +4051,7 @@
         offBtn.textContent = '🚫 بدون ترجمة';
         offBtn.addEventListener('click', () => {
           clearNativeSubtitles();
+          saveSubLangPref('off');
           showToast('تم إيقاف الترجمة');
         });
         listEl.appendChild(offBtn);
@@ -3995,6 +4075,7 @@
               if (!sRes.ok) throw new Error('sub_err');
               const vtt = await sRes.text();
               renderActiveVttTrack(vtt, tr.label);
+              saveSubLangPref(subLangOf(tr));
               document.getElementById('subtitleMenu')?.classList.add('hidden');
               showToast(`تم تفعيل: ${tr.label}`);
             } catch (err) {
@@ -4003,9 +4084,49 @@
           });
           listEl.appendChild(tb);
         });
+        autoApplyPreferredSubtitle(tracks, mediaKey);
       } catch (err) {
         listEl.innerHTML = '<div class="text-[11px] text-neutral-400 py-1">تعذر جلب الترجمات الآن.</div>';
       }
+    }
+
+    // Subtitles default to Arabic on every title until the viewer picks
+    // another language (or "بدون ترجمة"); that choice is remembered.
+    // Servers from Arabic sites already have Arabic burned into the
+    // picture, so nothing is added on top of them (no double subtitles).
+    const SUB_LANG_KEY = 'filmaty:subLang';
+    const HARDSUB_SERVER_RE = /أكوام|لاروزا|ايجي|فشار|ماي سيما|فاصل|توب سينما/;
+    function readSubLangPref() {
+      try { return localStorage.getItem(SUB_LANG_KEY) || 'ar'; } catch { return 'ar'; }
+    }
+    function saveSubLangPref(lang) {
+      try { localStorage.setItem(SUB_LANG_KEY, lang || 'ar'); } catch {}
+    }
+    function subLangOf(tr) {
+      const code = String(tr.langCode || '').toLowerCase();
+      if (code.startsWith('ar') || /عرب|arab/i.test(tr.label || '')) return 'ar';
+      if (code.startsWith('en') || /english|انجليز|إنجليز/i.test(tr.label || '')) return 'en';
+      return code.slice(0, 2) || 'ar';
+    }
+    async function autoApplyPreferredSubtitle(tracks, mediaKey) {
+      const pref = readSubLangPref();
+      if (pref === 'off' || !tracks.length) return;
+      const srv = selectedServer();
+      if (srv && HARDSUB_SERVER_RE.test(srv.name || '')) return;
+      const tr = tracks.find((t) => subLangOf(t) === pref);
+      if (!tr) return;
+      try {
+        const res = await fetch(tr.proxyUrl);
+        if (!res.ok) return;
+        const vtt = await res.text();
+        if (mediaKey !== currentSubMediaKey()) return; // user moved on
+        renderActiveVttTrack(vtt, tr.label);
+      } catch {}
+    }
+    function currentSubMediaKey() {
+      if (!currentItem) return '';
+      const type = currentItem.media_type === 'tv' ? 'tv' : 'movie';
+      return type === 'tv' ? `tv:${currentItem.id}:${selectedSeason}:${selectedEpisode}` : `movie:${currentItem.id}`;
     }
 
     document.getElementById('btnSubtitles')?.addEventListener('click', () => {
@@ -4207,6 +4328,7 @@
       currentServers = (resolved && Array.isArray(resolved.servers))
         ? resolved.servers
         : buildClientEmbedFallbacks(type, currentItem.id, s || 1, e || 1);
+      resetServerWatchdogState();
       const prefSrvName = readPrefServerMap()[type];
       if (prefSrvName && currentServers.length > 1) {
         const prefIdx = currentServers.findIndex((srv) => srv && srv.name === prefSrvName && !isEmbedServer(srv));
@@ -5187,6 +5309,7 @@
     document.getElementById('btnNextBackupServer')?.addEventListener('click', () => {
       if (!currentServers || currentServers.length < 2) return;
       captureCurrentPlaybackTime();
+      clearServerWatchdogs();
       selectedServerIdx = (selectedServerIdx + 1) % currentServers.length;
       selectedQualityIdx = 0;
       renderServerControls();

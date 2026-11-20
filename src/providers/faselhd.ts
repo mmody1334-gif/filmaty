@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseSeasonEpisode, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class FaselHdProvider implements Provider {
@@ -41,6 +41,8 @@ export class FaselHdProvider implements Provider {
         if (!slug.startsWith("فيلم-") && !slug.startsWith("مسلسل-") && !slug.startsWith("سلسلة-")) continue;
 
         const rawTitle = slug.replace(/-/g, " ");
+
+        if (isDubbed(rawTitle)) continue;
         if (!isRelevant(rawTitle, trimmed)) continue;
 
         seen.add(fullUrl);

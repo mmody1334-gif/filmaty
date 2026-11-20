@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, normalizeArabic, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, normalizeArabic, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, SeasonGroup, SourceLink, ResolvedStream } from "./types.ts";
 
 // EgyDead (ايجي ديد) — Arabic movies/series/anime site (WordPress).
@@ -90,6 +90,8 @@ export class EgyDeadProvider implements Provider {
         seen.add(href);
 
         const rawTitle = stripTags(am[2]);
+
+        if (isDubbed(rawTitle)) continue;
         if (!rawTitle || rawTitle.length < 2) continue;
         // Skip nav/chrome links whose text is not a title.
         if (/^(الرئيسية|بحث|تسجيل|دخول|اتصل بنا|فئات|أفلام|مسلسلات|انمي)$/i.test(rawTitle)) continue;

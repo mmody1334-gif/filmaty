@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, isRelevant, parseQuality, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseQuality, parseSeasonEpisode, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export const AKWAM_BASE = "https://akwam.ss";
@@ -247,6 +247,7 @@ export class AkwamProvider implements Provider {
         box.match(/<h3[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i) ||
         box.match(/alt="([^"]+)"/i);
       const rawTitle = titleMatch ? decodeHtmlEntities(titleMatch[1]).trim() : "";
+      if (isDubbed(rawTitle)) continue;
       if (!rawTitle) continue;
 
       // Strict relevance check: do not return unrelated trending items

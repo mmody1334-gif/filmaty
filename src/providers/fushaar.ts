@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, isRelevant, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SourceLink } from "./types.ts";
 
 export class FushaarProvider implements Provider {
@@ -37,6 +37,7 @@ export class FushaarProvider implements Provider {
       while ((m = linkRegex.exec(html))) {
         const url = m[1];
         const rawTitle = m[2].trim();
+        if (isDubbed(rawTitle)) continue;
 
         if (!rawTitle || seen.has(url)) continue;
         if (!isRelevant(rawTitle, trimmed)) continue;

@@ -1,4 +1,4 @@
-import { cleanTitle, computeSimilarity, isRelevant, parseQuality, parseSeasonEpisode, parseYear } from "../engine/normalize.ts";
+import { cleanTitle, computeSimilarity, isRelevant, parseQuality, parseSeasonEpisode, parseYear, isDubbed } from "../engine/normalize.ts";
 import type { Candidate, Episode, MediaDetails, MediaKind, Provider, ResolvedStream, SeasonGroup, SourceLink } from "./types.ts";
 
 export class LarozaProvider implements Provider {
@@ -41,6 +41,7 @@ export class LarozaProvider implements Provider {
       while ((m = re.exec(html))) {
         const url = m[1];
         const rawTitle = m[2] || m[3].replace(/<[^>]+>/g, "").trim();
+        if (isDubbed(rawTitle)) continue;
 
         if (!rawTitle || rawTitle.includes("ابحث") || seen.has(url)) continue;
         if (!url.includes("video.php") && !url.includes("view-serie") && !url.includes("/video/")) continue;
@@ -303,6 +304,7 @@ function extractEpisodesFromHtml(html: string, seasonNum: number, base: string):
       ? rawUrl
       : `${base}/${rawUrl.replace(/^\.?\//, "")}`;
     if (seen.has(url)) return;
+    if (isDubbed(text)) return; // original audio only
     const se = parseSeasonEpisode(text);
     if (se.season && se.season !== seasonNum) return;
     // Never fabricate an episode number from list order: a wrong
