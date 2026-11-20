@@ -3334,12 +3334,12 @@
 
     // Per-server watchdog. A native server gets 25s (all its qualities,
     // direct + proxy together) to start playing; if it doesn't, or it
-    // stalls for 20s mid-play, we jump to the next server instead of
+    // stalls for 40s mid-play, we jump to the next server instead of
     // spinning forever (Laroza's dead nodes did exactly that).
     // Embed servers run in an iframe we can't observe, so they are not
     // auto-skipped — the "سيرفر بديل" button stays for those.
     const SERVER_START_MS = 25000;
-    const SERVER_STALL_MS = 20000;
+    const SERVER_STALL_MS = 40000;
     let serverStartTimer = null;
     let serverStallTimer = null;
     let watchedServerIdx = -1;
@@ -3373,7 +3373,7 @@
       serverStallTimer = setTimeout(() => {
         serverStallTimer = null;
         if (!nativeActive || selectedServerIdx !== idx) return;
-        if (videoNative.readyState < 3) skipToNextServer('⚠️ السيرفر وقف أكتر من 20 ثانية');
+        if (videoNative.readyState < 3) skipToNextServer('⚠️ السيرفر وقف أكتر من 40 ثانية');
       }, SERVER_STALL_MS);
     }
 

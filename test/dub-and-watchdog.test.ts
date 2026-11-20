@@ -15,7 +15,7 @@ test("isDubbed flags Arabic/English dub markers and leaves originals alone", () 
 test("player skips a dead native server after a fixed budget and defaults subtitles to Arabic", () => {
   for (const s of [
     "const SERVER_START_MS = 25000;",
-    "const SERVER_STALL_MS = 20000;",
+    "const SERVER_STALL_MS = 40000;",
     "function skipToNextServer(reason)",
     "armServerStartWatchdog();",
     "resetServerWatchdogState();",
