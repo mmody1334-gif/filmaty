@@ -2015,7 +2015,16 @@
     searchInput.addEventListener('focus', () => {
       if (!searchInput.value.trim()) renderSuggestItems(readRecentSearches(), true);
     });
-    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideSuggest(); });
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { hideSuggest(); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(debounceTimer);
+        clearTimeout(suggestTimer);
+        const q = searchInput.value.trim();
+        if (q) executeSearch(q);
+      }
+    });
     document.addEventListener('click', (e) => {
       if (!searchSuggest.contains(e.target) && e.target !== searchInput) hideSuggest();
     });
@@ -2491,7 +2500,9 @@
     function clearActiveFilters() {
       filterBtns.forEach((b) => {
         b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
-        b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+        if (!b.classList.contains('platform-pill')) {
+          b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+        }
       });
       syncHeaderNavFilter('');
     }
@@ -2550,7 +2561,9 @@
       btn.addEventListener('click', () => {
         filterBtns.forEach(b => {
           b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
-          b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+          if (!b.classList.contains('platform-pill')) {
+            b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+          }
         });
         btn.classList.remove('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
         btn.classList.add('bg-[#e50914]', 'border-[#e50914]', 'text-white');
@@ -3104,10 +3117,10 @@
       clearAutoNext();
       document.querySelectorAll('.ep-btn').forEach(b => {
         b.classList.remove('bg-[#e50914]', 'bg-[#e50914]/25', 'border-[#e50914]', 'text-white');
-        b.classList.add('bg-[#232323]', 'text-neutral-200');
+        b.classList.add('bg-[#232323]', 'border-neutral-700', 'text-neutral-200');
       });
-      btn.classList.remove('bg-[#232323]', 'text-neutral-200');
-      btn.classList.add('bg-[#e50914]/25', 'border-[#e50914]', 'text-white');
+      btn.classList.remove('bg-[#232323]', 'border-neutral-700', 'border-[#737373]', 'text-neutral-200');
+      btn.classList.add(btn.querySelector('img') ? 'bg-[#e50914]/25' : 'bg-[#e50914]', 'border-[#e50914]', 'text-white');
       if (currentItem) {
         const k = resolveKey('tv', currentItem.id, selectedSeason, selectedEpisode);
         syncDownloadButtonState(lastResolved && lastResolved.key === k ? lastResolved.data : null);
