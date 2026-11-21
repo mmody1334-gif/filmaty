@@ -6,18 +6,25 @@ import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.app.PictureInPictureParams;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Rational;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -34,6 +41,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
@@ -78,6 +86,24 @@ public class MainActivity extends Activity {
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private long lastBackPress = 0;
+    private TextView downloadsFab;
+
+    private final Handler badgeHandler = new Handler(Looper.getMainLooper());
+    private final Runnable badgeTick = new Runnable() {
+        @Override
+        public void run() {
+            updateDownloadsBadge();
+            badgeHandler.postDelayed(this, 2000);
+        }
+    };
+
+    private final BroadcastReceiver downloadCompleteReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            DownloadQueue.onSystemComplete(context);
+            updateDownloadsBadge();
+        }
+    };
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -90,6 +116,29 @@ public class MainActivity extends Activity {
         root.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+
+        // Floating shortcut to the downloads screen (badge = running + queued).
+        downloadsFab = new TextView(this);
+        downloadsFab.setText("⬇️");
+        downloadsFab.setTextSize(18);
+        downloadsFab.setGravity(Gravity.CENTER);
+        GradientDrawable fabBg = new GradientDrawable();
+        fabBg.setColor(Color.parseColor("#e50914"));
+        fabBg.setCornerRadius(dp(28));
+        downloadsFab.setBackground(fabBg);
+        downloadsFab.setOnClickListener(v ->
+                startActivity(new Intent(this, DownloadsActivity.class)));
+        FrameLayout.LayoutParams fabLp = new FrameLayout.LayoutParams(dp(56), dp(56));
+        fabLp.gravity = Gravity.BOTTOM | Gravity.START;
+        fabLp.setMargins(dp(16), 0, 0, dp(24));
+        root.addView(downloadsFab, fabLp);
+
+        IntentFilter dlFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(downloadCompleteReceiver, dlFilter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(downloadCompleteReceiver, dlFilter);
+        }
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -198,9 +247,27 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        updateDownloadsBadge();
+        badgeHandler.postDelayed(badgeTick, 2000);
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
+        badgeHandler.removeCallbacks(badgeTick);
         CookieManager.getInstance().flush();
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            unregisterReceiver(downloadCompleteReceiver);
+        } catch (Exception ignored) {
+        }
+        badgeHandler.removeCallbacks(badgeTick);
+        super.onDestroy();
     }
 
     // ---------------------------------------------------------------- back
@@ -315,8 +382,22 @@ public class MainActivity extends Activity {
 
     // ------------------------------------------------------------ download
 
+    // Media downloads go through DownloadQueue: one at a time by default
+    // (adjustable in the downloads screen), the rest wait in line.
     private void download(String url, String ua, String disposition, String mime) {
         if (url == null || !url.startsWith("http")) return;
+        if (url.endsWith(".apk") || url.contains("github.com")) {
+            // The app-update APK skips the queue.
+            downloadNow(url, ua, disposition, mime);
+            return;
+        }
+        String name = URLUtil.guessFileName(url, disposition, mime);
+        DownloadQueue.enqueue(this, name, url, ua, mime, HOME);
+        updateDownloadsBadge();
+        Toast.makeText(this, "⬇️ اتضاف لقائمة التحميل: " + name, Toast.LENGTH_SHORT).show();
+    }
+
+    private void downloadNow(String url, String ua, String disposition, String mime) {
         try {
             DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
             String name = URLUtil.guessFileName(url, disposition, mime);
@@ -326,6 +407,7 @@ public class MainActivity extends Activity {
             r.addRequestHeader("User-Agent", ua);
             String cookies = CookieManager.getInstance().getCookie(url);
             if (cookies != null) r.addRequestHeader("Cookie", cookies);
+            if (APP_HOST.equals(Uri.parse(url).getHost())) r.addRequestHeader("Referer", HOME);
             r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
             ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
@@ -333,6 +415,16 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             openExternal(Uri.parse(url));
         }
+    }
+
+    private void updateDownloadsBadge() {
+        if (downloadsFab == null) return;
+        int n = DownloadQueue.runningCount(this) + DownloadQueue.queuedCount(this);
+        downloadsFab.setText(n > 0 ? "⬇️ " + n : "⬇️");
+    }
+
+    private int dp(int v) {
+        return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private void openExternal(Uri uri) {
