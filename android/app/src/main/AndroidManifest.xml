@@ -30,5 +30,10 @@
                 <data android:scheme="https" android:host="filmaty.hudhaifa-bio.workers.dev" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".DownloadsActivity"
+            android:exported="false"
+            android:label="تحميلاتي"
+            android:configChanges="orientation|screenSize" />
     </application>
 </manifest>
