@@ -9,7 +9,6 @@ export const LAB_SERVERS: Record<string, { movie: string; tv: string }> = {
   embedwave: { movie: "https://embedwave.cc/embed/movie/{id}", tv: "https://embedwave.cc/embed/tv/{id}/{s}/{e}" },
   "2embed.cc": { movie: "https://www.2embed.cc/embed/{id}", tv: "https://www.2embed.cc/embedtv/{id}&s={s}&e={e}" },
   "2embed.skin": { movie: "https://www.2embed.skin/embed/{id}", tv: "https://www.2embed.skin/embedtv/{id}&s={s}&e={e}" },
-  nontongo: { movie: "https://www.nontongo.win/embed/movie/{id}", tv: "https://www.nontongo.win/embed/tv/{id}/{s}/{e}" },
   "vidsrc.net": { movie: "https://vidsrc.net/embed/movie?tmdb={id}", tv: "https://vidsrc.net/embed/tv?tmdb={id}&season={s}&episode={e}" },
   "vidsrc.in": { movie: "https://vidsrc.in/embed/movie/{id}", tv: "https://vidsrc.in/embed/tv/{id}/{s}/{e}" },
   "vidsrc.pm": { movie: "https://vidsrc.pm/embed/movie/{id}", tv: "https://vidsrc.pm/embed/tv/{id}/{s}/{e}" },
