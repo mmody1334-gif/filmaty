@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.ts";
-import { resolveServersByTmdb, embedwaveUrl } from "../src/engine/resolve.ts";
+import { resolveServersByTmdb, embedwaveUrl, buildEmbedServers } from "../src/engine/resolve.ts";
 import { AkwamProvider } from "../src/providers/akwam.ts";
 import { verifyToken } from "../src/engine/token.ts";
 
@@ -168,14 +168,14 @@ test("GET /api/resolve returns servers (native multi-quality + embedwave) and be
     assert.ok(payload);
     assert.ok(payload!.u.includes("1080p"));
 
-    assert.equal(body.servers.length, 7);
+    assert.equal(body.servers.length, 4);
     assert.equal(body.servers[0].qualities.length, 3);
     for (const q of body.servers[0].qualities) {
       assert.ok(q.stream.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.startsWith(`${BASE}/stream?t=`));
       assert.ok(q.download.endsWith("&dl=1"));
     }
-    // embedwave comes first, followed by 5 backup sandboxed embeds.
+    // embedwave comes first, followed by 2 backup sandboxed embeds.
     assert.equal(body.servers[1].name, "embedwave");
     assert.equal(body.servers[1].qualities.length, 1);
     assert.equal(body.servers[1].qualities[0].stream, "https://embedwave.cc/embed/movie/157336");
@@ -187,6 +187,26 @@ test("GET /api/resolve returns servers (native multi-quality + embedwave) and be
     }
   } finally {
     restore();
+  }
+});
+
+test("embed fallback list excludes providers that refuse the sandbox", () => {
+  // nontongo.win, vidfast.pro and multiembed.mov render "Please Disable Sandbox"
+  // inside the site's sandboxed iframe (verified live 2026-11-21), so they must
+  // never be offered as fallback servers.
+  const refusedHosts = ["nontongo.win", "vidfast.pro", "vidfast.vc", "multiembed.mov"];
+  for (const type of ["movie", "tv"] as const) {
+    const servers = buildEmbedServers(type, 157336, 1, 1);
+    assert.deepEqual(
+      servers.map((s) => s.name),
+      ["embedwave", "2embed", "2embed-2"],
+    );
+    for (const server of servers) {
+      const host = new URL(server.qualities[0].stream).host;
+      for (const refused of refusedHosts) {
+        assert.ok(!host.endsWith(refused), `${host} must not be ${refused}`);
+      }
+    }
   }
 });
 
@@ -207,12 +227,12 @@ test("no validated native stream: ok:false returns embedwave and backup embed se
     assert.equal(res.status, 404);
     const body = (await res.json()) as any;
     assert.equal(body.ok, false);
-    assert.equal(body.servers.length, 6);
+    assert.equal(body.servers.length, 3);
     assert.equal(body.servers[0].name, "embedwave");
     assert.equal(body.servers[0].qualities[0].stream, "https://embedwave.cc/embed/movie/157336");
     assert.deepEqual(
       body.servers.map((s: any) => s.name),
-      ["embedwave", "2embed", "nontongo", "2embed-2", "vidfast", "multiembed"],
+      ["embedwave", "2embed", "2embed-2"],
     );
   } finally {
     restore();
