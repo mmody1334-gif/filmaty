@@ -524,7 +524,12 @@ export interface BackupEmbedServer {
   qualities: Array<{ quality: string; stream: string }>;
 }
 
-/** Build ordered list of sandbox-compatible embed servers (EmbedWave primary + 5 backups). */
+/**
+ * Build ordered list of sandbox-compatible embed servers (EmbedWave primary + 2 backups).
+ * Every server here was verified to play inside the site's sandboxed iframe
+ * (no allow-popups). nontongo/vidfast/multiembed were removed: they detect the
+ * sandbox and render "Please Disable Sandbox" instead of a player.
+ */
 export function buildEmbedServers(
   type: "movie" | "tv",
   tmdbId: number,
@@ -537,10 +542,7 @@ export function buildEmbedServers(
   const defs: Array<[string, string]> = [
     ["embedwave", embedwaveUrl(type, tmdbId, s, e)],
     ["2embed", tv ? `https://www.2embed.cc/embedtv/${tmdbId}&s=${s}&e=${e}` : `https://www.2embed.cc/embed/${tmdbId}`],
-    ["nontongo", tv ? `https://www.nontongo.win/embed/tv/${tmdbId}/${s}/${e}` : `https://www.nontongo.win/embed/movie/${tmdbId}`],
     ["2embed-2", tv ? `https://www.2embed.skin/embedtv/${tmdbId}&s=${s}&e=${e}` : `https://www.2embed.skin/embed/${tmdbId}`],
-    ["vidfast", tv ? `https://vidfast.pro/tv/${tmdbId}/${s}/${e}` : `https://vidfast.pro/movie/${tmdbId}`],
-    ["multiembed", tv ? `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${s}&e=${e}` : `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1`],
   ];
   return defs.map(([name, stream]) => ({
     name,
