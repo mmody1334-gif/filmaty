@@ -611,8 +611,12 @@ async function handleApiTvCommandGet(request: Request, env: Env, url: URL): Prom
   }
 }
 
-// Simple KV rate limit: max requests per IP per 10 min per bucket.
-// Fails open (allows the request) if KV is unavailable.
+// Simple per-isolate rate limit: max requests per IP per 10 min per bucket.
+// Kept in isolate memory (not KV) so each request does not burn a KV write,
+// which is capped at 1000/day on the free plan. Fails open on any error.
+const RATE_LIMIT_WINDOW_MS = 600_000;
+const rateLimitHits = new Map<string, { count: number; expiresAt: number }>();
+
 async function checkResolveRateLimit(
   env: Env,
   ip: string,
@@ -620,12 +624,21 @@ async function checkResolveRateLimit(
   limit = 30,
 ): Promise<boolean> {
   try {
-    if (!env.CACHE) return true;
+    const now = Date.now();
+    if (rateLimitHits.size > 2000) {
+      for (const [k, v] of rateLimitHits) {
+        if (v.expiresAt <= now) rateLimitHits.delete(k);
+      }
+      if (rateLimitHits.size > 4000) rateLimitHits.clear();
+    }
     const key = `rl:${bucket}:${ip}`;
-    const raw = await env.CACHE.get(key);
-    const count = raw ? Number.parseInt(raw, 10) || 0 : 0;
-    if (count >= limit) return false;
-    await env.CACHE.put(key, String(count + 1), { expirationTtl: 600 });
+    const entry = rateLimitHits.get(key);
+    if (!entry || entry.expiresAt <= now) {
+      rateLimitHits.set(key, { count: 1, expiresAt: now + RATE_LIMIT_WINDOW_MS });
+      return true;
+    }
+    if (entry.count >= limit) return false;
+    entry.count += 1;
     return true;
   } catch {
     return true;
