@@ -317,6 +317,23 @@
       <button type="button" style="--pbrand:#2563eb" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="paramount">⛰️ Paramount+</button>
       <button type="button" style="--pbrand:#f97316" class="filter-btn platform-pill min-h-[44px] whitespace-nowrap px-3.5 py-2 rounded-lg transition cursor-pointer" data-filter="crunchyroll">🍥 Crunchyroll</button>
     </div>
+
+    <!-- Mood Dock (#24): one-tap moods. Each chip is a preset browse
+         (type + genre + sort) that opens the full grid; the last chip
+         opens the existing random-pick سهرة modal. No new endpoints —
+         everything goes through /api/browse like the other pills. -->
+    <div id="moodDock" class="flex gap-2 overflow-x-auto scrollbar-hide pt-1 text-xs font-bold" aria-label="اختر على مزاجك">
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="35" data-sort="popular">😂 حاجة خفيفة</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="27" data-sort="popular">👻 رعب بالليل</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="53" data-sort="popular">🧠 غموض وتشويق</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="10749" data-sort="popular">💘 رومانسي</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="16" data-sort="popular">👨‍👩‍👧‍👦 سهرة عيلة</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="18" data-sort="top_rated">😭 دراما تقيلة</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="movie" data-genre="878" data-sort="popular">🚀 خيال ومغامرة</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="tv" data-genre="80" data-sort="popular">🕵️ جريمة وتحقيق</button>
+      <button type="button" class="mood-chip min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-white transition cursor-pointer" data-type="tv" data-genre="35" data-sort="popular">📺 مسلسل يضحك</button>
+      <button type="button" id="moodDockRandom" class="min-h-[44px] whitespace-nowrap px-4 py-2 rounded-md bg-[#232323] text-neutral-200 border border-[#737373] hover:border-[#e50914] transition cursor-pointer">🎲 مقترح السهرة</button>
+    </div>
   </section>
 
   <!-- Main Content Grid -->
@@ -2497,6 +2514,13 @@
       });
     }
 
+    function clearActiveMoodChips() {
+      document.querySelectorAll('.mood-chip').forEach((c) => {
+        c.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+        c.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+      });
+    }
+
     function clearActiveFilters() {
       filterBtns.forEach((b) => {
         b.classList.remove('bg-[#e50914]', 'border-[#e50914]', 'text-white');
@@ -2504,6 +2528,7 @@
           b.classList.add('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
         }
       });
+      clearActiveMoodChips();
       syncHeaderNavFilter('');
     }
 
@@ -2556,6 +2581,26 @@
       });
     });
 
+    // Mood dock (#24): each chip is a preset browse (type + genre + sort)
+    // that opens the full grid, so a mood is one tap from the header.
+    // The random chip just opens the existing سهرة modal.
+    document.querySelectorAll('.mood-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        clearActiveFilters();
+        btn.classList.remove('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
+        btn.classList.add('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+        loadBrowse({
+          type: btn.dataset.type || 'movie',
+          genre: btn.dataset.genre,
+          sort: btn.dataset.sort || 'popular',
+          page: '1',
+        }, btn.textContent.trim());
+      });
+    });
+    document.getElementById('moodDockRandom')?.addEventListener('click', () => {
+      document.getElementById('btnMoodPicker')?.click();
+    });
+
     // Category filter click handler: each tab has its own home.
     filterBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2567,6 +2612,7 @@
         });
         btn.classList.remove('bg-[#232323]', 'border-[#737373]', 'text-neutral-200');
         btn.classList.add('bg-[#e50914]', 'border-[#e50914]', 'text-white');
+        clearActiveMoodChips();
 
         const filter = btn.dataset.filter;
         syncHeaderNavFilter(filter);
