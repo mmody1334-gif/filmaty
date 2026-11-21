@@ -34,6 +34,13 @@ export async function recordView(
   id: number,
 ): Promise<{ count: number; top: TopViewEntry[] }> {
   const d1Count = await recordViewD1(env, type, id).catch(() => null);
+  // D1 is the source of truth when available: skip the KV counter and top-list
+  // writes (the free plan allows only 1000 KV writes/day). KV stays as fallback.
+  if (d1Count !== null && d1Count > 0) {
+    const d1Top = await topViewedFromD1(env, TOP_N).catch(() => null);
+    const top: TopViewEntry[] = d1Top ? d1Top.map((r) => ({ type: r.type, id: r.id, count: r.count })) : [];
+    return { count: d1Count, top };
+  }
   let kvCount = 0;
   try {
     const raw = await env.CACHE?.get(viewCounterKey(type, id));
