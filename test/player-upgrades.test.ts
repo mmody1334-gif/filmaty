@@ -122,13 +122,13 @@ test("Stage 1: resolveServersByTmdb collects both Akwam and Laroza and uses 1h T
         { status: 200, headers: { "Content-Type": "text/html" } },
       );
     }
-    if (url.includes("laroza1.bond/search.php")) {
+    if (url.includes("laroza1.cfd/search.php")) {
       return new Response(
-        '<a href="https://laroza1.bond/video.php?vid=dune1" title="فيلم Dune 2021">Dune</a>',
+        '<a href="https://laroza1.cfd/video.php?vid=dune1" title="فيلم Dune 2021">Dune</a>',
         { status: 200, headers: { "Content-Type": "text/html" } },
       );
     }
-    if (url.includes("laroza1.bond/download.php?vid=dune1")) {
+    if (url.includes("laroza1.cfd/download.php?vid=dune1")) {
       return new Response(
         '<a href="https://okprimeone.site/v/02/00029/dune_n/Dune.2021.720p.mp4">720p (650 MB)</a>',
         { status: 200, headers: { "Content-Type": "text/html" } },
@@ -186,13 +186,13 @@ test("Stage 1: /api/resolve exposes direct URL for downet.net and non-IP-bound o
         { status: 200 },
       );
     }
-    if (url.includes("laroza1.bond/search.php")) {
+    if (url.includes("laroza1.cfd/search.php")) {
       return new Response(
-        '<a href="https://laroza1.bond/video.php?vid=dune1" title="فيلم Dune">Dune</a>',
+        '<a href="https://laroza1.cfd/video.php?vid=dune1" title="فيلم Dune">Dune</a>',
         { status: 200 },
       );
     }
-    if (url.includes("laroza1.bond/download.php?vid=dune1")) {
+    if (url.includes("laroza1.cfd/download.php?vid=dune1")) {
       return new Response(
         '<a href="https://okprimeone.site/v/02/00029/dune_n/Dune.720p.mp4?e=7200&i=0.0">720p</a>',
         { status: 200 },
@@ -506,13 +506,13 @@ test("Resolve speed & accuracy: omits direct for IP-locked okprimeone, omits emb
       await new Promise((r) => setTimeout(r, 120));
       return new Response("dead", { status: 526, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.bond/search.php")) {
+    if (url.includes("laroza1.cfd/search.php")) {
       return new Response(
-        '<a href="https://laroza1.bond/video.php?vid=eqe3" title="فيلم Avengers : Endgame Extended">Avengers : Endgame Extended</a>',
+        '<a href="https://laroza1.cfd/video.php?vid=eqe3" title="فيلم Avengers : Endgame Extended">Avengers : Endgame Extended</a>',
         { status: 200 },
       );
     }
-    if (url.includes("laroza1.bond/download.php?vid=eqe3")) {
+    if (url.includes("laroza1.cfd/download.php?vid=eqe3")) {
       await new Promise((r) => setTimeout(r, 120));
       return new Response(
         '<a href="https://cdn2.okprimeone.site/v/01/eqe3_n/Encore.720p.mp4?e=7200&i=197.1.2.3">720p</a>',
