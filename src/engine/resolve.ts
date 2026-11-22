@@ -1,5 +1,6 @@
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
+import { edgeGet, edgePut } from "./edge-cache.ts";
 import { normalizeArabic, parseSeasonEpisode } from "./normalize.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import { findProvider, searchAllProviders } from "../providers/index.ts";
@@ -307,7 +308,7 @@ export async function resolveByTmdb(
   const cacheKey = `dl3:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
-    const cached = await env.CACHE?.get(cacheKey);
+    const cached = await edgeGet(cacheKey, env.CACHE);
     if (cached) {
       const parsed = JSON.parse(cached) as { ok: boolean } & ResolvedDirect;
       if (parsed && parsed.ok) {
@@ -327,23 +328,19 @@ export async function resolveByTmdb(
 
   try {
     if (result) {
-      await env.CACHE?.put(
+      await edgePut(
         cacheKey,
         JSON.stringify({ ok: true, ...result }),
-        {
-          // Same rule as resolveCacheTtl: time-bound provider links
-          // cache for 1h only, so the bot never serves a dead link
-          // from a 6h-old entry (SIGNED_LINK_CACHE_TTL is declared
-          // below; it is read here at call time, after module load).
-          expirationTtl: isTimeBoundDirectUrl(result.directVideoUrl)
-            ? SIGNED_LINK_CACHE_TTL
-            : CACHE_SUCCESS_TTL,
-        },
+        // Same rule as resolveCacheTtl: time-bound provider links
+        // cache for 1h only, so a dead link is never served from a
+        // 6h-old entry.
+        isTimeBoundDirectUrl(result.directVideoUrl)
+          ? SIGNED_LINK_CACHE_TTL
+          : CACHE_SUCCESS_TTL,
+        env.CACHE,
       );
     } else {
-      await env.CACHE?.put(cacheKey, JSON.stringify({ ok: false }), {
-        expirationTtl: CACHE_FAILURE_TTL,
-      });
+      await edgePut(cacheKey, JSON.stringify({ ok: false }), CACHE_FAILURE_TTL, env.CACHE);
     }
   } catch {
     /* cache write failure: ignore */
@@ -610,7 +607,7 @@ export async function resolveServersByTmdb(
   const cacheKey = `srv11:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
-    const cached = await env.CACHE?.get(cacheKey);
+    const cached = await edgeGet(cacheKey, env.CACHE);
     if (cached) {
       const parsed = JSON.parse(cached) as { ok: boolean } & ResolvedMulti;
       if (parsed && parsed.ok) {
@@ -630,15 +627,14 @@ export async function resolveServersByTmdb(
 
   try {
     if (result) {
-      await env.CACHE?.put(
+      await edgePut(
         cacheKey,
         JSON.stringify({ ok: true, ...result }),
-        { expirationTtl: resolveCacheTtl(result) },
+        resolveCacheTtl(result),
+        env.CACHE,
       );
     } else {
-      await env.CACHE?.put(cacheKey, JSON.stringify({ ok: false }), {
-        expirationTtl: SERVER_CACHE_FAILURE_TTL,
-      });
+      await edgePut(cacheKey, JSON.stringify({ ok: false }), SERVER_CACHE_FAILURE_TTL, env.CACHE);
     }
   } catch {
     /* cache write failure: ignore */
@@ -850,4 +846,4 @@ async function pickTargetUrl(
     return ep.url;
   }
   return null;
-}
+        }
