@@ -5,11 +5,12 @@
 // count, recomputed on each view; last-write-wins, race-tolerant).
 // Home returns { mostWatched, topRated }; mostWatched falls back to TMDB
 // trending when nothing has been watched yet, so home is never empty.
-// The home response is cached in KV for 10 minutes.
+// The home response is cached on the edge (Cache API) for 10 minutes.
 
 import type { Env } from "../env.ts";
 import { fetchTmdbDetails } from "./resolve.ts";
 import { attachEnTitles, enTitleFromTranslations } from "./en-titles.ts";
+import { edgeGet, edgePut } from "./edge-cache.ts";
 import { TMDB_BASE, tmdbApiKey } from "./search.ts";
 import { recordViewD1, topViewedFromD1 } from "./db.ts";
 
@@ -80,7 +81,7 @@ export interface HomeData {
 
 export async function getHome(env: Env): Promise<HomeData> {
   try {
-    const cached = await env.CACHE?.get(HOME_CACHE_KEY);
+    const cached = await edgeGet(HOME_CACHE_KEY, env.CACHE);
     if (cached) {
       const parsed = JSON.parse(cached) as HomeData;
       if (parsed && Array.isArray(parsed.mostWatched) && Array.isArray(parsed.topRated)) {
@@ -93,9 +94,7 @@ export async function getHome(env: Env): Promise<HomeData> {
 
   const data = await buildHome(env);
   try {
-    await env.CACHE?.put(HOME_CACHE_KEY, JSON.stringify(data), {
-      expirationTtl: HOME_CACHE_TTL,
-    });
+    await edgePut(HOME_CACHE_KEY, JSON.stringify(data), HOME_CACHE_TTL, env.CACHE);
   } catch {
     /* ignore */
   }
