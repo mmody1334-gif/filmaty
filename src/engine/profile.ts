@@ -413,6 +413,7 @@ export async function saveProfile(
   const merged = mergeProfileData(current, patch);
   const json = JSON.stringify(merged);
 
+  let savedToD1 = false;
   try {
     const db = await ensureProfileTable(env);
     if (db) {
@@ -422,17 +423,24 @@ export async function saveProfile(
         )
         .bind(username, json, merged.updatedAt)
         .run();
+      savedToD1 = true;
     }
   } catch {
     /* KV mirror still preserves profile if D1 fails */
   }
 
-  try {
-    await env.CACHE?.put(profileCacheKey(username), json, {
-      expirationTtl: PROFILE_TTL_SECONDS,
-    });
-  } catch {
-    /* ignore KV write failure when D1 succeeded */
+  // KV is only a fallback when D1 is unavailable: profile saves (watch
+  // progress, my list) happen on every sync and would burn the free KV
+  // quota of 1,000 writes/day. getProfile prefers the newer of D1/KV, so a
+  // stale KV copy never shadows a newer D1 row.
+  if (!savedToD1) {
+    try {
+      await env.CACHE?.put(profileCacheKey(username), json, {
+        expirationTtl: PROFILE_TTL_SECONDS,
+      });
+    } catch {
+      /* ignore KV write failure */
+    }
   }
 
   return merged;

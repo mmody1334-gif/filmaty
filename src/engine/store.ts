@@ -1,4 +1,5 @@
 import type { Env } from "../env.ts";
+import { edgeDelete, edgeGet, edgePut } from "./edge-cache.ts";
 
 export interface ArchiveEntry {
   id?: number;
@@ -60,33 +61,33 @@ export class AppStore {
 
   async clearSession(chatId: number): Promise<void> {
     const key = `session:${chatId}`;
-    if (this.env?.CACHE) {
-      await this.env.CACHE.delete(key).catch(() => undefined);
-    }
+    await edgeDelete(key, this.env?.CACHE);
     AppStore.memStore.delete(key);
   }
 
   async delete(key: string): Promise<void> {
-    if (this.env?.CACHE) {
-      await this.env.CACHE.delete(key).catch(() => undefined);
-    }
+    await edgeDelete(key, this.env?.CACHE);
     AppStore.memStore.delete(key);
   }
 
+  // Bot sessions and navigation state are short-lived (<= 1h) and written on
+  // almost every button press, so they live in the edge cache (Cache API, no
+  // write quota) instead of Workers KV (free plan: 1,000 writes/day).
+  // Telegram webhooks reach the same colo, so edge-cache locality is fine.
+  // Reads still fall back to KV for entries written before this change.
   async put(key: string, value: string, ttlSeconds = 3600): Promise<void> {
-    if (this.env?.CACHE) {
-      try {
-        await this.env.CACHE.put(key, value, { expirationTtl: ttlSeconds });
-        return;
-      } catch (err) {
-        // Fallback to in-memory store
-      }
+    const hasEdge = !!(globalThis as { caches?: CacheStorage }).caches?.default;
+    if (hasEdge || this.env?.CACHE) {
+      await edgePut(key, value, ttlSeconds, this.env?.CACHE);
+      return;
     }
     AppStore.memStore.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
   }
 
   async get(key: string): Promise<string | null> {
-    if (this.env?.CACHE) {
+    const edgeVal = await edgeGet(key, this.env?.CACHE);
+    if (edgeVal !== null) return edgeVal;
+    if (this.env?.CACHE && (globalThis as { caches?: CacheStorage }).caches?.default) {
       try {
         const val = await this.env.CACHE.get(key);
         if (val !== null) return val;

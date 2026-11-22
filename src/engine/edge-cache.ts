@@ -81,3 +81,23 @@ export async function edgePut(
     }
   }
 }
+
+export async function edgeDelete(key: string, kv?: KVNamespace): Promise<void> {
+  const store = edgeStore();
+  if (store) {
+    try {
+      await store.delete(cacheRequest(key));
+    } catch {
+      /* ignore */
+    }
+  }
+  if (kv) {
+    // Also clear any legacy KV copy (a delete counts as a KV write, but
+    // only happens on explicit resets, not on every request).
+    try {
+      await kv.delete(key);
+    } catch {
+      /* ignore */
+    }
+  }
+}

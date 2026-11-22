@@ -81,7 +81,7 @@ test("GET /api/profile?u=Megoo normalizes username and validates input", async (
   assert.deepEqual(body.profile.history, []);
 });
 
-test("POST /api/profile saves megoo progress, myList, watched, history in D1 and KV", async () => {
+test("POST /api/profile saves megoo progress, myList, watched, history in D1 (no KV write when D1 works)", async () => {
   const { env, kvMap, d1Rows } = createMockEnv({ withD1: true });
 
   const postRes = await worker.fetch(
@@ -133,7 +133,7 @@ test("POST /api/profile saves megoo progress, myList, watched, history in D1 and
   );
   assert.equal(postRes.status, 200);
   assert.ok(d1Rows.has("megoo"), "D1 row should be stored under lowercase megoo");
-  assert.ok(kvMap.has("profile:v1:megoo"), "KV mirror should be stored");
+  assert.ok(!kvMap.has("profile:v1:megoo"), "KV mirror must not be written when D1 succeeds (free KV write quota)");
 
   const getRes = await worker.fetch(new Request(`${BASE}/api/profile?u=megoo`), env, {} as any);
   assert.equal(getRes.status, 200);

@@ -1,4 +1,5 @@
 import { hostOf } from "./normalize.ts";
+import { edgeGet, edgePut } from "./edge-cache.ts";
 
 export interface ProbeResult {
   url: string;
@@ -151,19 +152,19 @@ export async function probeCached(
   kv?: KVNamespace,
 ): Promise<ProbeResult> {
   const cacheKey = `probe:${url}`;
-  if (kv) {
+  // Edge cache (Cache API, no write quota); kv is only read/written as a
+  // fallback in runtimes without caches.default (tests).
+  const cached = await edgeGet(cacheKey, kv);
+  if (cached) {
     try {
-      const cached = await kv.get<ProbeResult>(cacheKey, "json");
-      if (cached) return cached;
+      return JSON.parse(cached) as ProbeResult;
     } catch {}
   }
 
   const result = await probeLink(url, referer);
 
-  if (kv && result.playable) {
-    try {
-      await kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 1800 }); // 30 min cache
-    } catch {}
+  if (result.playable) {
+    await edgePut(cacheKey, JSON.stringify(result), 1800, kv); // 30 min cache
   }
 
   return result;
