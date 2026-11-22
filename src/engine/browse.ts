@@ -1,11 +1,12 @@
 // Browsing for /api/browse: TMDB discover behind the Worker (the old
 // frontend called TMDB discover directly from the browser, so the
-// marvel/netflix tabs were just text searches). Responses are cached in
-// KV for 10 minutes, same pattern as /api/home.
+// marvel/netflix tabs were just text searches). Responses are cached on
+// the edge (Cache API) for 10 minutes, same pattern as /api/home.
 
 import type { Env } from "../env.ts";
 import { TMDB_BASE, tmdbApiKey } from "./search.ts";
 import { attachEnTitles } from "./en-titles.ts";
+import { edgeGet, edgePut } from "./edge-cache.ts";
 
 export const BROWSE_LANGS = ["ar", "en", "hi", "tr", "ko", "es", "fr", "ja"] as const;
 export type BrowseLang = (typeof BROWSE_LANGS)[number];
@@ -175,7 +176,7 @@ function browseUrl(env: Env, p: BrowseParams, language = "ar"): string {
 export async function browseTitles(env: Env, p: BrowseParams): Promise<BrowseOutcome> {
   const key = browseCacheKey(p);
   try {
-    const cached = await env.CACHE?.get(key);
+    const cached = await edgeGet(key, env.CACHE);
     if (cached) {
       const parsed = JSON.parse(cached) as BrowseOutcome;
       if (parsed && Array.isArray(parsed.results)) return parsed;
@@ -204,9 +205,7 @@ export async function browseTitles(env: Env, p: BrowseParams): Promise<BrowseOut
 
   const outcome: BrowseOutcome = { results, total_pages: totalPages };
   try {
-    await env.CACHE?.put(key, JSON.stringify(outcome), {
-      expirationTtl: BROWSE_CACHE_TTL,
-    });
+    await edgePut(key, JSON.stringify(outcome), BROWSE_CACHE_TTL, env.CACHE);
   } catch {
     /* ignore */
   }
