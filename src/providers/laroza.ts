@@ -6,14 +6,15 @@ export class LarozaProvider implements Provider {
   label = "لاروزا";
   kinds: MediaKind[] = ["movie", "series"];
 
-  // Live domain first: laroza1.quest/.site/.lol all 301-redirect (to
-  // laroza1.website, which 301s again), while laroza1.bond serves the
-  // search/details/play/download pages directly (verified 2026-11-16).
-  // The old bases made the provider silently return nothing from the
-  // Worker, so titles only Laroza had (e.g. VisionQuest S1E1's working
-  // copy) never resolved.
-  private baseUrls = ["https://laroza1.bond", "https://laroza1.website", "https://laroza1.quest", "https://laroza1.site", "https://laroza.lol"];
-  private currentBase = "https://laroza1.bond";
+  // Live domain first: every laroza1.* host now 301s to larooza.net,
+  // which 301s again to laroza1.cfd, the host that actually serves the
+  // search/details/play/download pages (verified 2026-11-22). Starting
+  // from .cfd skips two redirect hops per request — each hop costs a
+  // Worker subrequest (~50/request budget across a resolve's provider
+  // rounds) and redirect latency against the 12s timeout, which made
+  // Laroza vanish from /api/resolve intermittently ("المشغل بيفشل ساعات").
+  private baseUrls = ["https://laroza1.cfd", "https://larooza.net", "https://laroza1.bond", "https://laroza1.website", "https://laroza1.quest", "https://laroza1.site", "https://laroza.lol"];
+  private currentBase = "https://laroza1.cfd";
 
   private headers = {
     "User-Agent":
