@@ -28,6 +28,7 @@ import { archiveResolvedStreamD1 } from "./engine/db.ts";
 import { handleApiSubtitles } from "./engine/subtitles.ts";
 import { handleApiTmdbProxy } from "./engine/tmdb-proxy.ts";
 import { signToken, verifyToken } from "./engine/token.ts";
+import { edgeGet, edgePut } from "./engine/edge-cache.ts";
 import { downloadDisplayName } from "./engine/filenames.ts";
 import { renderPlayerHtml } from "./player/html.ts";
 import { FILMATY_MANIFEST_JSON, FILMATY_SW_JS, FILMATY_WEBAPP_HTML } from "./player/webapp-html.ts";
@@ -801,7 +802,7 @@ interface OgMeta {
 async function fetchOgMeta(env: Env, type: "movie" | "tv", id: number): Promise<OgMeta | null> {
   const cacheKey = `og:v1:${type}:${id}`;
   try {
-    const cached = await env.CACHE?.get(cacheKey);
+    const cached = await edgeGet(cacheKey, env.CACHE);
     if (cached) {
       const parsed = JSON.parse(cached) as OgMeta;
       if (parsed && parsed.title) return parsed;
@@ -829,7 +830,7 @@ async function fetchOgMeta(env: Env, type: "movie" | "tv", id: number): Promise<
         : "";
     const meta: OgMeta = { title, overview, image };
     try {
-      await env.CACHE?.put(cacheKey, JSON.stringify(meta), { expirationTtl: 86400 });
+      await edgePut(cacheKey, JSON.stringify(meta), 86400, env.CACHE);
     } catch {
       /* ignore KV error */
     }
@@ -957,4 +958,4 @@ async function handleImageProxy(url: URL): Promise<Response> {
   } catch {
     return new Response("Image upstream error", { status: 502 });
   }
-}
+                                }
