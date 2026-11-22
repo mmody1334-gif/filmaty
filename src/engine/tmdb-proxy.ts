@@ -1,5 +1,6 @@
 import type { Env } from "../env.ts";
 import { tmdbApiKey } from "./search.ts";
+import { edgeGet, edgePut } from "./edge-cache.ts";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const TMDB_PROXY_TTL = 1800;
@@ -74,7 +75,7 @@ export async function handleApiTmdbProxy(
 
   const cacheKey = `tmdb1:${path}:${lang}:${append}${hasValidRegion ? `:r:${region}` : ""}${hasValidPage ? `:p:${page}` : ""}`;
   try {
-    const cached = await env.CACHE?.get(cacheKey);
+    const cached = await edgeGet(cacheKey, env.CACHE);
     if (cached) {
       return new Response(cached, {
         status: 200,
@@ -109,7 +110,7 @@ export async function handleApiTmdbProxy(
     }
     const text = await res.text();
     try {
-      await env.CACHE?.put(cacheKey, text, { expirationTtl: TMDB_PROXY_TTL });
+      await edgePut(cacheKey, text, TMDB_PROXY_TTL, env.CACHE);
     } catch {
       /* ignore KV write errors */
     }
