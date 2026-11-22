@@ -415,7 +415,7 @@ test("Laroza getDetails: video page whose <title> says episode 4 reports episode
       title: "Dexter",
       kind: "series",
       site: "laroza",
-      url: "https://laroza1.website/video.php?vid=383c220e9",
+      url: "https://laroza1.cfd/video.php?vid=383c220e9",
     } as any);
     assert.equal(details.seasons.length, 1);
     assert.equal(details.seasons[0].episodes[0].episode, 4);
@@ -448,11 +448,11 @@ function installLarozaEp4Mock() {
     }
     if (url.includes("laroza1.quest/search.php")) {
       return new Response(
-        `<a href="https://laroza1.website/video.php?vid=383c220e9" title="مسلسل Dexter الموسم الاول">مسلسل Dexter الموسم الاول</a>`,
+        `<a href="https://laroza1.cfd/video.php?vid=383c220e9" title="مسلسل Dexter الموسم الاول">مسلسل Dexter الموسم الاول</a>`,
         { status: 200, headers: { "Content-Type": "text/html" } },
       );
     }
-    if (url.includes("laroza1.website/video.php")) {
+    if (url.includes("laroza1.cfd/video.php")) {
       return new Response(
         `<html><head><title>مسلسل Dexter الموسم الاول الحلقة 4 مترجمة</title></head><body></body></html>`,
         { status: 200, headers: { "Content-Type": "text/html" } },
