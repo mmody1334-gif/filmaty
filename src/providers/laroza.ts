@@ -194,8 +194,18 @@ export class LarozaProvider implements Provider {
 
       if (dlRes.ok) {
         const dlHtml = await dlRes.text();
-        // Extract direct MP4 download link
-        const directMp4Match = dlHtml.match(/href="([^"]+\.mp4[^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+        // Extract the direct video download link. The new site (laroza1.cfd,
+        // 2026-11) serves .mkv next to .mp4, so match both; the old .mp4-only
+        // regex found nothing and the main player lost Laroza entirely.
+        // Prefer the CDN anchor (class="download-link", e.g. okprimeone)
+        // over file-host aggregators (multiup/1cloudfile/usersdrive) whose
+        // .mkv hrefs are landing pages, not direct media.
+        const dlLinkRe = /<a\s[^>]*href="([^"]+\.(?:mp4|mkv)[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+        const dlMatches = [...dlHtml.matchAll(dlLinkRe)];
+        const directMp4Match =
+          dlMatches.find((m) => /class="download-link"/i.test(m[0])) ||
+          dlMatches.find((m) => !/multiup\.io|1cloudfile|usersdrive|uploady|vk\.com|gofile|mediafire|mega\./i.test(m[1])) ||
+          dlMatches[0];
         if (directMp4Match) {
           const url = directMp4Match[1].replace(/&amp;/g, "&");
           const text = directMp4Match[2].replace(/<[^>]+>/g, " ").trim();
