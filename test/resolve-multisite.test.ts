@@ -83,7 +83,7 @@ const EGYBEST_SEARCH_HTML = `
 
 const LAROZA_SEARCH_HTML = `
 <html><body>
-<a href="https://laroza1.bond/video.php?vid=935f0b66d" title="مسلسل VisionQuest">VisionQuest</a>
+<a href="https://laroza1.cfd/video.php?vid=935f0b66d" title="مسلسل VisionQuest">VisionQuest</a>
 </body></html>
 `;
 
@@ -129,13 +129,13 @@ function installMock() {
     if (url.includes("iegybest.cimawbas.tv/search.php")) {
       return new Response(EGYBEST_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.bond/search.php")) {
+    if (url.includes("laroza1.cfd/search.php")) {
       return new Response(LAROZA_SEARCH_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.bond/video.php?vid=935f0b66d")) {
+    if (url.includes("laroza1.cfd/video.php?vid=935f0b66d")) {
       return new Response(LAROZA_DETAILS_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.bond/download.php?vid=935f0b66d")) {
+    if (url.includes("laroza1.cfd/download.php?vid=935f0b66d")) {
       return new Response(LAROZA_DL_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
     // The dead Akwam node: accepts the connection, never answers.
@@ -224,7 +224,7 @@ test("Laroza series page: episode <select> maps every episode to its own page", 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
     const url = String(input);
-    if (url.includes("laroza1.bond/video.php?vid=935f0b66d")) {
+    if (url.includes("laroza1.cfd/video.php?vid=935f0b66d")) {
       return new Response(SELECT_PAGE, { status: 200, headers: { "Content-Type": "text/html" } });
     }
     return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
@@ -237,7 +237,7 @@ test("Laroza series page: episode <select> maps every episode to its own page", 
       kind: "series",
       site: "laroza",
       siteLabel: "لاروزا",
-      url: "https://laroza1.bond/video.php?vid=935f0b66d",
+      url: "https://laroza1.cfd/video.php?vid=935f0b66d",
     });
     assert.equal(details.seasons.length, 1);
     const eps = details.seasons[0].episodes;
@@ -247,8 +247,8 @@ test("Laroza series page: episode <select> maps every episode to its own page", 
       eps.map((e) => e.episode),
       [1, 2, 3, 4],
     );
-    assert.equal(eps[3].url, "https://laroza1.bond/video.php?vid=4de45820f");
-    assert.equal(eps[0].url, "https://laroza1.bond/video.php?vid=51eb1353d");
+    assert.equal(eps[3].url, "https://laroza1.cfd/video.php?vid=4de45820f");
+    assert.equal(eps[0].url, "https://laroza1.cfd/video.php?vid=51eb1353d");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -268,7 +268,7 @@ test("matchesKnownTitles: Arabic+English combined title matches, spin-off does n
 test("حب متنكر S1E1 resolves via the Arabic display title when the original is Korean", async () => {
   const HM_SEARCH_HTML = `
 <html><body>
-<a href="https://laroza1.bond/video.php?vid=hmep1" title="مسلسل حب متنكر Love in Disguise">حب متنكر Love in Disguise</a>
+<a href="https://laroza1.cfd/video.php?vid=hmep1" title="مسلسل حب متنكر Love in Disguise">حب متنكر Love in Disguise</a>
 </body></html>
 `;
   const HM_DETAILS_HTML = `
@@ -300,7 +300,7 @@ test("حب متنكر S1E1 resolves via the Arabic display title when the origin
     if (url.includes("api.themoviedb.org")) {
       return jsonResponse({ results: [] });
     }
-    if (url.includes("laroza1.bond/search.php")) {
+    if (url.includes("laroza1.cfd/search.php")) {
       // Laroza's site search only finds the show by its Arabic name —
       // the English/Korean query rounds must yield nothing here, so the
       // resolve has to fall through to the Arabic round (the lazy
@@ -312,10 +312,10 @@ test("حب متنكر S1E1 resolves via the Arabic display title when the origin
       }
       return new Response("", { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.bond/video.php?vid=hmep1")) {
+    if (url.includes("laroza1.cfd/video.php?vid=hmep1")) {
       return new Response(HM_DETAILS_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
-    if (url.includes("laroza1.bond/download.php?vid=hmep1")) {
+    if (url.includes("laroza1.cfd/download.php?vid=hmep1")) {
       return new Response(HM_DL_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
     }
     if (url.includes("okprimeone.site")) {
