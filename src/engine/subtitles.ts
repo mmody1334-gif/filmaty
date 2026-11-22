@@ -1,5 +1,6 @@
 import type { Env } from "../env.ts";
 import { tmdbApiKey } from "./search.ts";
+import { edgeGet, edgePut } from "./edge-cache.ts";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const SUBTITLE_INDEX_TTL = 6 * 3600;
@@ -193,7 +194,7 @@ export async function handleApiSubtitles(env: Env, url: URL): Promise<Response> 
 
   const cacheKey = type === "tv" ? `subidx:v1:tv:${id}:${s}:${e}` : `subidx:v1:movie:${id}`;
   try {
-    const cached = await env.CACHE?.get(cacheKey);
+    const cached = await edgeGet(cacheKey, env.CACHE);
     if (cached) {
       const parsed = JSON.parse(cached);
       if (parsed && Array.isArray(parsed.tracks)) {
@@ -248,9 +249,7 @@ export async function handleApiSubtitles(env: Env, url: URL): Promise<Response> 
 
   const payload = { imdbId, tracks };
   try {
-    await env.CACHE?.put(cacheKey, JSON.stringify(payload), {
-      expirationTtl: SUBTITLE_INDEX_TTL,
-    });
+    await edgePut(cacheKey, JSON.stringify(payload), SUBTITLE_INDEX_TTL, env.CACHE);
   } catch {
     /* ignore KV failure */
   }
