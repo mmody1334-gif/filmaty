@@ -1,7 +1,7 @@
 import type { Env } from "../env.ts";
 import { parseList } from "../env.ts";
 import { edgeGet, edgePut } from "./edge-cache.ts";
-import { normalizeArabic, parseSeasonEpisode } from "./normalize.ts";
+import { normalizeArabic, parseSeasonEpisode, parseYear } from "./normalize.ts";
 import { AkwamProvider } from "../providers/akwam.ts";
 import { findProvider, searchAllProviders } from "../providers/index.ts";
 import type { Candidate, MediaKind, Provider, ResolvedStream } from "../providers/types.ts";
@@ -360,6 +360,39 @@ export async function resolveByTmdb(
 // list a show as "Arabic title + English title", e.g. "حب متنكر Love
 // in Disguise"). Anything else — "Dexter: Resurrection" for "Dexter" —
 // is still rejected: the remainder is neither metadata nor a known name.
+/**
+ * Reverse-prefix check: the provider lists the title WITHOUT the subtitle
+ * TMDB carries ("ولاد رزق 3 2024" for TMDB's "ولاد رزق 3: القاضية").
+ * True only when the candidate is a strict prefix of the known title AND
+ * their part-number digits agree, so "ولاد رزق" (part 1) never matches a
+ * part-3 request. Callers must add identity proof on top: movies gate on
+ * the release year, series confirm the full title on the provider page —
+ * "Dexter" for a "Dexter: Resurrection" request must stay rejected.
+ */
+export function prefixTitleDigitsOk(candidateTitle: string, knownTitle: string): boolean {
+  const cand = normalizeTitleForMatch(candidateTitle);
+  const req = normalizeTitleForMatch(knownTitle);
+  if (!cand || !req || !req.startsWith(cand + " ")) return false;
+  const digits = (s: string) => (s.match(/\d+/g) ?? []).join(",");
+  return digits(cand) === digits(req);
+}
+
+// Series prefix candidates carry no reliable year, so the full known title
+// (subtitle included) must appear on the provider's own page.
+async function providerPageContainsTitle(url: string, knownTitle: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": RESOLVER_UA },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return false;
+    const html = await res.text();
+    return normalizeTitleForMatch(html.slice(0, 20000)).includes(normalizeTitleForMatch(knownTitle));
+  } catch {
+    return false;
+  }
+}
+
 export function matchesKnownTitles(candidateTitle: string, knownTitles: string[]): boolean {
   const cand = normalizeTitleForMatch(candidateTitle);
   if (!cand) return false;
@@ -460,7 +493,23 @@ async function fetchResolveCandidateRounds(
         // exhausts the Worker's subrequest budget before the working
         // copy is tried.
         const found = await searchAllProviders(q, kind, disabled, true, ["akwam", "laroza", "embed"], { pages: 2 });
-        const matched = found.filter((c) => matchesKnownTitles(c.title, knownTitles));
+        const matched: Candidate[] = [];
+        for (const c of found) {
+          if (matchesKnownTitles(c.title, knownTitles)) {
+            matched.push(c);
+            continue;
+          }
+          // Provider dropped the TMDB subtitle ("ولاد رزق 3 2024" for
+          // "ولاد رزق 3: القاضية"): accept the short name only with proof.
+          const full = knownTitles.find((k) => prefixTitleDigitsOk(c.title, k));
+          if (!full) continue;
+          if (kind === "movie") {
+            const candYear = c.year ?? parseYear(c.title);
+            if (candYear && enTitle.year && candYear === enTitle.year) matched.push(c);
+          } else if (await providerPageContainsTitle(c.url, full)) {
+            matched.push(c);
+          }
+        }
         if (matched.length > 0) return matched;
       }
       return null;
