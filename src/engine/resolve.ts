@@ -393,6 +393,17 @@ async function providerPageContainsTitle(url: string, knownTitle: string): Promi
   }
 }
 
+// Same-title remakes ("Resident Evil" 2002 vs 2026): a provider entry or
+// file that names a different release year is a different film. Returns
+// true only when the text carries a year and none is within 1 of the
+// requested year.
+export function yearConflicts(text: string, year: number | undefined): boolean {
+  if (!year) return false;
+  const found = (text.match(/(?<![0-9])(19\d{2}|20\d{2})(?![0-9])/g) ?? []).map(Number);
+  if (found.length === 0) return false;
+  return !found.some((y) => Math.abs(y - year) <= 1);
+}
+
 export function matchesKnownTitles(candidateTitle: string, knownTitles: string[]): boolean {
   const cand = normalizeTitleForMatch(candidateTitle);
   if (!cand) return false;
@@ -495,6 +506,7 @@ async function fetchResolveCandidateRounds(
         const found = await searchAllProviders(q, kind, disabled, true, ["akwam", "laroza", "embed"], { pages: 2 });
         const matched: Candidate[] = [];
         for (const c of found) {
+          if (kind === "movie" && yearConflicts(`${c.title} ${c.year ?? ""}`, enTitle.year)) continue;
           if (matchesKnownTitles(c.title, knownTitles)) {
             matched.push(c);
             continue;
@@ -762,7 +774,11 @@ async function resolveServersByTmdbUncached(
       for (const item of resolvedBatch) {
         if (!item || servers.length >= MAX_DIRECT_SERVERS) continue;
         const { candidate, provider, streams } = item;
-        const uniqueStreams = streams.filter((s) => !seenDirectUrls.has(s.directVideoUrl));
+        const uniqueStreams = streams.filter(
+          (s) =>
+            !seenDirectUrls.has(s.directVideoUrl) &&
+            !(kind === "movie" && yearConflicts(decodeURIComponent(s.directVideoUrl.split("/").pop() ?? ""), enTitle.year)),
+        );
         if (uniqueStreams.length > 0) {
           usedSites.add(candidate.site);
           for (const s of uniqueStreams) seenDirectUrls.add(s.directVideoUrl);
