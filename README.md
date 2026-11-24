@@ -95,3 +95,4 @@ npx wrangler deploy
 
 ## 📄 الترخيص
 MIT License © 2026 Mohamed Megdy
+
