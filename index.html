@@ -824,6 +824,20 @@
       ];
       return defs.map(([name, stream]) => ({ name, embed: true, qualities: [{ quality: 'HD', stream }] }));
     }
+    // Unsandboxed embeds for brand-new releases that have no direct file.
+    // These providers refuse to play inside a sandboxed iframe, so they run
+    // without one and may open ad popups. Always listed last, labelled
+    // "Server N (ads)", and never picked automatically.
+    function buildAdServers(type, id, s = 1, e = 1) {
+      const tv = type === 'tv';
+      const defs = [
+        tv ? `https://vidsrc.to/embed/tv/${id}/${s}/${e}` : `https://vidsrc.to/embed/movie/${id}`,
+        tv ? `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}` : `https://vidsrc.me/embed/movie?tmdb=${id}`,
+        tv ? `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}` : `https://www.2embed.cc/embed/${id}`,
+        tv ? `https://vidfast.pro/tv/${id}/${s}/${e}` : `https://vidfast.pro/movie/${id}`,
+      ];
+      return defs.map((stream, i) => ({ name: `Server ${i + 1}`, embed: true, ads: true, qualities: [{ quality: 'HD', stream }] }));
+    }
     // Posters go through the Worker's /img proxy (edge-cached). If one
     // still fails, retry it once straight from image.tmdb.org, then give
     // up quietly on a dark tile instead of a broken image.
@@ -3695,7 +3709,20 @@
         b.className = 'min-h-[44px] px-3.5 py-1.5 rounded-md text-xs font-bold border transition ' + (idx === selectedServerIdx
           ? 'bg-[#e50914] border-[#e50914] text-white'
           : 'bg-[#232323] border-[#737373] text-neutral-200 hover:border-white');
-        b.textContent = server.name;
+        if (server.ads) {
+          b.className = 'min-h-[60px] min-w-[104px] px-5 py-2 rounded-lg text-sm font-black border-2 transition flex flex-col items-center justify-center leading-tight ' + (idx === selectedServerIdx
+            ? 'bg-[#e50914] border-[#e50914] text-white'
+            : 'bg-[#232323] border-[#737373] text-neutral-100 hover:border-white');
+          const t1 = document.createElement('span');
+          t1.textContent = server.name;
+          const t2 = document.createElement('span');
+          t2.className = 'text-[11px] font-bold opacity-80';
+          t2.textContent = '(ads)';
+          b.appendChild(t1);
+          b.appendChild(t2);
+        } else {
+          b.textContent = server.name;
+        }
         b.addEventListener('click', () => {
           captureCurrentPlaybackTime();
           selectedServerIdx = idx;
@@ -3749,7 +3776,7 @@
         // natively, so the player runs unsandboxed (sandbox-detecting
         // embeds then work too).
         clearServerWatchdogs();
-        if (IN_APP) videoIframe.removeAttribute('sandbox');
+        if (IN_APP || server.ads) videoIframe.removeAttribute('sandbox');
         else videoIframe.setAttribute('sandbox', EMBEDWAVE_SANDBOX);
         showIframeSpinner();
         videoIframe.src = quality.stream;
@@ -3820,7 +3847,7 @@
       const startIdx = curIsEmbed ? selectedServerIdx + 1 : 0;
       let nextEmbedIdx = -1;
       for (let i = startIdx; i < currentServers.length; i++) {
-        if (isEmbedServer(currentServers[i])) {
+        if (isEmbedServer(currentServers[i]) && !currentServers[i].ads) {
           nextEmbedIdx = i;
           break;
         }
@@ -4383,6 +4410,7 @@
       currentServers = (resolved && Array.isArray(resolved.servers))
         ? resolved.servers
         : buildClientEmbedFallbacks(type, currentItem.id, s || 1, e || 1);
+      currentServers = currentServers.concat(buildAdServers(type, currentItem.id, s || 1, e || 1));
       resetServerWatchdogState();
       const prefSrvName = readPrefServerMap()[type];
       if (prefSrvName && currentServers.length > 1) {
