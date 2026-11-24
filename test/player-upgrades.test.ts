@@ -155,7 +155,7 @@ test("Stage 1: resolveServersByTmdb collects both Akwam and Laroza and uses 1h T
     assert.match(res!.servers[0].name, /أكوام|akwam/i);
     assert.match(res!.servers[1].name, /لاروزا|laroza/i);
     assert.equal(
-      puts.find((p) => p.key === "srv11:movie:438631:0:0")?.ttl,
+      puts.find((p) => p.key === "srv12:movie:438631:0:0")?.ttl,
       3600,
       "must keep 1h TTL whenever any collected server carries signed okprimeone links",
     );
