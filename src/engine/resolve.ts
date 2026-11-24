@@ -246,6 +246,8 @@ export interface TmdbTitle {
   /** Original-language title, best for matching against providers. */
   originalTitle: string;
   year?: number;
+  /** Series only: year of the last aired episode (same-title shows overlap otherwise, e.g. The Office UK vs US). */
+  lastYear?: number;
 }
 
 export async function fetchTmdbDetails(
@@ -279,7 +281,23 @@ export function tmdbTitleOf(data: any, type: "movie" | "tv"): TmdbTitle | null {
   if (!title && !originalTitle) return null;
   const date = data.release_date || data.first_air_date || "";
   const year = date ? Number(String(date).slice(0, 4)) || undefined : undefined;
-  return { title: title || originalTitle, originalTitle: originalTitle || title, year };
+  const lastDate = type === "tv" ? data.last_air_date || "" : "";
+  const lastYear = lastDate ? Number(String(lastDate).slice(0, 4)) || undefined : undefined;
+  return { title: title || originalTitle, originalTitle: originalTitle || title, year, ...(lastYear ? { lastYear } : {}) };
+}
+
+// Same-title series ("The Office" UK 2001-2003 vs US 2005-2013): a provider
+// entry whose year falls outside the show's TMDB run (1 year of slack) is a
+// different show.
+export function seriesYearConflicts(
+  candYear: number | undefined,
+  firstYear: number | undefined,
+  lastYear: number | undefined,
+): boolean {
+  if (!candYear || !firstYear) return false;
+  if (candYear < firstYear - 1) return true;
+  if (lastYear && candYear > lastYear + 1) return true;
+  return false;
 }
 
 // -----------------------------------------------------------------------------
@@ -507,6 +525,7 @@ async function fetchResolveCandidateRounds(
         const matched: Candidate[] = [];
         for (const c of found) {
           if (kind === "movie" && yearConflicts(`${c.title} ${c.year ?? ""}`, enTitle.year)) continue;
+          if (kind === "series" && seriesYearConflicts(c.year ?? parseYear(c.title), enTitle.year, enTitle.lastYear)) continue;
           if (matchesKnownTitles(c.title, knownTitles)) {
             matched.push(c);
             continue;
@@ -665,7 +684,7 @@ export async function resolveServersByTmdb(
   // resolve that ran out of the Worker's subrequest budget mid-loop,
   // e.g. حب متنكر cached as "no download" because Laroza's details
   // came back empty and round 3 never ran.)
-  const cacheKey = `srv12:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  const cacheKey = `srv13:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await edgeGet(cacheKey, env.CACHE);
