@@ -3189,13 +3189,16 @@
       return `${type}:${id}:${s || 0}:${e || 0}`;
     }
 
+    // Signed direct links (Laroza) expire after ~2h: never replay a resolve
+    // older than this from the in-page cache.
+    const RESOLVE_REUSE_OK_MS = 30 * 60 * 1000;
     const inflightResolves = new Map();
 
     // Ask the Worker for the servers/qualities of a title, deduplicating
     // concurrent requests and reusing fresh prefetched results.
     async function fetchResolve(type, id, s, e) {
       const key = resolveKey(type, id, s, e);
-      if (lastResolved && lastResolved.key === key && lastResolved.data && (lastResolved.data.ok || (Date.now() - (lastResolved.at || 0) < 60000))) {
+      if (lastResolved && lastResolved.key === key && lastResolved.data && ((lastResolved.data.ok && Date.now() - (lastResolved.data._at || 0) < RESOLVE_REUSE_OK_MS) || (Date.now() - (lastResolved.at || 0) < 60000))) {
         return lastResolved.data;
       }
       if (inflightResolves.has(key)) {
@@ -3211,6 +3214,7 @@
           const res = await fetch(`${API_BASE}/api/resolve?${params.toString()}`, { signal: controller.signal });
           const data = await res.json().catch(() => null);
           if (data && Array.isArray(data.servers)) {
+            data._at = Date.now();
             lastResolved = { key, data, at: Date.now() };
           }
           return data || null;
