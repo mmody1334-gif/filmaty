@@ -311,13 +311,14 @@ test("built webapp gives slow streams 45s and always sandboxes the embed iframe"
     assert.ok(FILMATY_WEBAPP_HTML.includes(s), `built webapp must contain: ${s}`);
   }
   // The sandbox may only ever be removed for the YouTube trailer, or
-  // inside the Android app (IN_APP), whose shell blocks popups natively.
-  const inApp = [...FILMATY_WEBAPP_HTML.matchAll(/if \(IN_APP\) videoIframe\.removeAttribute\('sandbox'\);/g)];
+  // inside the Android app (IN_APP), whose shell blocks popups natively, or
+  // for the labelled "(ads)" servers (server.ads) the user approved for new releases.
+  const inApp = [...FILMATY_WEBAPP_HTML.matchAll(/if \(IN_APP(?: \|\| server\.ads)?\) videoIframe\.removeAttribute\('sandbox'\);/g)];
   assert.equal(inApp.length, 1, "exactly one app-only sandbox removal");
   assert.ok(FILMATY_WEBAPP_HTML.includes("const IN_APP = /FilmatyApp\\//.test(navigator.userAgent);"), "IN_APP must be UA-gated");
-  const removals = [...FILMATY_WEBAPP_HTML.replace(/if \(IN_APP\) videoIframe\.removeAttribute\('sandbox'\);/g, "").matchAll(/removeAttribute\('sandbox'\)/g)];
+  const removals = [...FILMATY_WEBAPP_HTML.replace(/if \(IN_APP(?: \|\| server\.ads)?\) videoIframe\.removeAttribute\('sandbox'\);/g, "").matchAll(/removeAttribute\('sandbox'\)/g)];
   assert.equal(removals.length, 1, "the sandbox must be removed in exactly one place (the trailer)");
-  const stripped = FILMATY_WEBAPP_HTML.replace(/if \(IN_APP\) videoIframe\.removeAttribute\('sandbox'\);/g, "");
+  const stripped = FILMATY_WEBAPP_HTML.replace(/if \(IN_APP(?: \|\| server\.ads)?\) videoIframe\.removeAttribute\('sandbox'\);/g, "");
   const around = stripped.slice(Math.max(0, removals[0].index - 400), removals[0].index + 400);
   assert.ok(around.includes("youtube.com/embed/"), "the single sandbox removal must be the YouTube trailer handler");
   assert.ok(!FILMATY_WEBAPP_HTML.includes("vidlink"), "no vidlink fallback may remain in the player");
