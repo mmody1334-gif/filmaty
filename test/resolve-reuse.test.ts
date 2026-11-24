@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
-const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
 
 test("in-page resolve reuse is age-limited so expired signed links are not replayed", () => {
   assert.match(html, /const RESOLVE_REUSE_OK_MS = 30 \* 60 \* 1000;/);
