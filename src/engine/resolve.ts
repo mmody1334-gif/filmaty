@@ -665,7 +665,7 @@ export async function resolveServersByTmdb(
   // resolve that ran out of the Worker's subrequest budget mid-loop,
   // e.g. حب متنكر cached as "no download" because Laroza's details
   // came back empty and round 3 never ran.)
-  const cacheKey = `srv11:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
+  const cacheKey = `srv12:${type}:${tmdbId}:${season || 0}:${episode || 0}`;
 
   try {
     const cached = await edgeGet(cacheKey, env.CACHE);
