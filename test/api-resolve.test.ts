@@ -143,17 +143,17 @@ test("resolves Interstellar to a signed stream + download link", async () => {
     assert.equal(payload!.k, "mp4");
     assert.equal(payload!.n, "Interstellar");
 
-    // Success is cached for 1h under srv11:<type>:<id>:<s>:<e> —
+    // Success is cached for 1h under srv12:<type>:<id>:<s>:<e> —
     // Akwam's downet links carry a fixed expiry timestamp in the path,
     // so they are time-bound like Laroza's okprimeone links: a 6h cache
     // kept serving a stale link and the player spun forever (Interstellar
     // loaded ~15 min and never opened on 2026-11-19). 1h is comfortably
     // below every link life and below the 3h /stream token life.
-    const cached = map.get("srv11:movie:157336:0:0");
+    const cached = map.get("srv12:movie:157336:0:0");
     assert.ok(cached, "expected cached resolve result");
     assert.equal(JSON.parse(cached!).ok, true);
     assert.equal(
-      puts.find((p) => p.key === "srv11:movie:157336:0:0")?.ttl,
+      puts.find((p) => p.key === "srv12:movie:157336:0:0")?.ttl,
       1 * 3600,
       "Akwam resolves cache for 1h",
     );
@@ -228,7 +228,7 @@ test("resolveCacheTtl: 1h for time-bound provider links, 6h otherwise", () => {
   );
 });
 
-test("pre-fix srv9: entries are never reused (key bumped to srv11:)", async () => {
+test("pre-fix srv9: entries are never reused (key bumped to srv12:)", async () => {
   const restore = installFetchMock();
   const { env, map, puts } = mockEnv();
   try {
@@ -251,11 +251,11 @@ test("pre-fix srv9: entries are never reused (key bumped to srv11:)", async () =
     assert.equal(res.status, 200);
     const body = (await res.json()) as any;
     assert.equal(body.title, "Interstellar", "stale srv9 entry must be ignored");
-    assert.ok(map.get("srv11:movie:157336:0:0"), "fresh resolve must cache under srv11:");
+    assert.ok(map.get("srv12:movie:157336:0:0"), "fresh resolve must cache under srv12:");
     assert.equal(
-      puts.find((p) => p.key === "srv11:movie:157336:0:0")?.ttl,
+      puts.find((p) => p.key === "srv12:movie:157336:0:0")?.ttl,
       1 * 3600,
-      "fresh Akwam resolve caches for 1h under srv11:",
+      "fresh Akwam resolve caches for 1h under srv12:",
     );
   } finally {
     restore();
@@ -270,7 +270,7 @@ test("unknown TMDB id returns {ok:false} with 404 (not 500)", async () => {
     assert.equal(res.status, 404);
     assert.equal((await res.json() as any).ok, false);
     // Failures are cached too (30 min) so the lookup is not repeated.
-    const cached = map.get("srv11:movie:999999999:0:0");
+    const cached = map.get("srv12:movie:999999999:0:0");
     assert.ok(cached, "expected cached failure");
     assert.equal(JSON.parse(cached!).ok, false);
   } finally {
