@@ -4373,7 +4373,11 @@
       hideModalBackdrop();
       playerContainer.classList.remove('hidden');
       showPlayerStatus('⏳ جاري تجهيز مشغّل بدون إعلانات...');
+      const slowStatusTimer = setTimeout(() => {
+        showPlayerStatus('⏳ البحث عن المصدر بياخد وقت أكتر من المعتاد، ثواني ويشتغل...');
+      }, 6000);
       const resolved = await fetchResolve(type, currentItem.id, s, e);
+      clearTimeout(slowStatusTimer);
       selectedServerIdx = 0;
       selectedQualityIdx = 0;
       currentServers = (resolved && Array.isArray(resolved.servers))
