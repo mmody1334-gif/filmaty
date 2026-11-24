@@ -2828,10 +2828,14 @@
     }
 
     // Modal Details Logic
+    let detailsOpenSeq = 0;
     async function openDetails(id, mediaType, wantSeason = null, wantEpisode = null) {
+      const mySeq = ++detailsOpenSeq;
       try {
         const fetched = await fetchTmdbJson(`/${mediaType}/${id}`, { append: 'translations' });
         if (!fetched) throw new Error('details_failed');
+        // A newer open (fast taps) won: never paint this older movie over it.
+        if (mySeq !== detailsOpenSeq) return;
         currentItem = fetched;
         {
           const tr = currentItem.translations?.translations || [];
