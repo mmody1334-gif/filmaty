@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def ksFile = file(System.getenv("FILMATY_KEYSTORE") ?: "none")
+def ksPass = System.getenv("FILMATY_KEYSTORE_PASSWORD") ?: ""
+
+android {
+    namespace 'app.filmaty.nativeapp'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'app.filmaty.nativeapp'
+        minSdk 24
+        targetSdk 34
+        versionCode((project.findProperty('versionCode') ?: '1') as int)
+        versionName "n1.${project.findProperty('versionCode') ?: '0'}"
+    }
+    signingConfigs {
+        release {
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword ksPass
+                keyAlias 'filmaty'
+                keyPassword ksPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ksFile.exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    buildFeatures { compose true }
+    composeOptions { kotlinCompilerExtensionVersion '1.5.14' }
+}
+
+dependencies {
+    implementation platform('androidx.compose:compose-bom:2024.06.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.activity:activity-compose:1.9.0'
+    implementation 'io.coil-kt:coil-compose:2.6.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+}
