@@ -1,0 +1,71 @@
+name: Build Native APK
+
+on:
+  push:
+    branches: [native]
+    paths: ["native-bundle/**", ".github/workflows/native-apk.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Unpack sources
+        run: |
+          rm -rf android-native
+          mkdir -p android-native
+          base64 -d native-bundle/bundle.b64 | tar xz -C android-native --strip-components=1
+          ls android-native
+
+      - name: Restore signing key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/filmaty.jks"
+            echo "FILMATY_KEYSTORE=$RUNNER_TEMP/filmaty.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 not set"
+          fi
+
+      - name: Build release APK
+        env:
+          FILMATY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle -p android-native assembleRelease -PversionCode=${{ github.run_number }} --no-daemon
+
+      - name: Collect APK
+        run: cp android-native/app/build/outputs/apk/release/app-release.apk filmaty-native.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filmaty-native-apk
+          path: filmaty-native.apk
+
+      - name: Publish releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "native-v1.${{ github.run_number }}" filmaty-native.apk --prerelease --title "فيلماتي Native n1.${{ github.run_number }}" --notes "النسخة النيتف من فيلماتي." --latest=false
+          gh release delete native-latest --cleanup-tag -y || true
+          gh release create native-latest filmaty-native.apk --prerelease --title "فيلماتي Native (الأحدث)" --notes "أحدث نسخة نيتف: n1.${{ github.run_number }}" --latest=false
+
+      - name: Commit unpacked sources
+        run: |
+          git config user.name "filmaty-ci"
+          git config user.email "ci@filmaty.invalid"
+          git add android-native
+          git diff --cached --quiet || (git commit -m "native sources (unpacked) [skip ci]" && git push)
