@@ -859,7 +859,7 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <h2 id="profileOverlayTitle" class="text-2xl font-black text-white">مين بيتفرج؟</h2>
-          <p class="text-xs sm:text-sm text-[#a3a3a3] mt-1 leading-relaxed">اكتب اسم المستخدم (مثال: megoo) لحفظ أفلامك ومسلسلاتك ومكان ما وقفت ومزامنتها مع التلفزيون.</p>
+          <p class="text-xs sm:text-sm text-[#a3a3a3] mt-1 leading-relaxed">اكتب اسم المستخدم وPIN من 4 أرقام مرة واحدة بس، وكل أفلامك ومسلسلاتك ومكان ما وقفت بتتحفظ وبتفضل معاك.</p>
         </div>
         <button id="profileCloseBtn" type="button" aria-label="إغلاق نافذة الحساب" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition shrink-0 cursor-pointer">✕</button>
       </div>
@@ -892,6 +892,10 @@
               placeholder="megoo"
               class="w-full min-h-[46px] px-3.5 py-2.5 rounded-md bg-[#1f1f1f] text-white placeholder-neutral-400 border border-[#737373] focus:border-white focus:outline-none text-sm font-bold"
             />
+          </div>
+          <div>
+            <label for="profilePin" class="block text-xs font-bold text-neutral-200 mb-1.5">PIN (4 أرقام)</label>
+            <input id="profilePin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" dir="ltr" autocomplete="off" placeholder="••••" class="w-full min-h-[46px] px-3.5 py-2.5 rounded-md bg-[#1f1f1f] text-white placeholder-neutral-400 border border-[#737373] focus:border-white focus:outline-none text-sm font-black tracking-[.6em] text-center" />
           </div>
           <p id="profileStatus" class="hidden text-xs font-bold text-amber-400"></p>
           <div class="flex flex-col sm:flex-row gap-2">
@@ -1144,8 +1148,27 @@
     const MAX_MYLIST_ITEMS = 60;
     const MAX_HISTORY_ITEMS = 40;
 
+    const PINS_KEY = 'filmaty:pins:v1';
+    function readPins() { try { return JSON.parse(localStorage.getItem(PINS_KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function pinOf(u) { const p = u ? readPins()[u] : ''; return /^\d{4}$/.test(p || '') ? p : ''; }
+    function rememberPin(u, p) {
+      try {
+        const m = readPins(); m[u] = p; localStorage.setItem(PINS_KEY, JSON.stringify(m));
+        document.cookie = 'fmu=' + encodeURIComponent(u + '|' + p) + ';max-age=31536000;path=/;SameSite=Lax';
+      } catch (e) {}
+    }
     let activeUser = null;
     try { activeUser = clientNormalizeUsername(localStorage.getItem(ACTIVE_USER_KEY) || ''); } catch (e) {}
+    if (!activeUser) {
+      try {
+        const m = document.cookie.match(/(?:^|; )fmu=([^;]+)/);
+        if (m) {
+          const parts = decodeURIComponent(m[1]).split('|');
+          const nu = clientNormalizeUsername(parts[0]);
+          if (nu) { activeUser = nu; localStorage.setItem(ACTIVE_USER_KEY, nu); if (/^\d{4}$/.test(parts[1] || '')) rememberPin(nu, parts[1]); }
+        }
+      } catch (e) {}
+    }
     let personalRecs = [];
     let profileSyncTimer = null;
     let clearedProgressKeys = new Set();
@@ -1248,6 +1271,7 @@
         removedMyList: readRemovedMyListStore(),
         history: readHistoryStore(),
         clearProgressKeys: [...clearedProgressKeys],
+        ...(pinOf(username) ? { pin: pinOf(username) } : {}),
       };
     }
     async function syncProfileToCloud(immediate = false, targetUser = null) {
@@ -5143,6 +5167,7 @@
       renderSavedProfileButtons();
       renderAvatarPicker();
       if (profileInput) profileInput.value = activeUser || '';
+      { const pf = document.getElementById('profilePin'); if (pf) pf.value = ''; }
       if (profileOverlay) profileOverlay.classList.remove('hidden');
       if (profileInput) setTimeout(() => profileInput.focus(), 40);
     }
@@ -5183,9 +5208,15 @@
     async function pullProfileFromCloud(username) {
       if (!username) return;
       try {
-        const res = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}`);
+        const res = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}&p=${pinOf(username)}`);
         const data = await res.json().catch(() => null);
         if (!data || !data.ok || username !== activeUser) return;
+        if (data.locked) {
+          openProfileOverlay();
+          if (profileInput) profileInput.value = username;
+          setProfileStatus('اكتب الـ PIN بتاعك عشان تكمل (4 أرقام).', true);
+          return;
+        }
         const localSnap = readLocalUserSnapshot(username);
         if (localSnap && (localSnap.updatedAt || 0) > (data.profile?.updatedAt || 0)) {
           await syncProfileToCloud(false);
@@ -5204,6 +5235,39 @@
         setProfileStatus('اكتب اسم مستخدم صحيح (حرفين على الأقل، بدون مسافات غريبة مثل megoo).', true);
         return;
       }
+      if (profileInput) profileInput.value = username;
+      const pinField = document.getElementById('profilePin');
+      const pinTyped = ((pinField && pinField.value) || '').trim();
+      const pinValid = /^\d{4}$/.test(pinTyped);
+      const pin = pinValid ? pinTyped : pinOf(username);
+      let pre = null;
+      try {
+        const r0 = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}&p=${pin}`);
+        pre = await r0.json().catch(() => null);
+      } catch (e) {}
+      if (pre && pre.ok) {
+        if (pre.locked) {
+          setProfileStatus(pre.error === 'too_many' ? 'محاولات غلط كتير، جرب بعد ربع ساعة.' : (pinTyped ? 'الـ PIN غلط، جرب تاني.' : 'الحساب ده محمي، اكتب الـ PIN (4 أرقام).'), true);
+          if (pinField) { pinField.value = ''; pinField.focus(); }
+          return;
+        }
+        if (!pre.hasPin && !pinValid) {
+          setProfileStatus(pre.exists ? 'اعمل PIN من 4 أرقام لحماية حسابك (بتدخله مرة واحدة بس) وتقدمك هيفضل زي ما هو.' : 'اعمل PIN من 4 أرقام لحسابك الجديد.', true);
+          if (pinField) pinField.focus();
+          return;
+        }
+        if (!pre.hasPin && pinValid) {
+          const base = readLocalUserSnapshot(username) || (!activeUser && hasAnyLocalMediaData() ? readCurrentMediaBundle() : {});
+          try {
+            await fetch(`${API_BASE}/api/profile`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({ ...base, username, setPin: pinTyped }),
+            });
+          } catch (e) {}
+        }
+      }
+      if (pin) rememberPin(username, pin);
       if (profileSubmitBtn) profileSubmitBtn.disabled = true;
       setProfileStatus('جاري تحميل بيانات حسابك...');
       try {
@@ -5218,7 +5282,7 @@
         }
         let syncedProfile = null;
         try {
-          const res = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}`);
+          const res = await fetch(`${API_BASE}/api/profile?u=${encodeURIComponent(username)}&p=${pin}`);
           const data = await res.json().catch(() => null);
           const localSnap = readLocalUserSnapshot(username);
           if (data && data.ok) {
@@ -5226,7 +5290,7 @@
               const postRes = await fetch(`${API_BASE}/api/profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ username, ...guestBundle }),
+                body: JSON.stringify({ username, pin, ...guestBundle }),
               });
               const postData = await postRes.json().catch(() => null);
               syncedProfile = postData?.profile || guestBundle;
@@ -5234,7 +5298,7 @@
               const postRes = await fetch(`${API_BASE}/api/profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ username, ...localSnap }),
+                body: JSON.stringify({ username, pin, ...localSnap }),
               });
               const postData = await postRes.json().catch(() => null);
               syncedProfile = postData?.profile || data.profile;
@@ -5581,6 +5645,7 @@
       clearLocalMediaStores();
       try {
         localStorage.removeItem(ACTIVE_USER_KEY);
+        document.cookie = 'fmu=;max-age=0;path=/';
         sessionStorage.setItem('filmaty:guest:v1', '1');
       } catch (e) {}
       updateProfileBadges();
@@ -5784,6 +5849,67 @@ document.querySelectorAll('#fmDock button').forEach(function(b){b.addEventListen
    show('ثبت على الكمبيوتر','اضغط أيقونة التثبيت في شريط العنوان، أو من قائمة المتصفح اختر <b>تثبيت فيلماتي</b>.');
   });
  });
+})();
+</script>
+<style id="fmFxCss">
+@keyframes fmPop { from { opacity: 0; transform: translateY(22px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes fmRise { from { opacity: 0; transform: translateX(var(--rx, 26px)) scale(.94); } to { opacity: 1; transform: none; } }
+.fm-row { scroll-snap-type: x proximity; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; cursor: grab; }
+.fm-row.dragging { scroll-snap-type: none; scroll-behavior: auto; cursor: grabbing; user-select: none; }
+.fm-row > .pcard { scroll-snap-align: start; }
+.fm-row.dragging a, .fm-row.dragging .pcard { pointer-events: none; }
+.pcard.fm-rv { opacity: 0; }
+.pcard.fm-in { animation: fmRise .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--d, 0ms); }
+.pcard:active { transform: scale(.95) !important; transition-duration: .12s !important; }
+@media (hover: hover) { .pcard:hover { transform: translateY(-6px) scale(1.03); } }
+#fmDock button { transition: transform .2s cubic-bezier(.2,.8,.2,1), background .25s, color .25s; }
+#fmDock button:active { transform: scale(.88); }
+#fmDock button.on svg { animation: fmPop .4s both; }
+#profileOverlay:not(.hidden) > div, #mediaModal:not(.hidden) #modalCard { animation: fmPop .38s cubic-bezier(.2,.8,.2,1) both; }
+#heroContent, #heroImg, #heroImg2 { will-change: transform; }
+.hero-dot { transition: width .35s cubic-bezier(.2,.8,.2,1), background .3s; }
+button, a.apk, .fm-tile { -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: reduce) { .pcard.fm-in, .pcard.fm-rv { animation: none; opacity: 1; } .fm-row { scroll-behavior: auto; } }
+</style>
+<script>
+(function(){
+ var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+ // 1) Rows: snap + mouse drag + staggered reveal on scroll into view.
+ var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(!e.isIntersecting) return; var c=e.target; io.unobserve(c);
+   var rtl = getComputedStyle(c.parentElement).direction === 'rtl';
+   c.style.setProperty('--rx', (rtl ? -26 : 26) + 'px');
+   var i = Array.prototype.indexOf.call(c.parentElement.children, c);
+   c.style.setProperty('--d', Math.min(i % 8, 7) * 55 + 'ms');
+   c.classList.remove('fm-rv'); c.classList.add('fm-in');
+  });
+ }, { rootMargin: '0px 60px 0px 60px', threshold: 0.05 }) : null;
+ function prep(root){
+  (root||document).querySelectorAll('.overflow-x-auto').forEach(function(r){
+   if(r.__fm || !r.querySelector('.pcard')) return; r.__fm = 1; r.classList.add('fm-row');
+   var down=false,sx=0,sl=0,moved=0;
+   r.addEventListener('pointerdown',function(e){ if(e.pointerType!=='mouse'||e.button!==0) return; down=true; moved=0; sx=e.clientX; sl=r.scrollLeft; });
+   window.addEventListener('pointermove',function(e){ if(!down) return; var dx=e.clientX-sx; moved=Math.max(moved,Math.abs(dx)); if(moved>5) r.classList.add('dragging'); if(r.classList.contains('dragging')) r.scrollLeft = sl - dx; });
+   window.addEventListener('pointerup',function(){ if(!down) return; down=false; setTimeout(function(){ r.classList.remove('dragging'); },0); });
+   r.addEventListener('click',function(e){ if(moved>5){ e.preventDefault(); e.stopPropagation(); moved=0; } }, true);
+  });
+  if(!io||reduce) return;
+  (root||document).querySelectorAll('.pcard:not(.fm-rv):not(.fm-in)').forEach(function(c){
+   var r=c.getBoundingClientRect(); c.classList.add('fm-rv'); io.observe(c);
+  });
+ }
+ prep();
+ var t; new MutationObserver(function(){ clearTimeout(t); t=setTimeout(prep,60); }).observe(document.body,{childList:true,subtree:true});
+ // 2) Hero: content follows the finger, then snaps back (slide change is handled by the existing swipe code).
+ var hero=document.getElementById('heroBanner'); if(!hero) return;
+ var c=document.getElementById('heroContent'),i1=document.getElementById('heroImg'),i2=document.getElementById('heroImg2');
+ var x0=null,y0=null,lock=null;
+ function tf(dx){ if(c){ c.style.transform='translateX('+dx*.45+'px)'; c.style.opacity=String(Math.max(.25,1-Math.abs(dx)/320)); } [i1,i2].forEach(function(i){ if(i) i.style.translate=(dx*.12)+'px 0'; }); }
+ function reset(){ [c,i1,i2].forEach(function(el){ if(el){ el.style.transition='transform .45s cubic-bezier(.2,.8,.2,1), opacity .45s, translate .45s cubic-bezier(.2,.8,.2,1)'; } }); if(c){ c.style.transform=''; c.style.opacity=''; } [i1,i2].forEach(function(i){ if(i) i.style.translate=''; }); setTimeout(function(){ [c,i1,i2].forEach(function(el){ if(el) el.style.transition=''; }); },480); }
+ hero.addEventListener('touchstart',function(e){ x0=e.touches[0].clientX; y0=e.touches[0].clientY; lock=null; [c,i1,i2].forEach(function(el){ if(el) el.style.transition='none'; }); },{passive:true});
+ hero.addEventListener('touchmove',function(e){ if(x0===null) return; var dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0; if(lock===null && (Math.abs(dx)>8||Math.abs(dy)>8)) lock = Math.abs(dx)>Math.abs(dy)*1.2 ? 'x' : 'y'; if(lock==='x') tf(dx); },{passive:true});
+ hero.addEventListener('touchend',function(){ x0=null; if(lock==='x') reset(); lock=null; },{passive:true});
+ hero.addEventListener('touchcancel',function(){ x0=null; reset(); },{passive:true});
 })();
 </script>
 </body>
