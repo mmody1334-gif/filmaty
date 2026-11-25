@@ -49,7 +49,7 @@ public class DownloadsActivity extends Activity {
 
         LinearLayout rootLayout = new LinearLayout(this);
         rootLayout.setOrientation(LinearLayout.VERTICAL);
-        rootLayout.setBackgroundColor(Color.parseColor("#0b0b0f"));
+        rootLayout.setBackgroundColor(Color.parseColor("#0c0a08"));
         int pad = dp(16);
         rootLayout.setPadding(pad, pad, pad, pad);
         setContentView(rootLayout);
@@ -69,7 +69,7 @@ public class DownloadsActivity extends Activity {
         limitBox.setPadding(0, dp(10), 0, dp(4));
         TextView limitLabel = new TextView(this);
         limitLabel.setText("تحميلات في نفس الوقت:");
-        limitLabel.setTextColor(Color.parseColor("#a3a3a3"));
+        limitLabel.setTextColor(Color.parseColor("#a99f8e"));
         limitLabel.setTextSize(13);
         limitBox.addView(limitLabel, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -91,7 +91,7 @@ public class DownloadsActivity extends Activity {
 
         empty = new TextView(this);
         empty.setText("لسه مفيش تحميلات.\nابدأ تحميل أي فيلم أو حلقة من الموقع وهتلاقيها هنا.");
-        empty.setTextColor(Color.parseColor("#a3a3a3"));
+        empty.setTextColor(Color.parseColor("#a99f8e"));
         empty.setTextSize(14);
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(0, dp(48), 0, 0);
@@ -120,7 +120,7 @@ public class DownloadsActivity extends Activity {
         for (int n = 1; n <= 4; n++) {
             final int value = n;
             Button b = smallButton(String.valueOf(n),
-                    n == current ? "#e50914" : "#232323");
+                    n == current ? "#f0a32b" : "#1f1a14");
             b.setOnClickListener(v -> {
                 DownloadQueue.setLimit(this, value);
                 renderLimitButtons();
@@ -147,7 +147,7 @@ public class DownloadsActivity extends Activity {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(12), dp(10), dp(12), dp(10));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.parseColor("#16161c"));
+        bg.setColor(Color.parseColor("#15110d"));
         bg.setCornerRadius(dp(10));
         box.setBackground(bg);
         LinearLayout.LayoutParams boxLp = new LinearLayout.LayoutParams(
@@ -165,7 +165,7 @@ public class DownloadsActivity extends Activity {
 
         TextView status = new TextView(this);
         status.setText(statusText(row));
-        status.setTextColor(Color.parseColor("#a3a3a3"));
+        status.setTextColor(Color.parseColor("#a99f8e"));
         status.setTextSize(12);
         status.setPadding(0, dp(4), 0, 0);
         box.addView(status);
@@ -192,7 +192,7 @@ public class DownloadsActivity extends Activity {
         box.addView(buttons);
 
         if (DownloadQueue.ACTIVE.equals(row.state) || DownloadQueue.QUEUED.equals(row.state)) {
-            Button cancel = smallButton("إلغاء", "#232323");
+            Button cancel = smallButton("إلغاء", "#1f1a14");
             cancel.setOnClickListener(v -> {
                 DownloadQueue.cancel(this, row.key);
                 refresh();
@@ -200,7 +200,7 @@ public class DownloadsActivity extends Activity {
             buttons.addView(cancel);
         }
         if (DownloadQueue.FAILED.equals(row.state) || DownloadQueue.CANCELLED.equals(row.state)) {
-            Button retry = smallButton("إعادة", "#e50914");
+            Button retry = smallButton("إعادة", "#f0a32b");
             retry.setOnClickListener(v -> {
                 DownloadQueue.retry(this, row.key);
                 refresh();
@@ -208,12 +208,12 @@ public class DownloadsActivity extends Activity {
             buttons.addView(retry);
         }
         if (DownloadQueue.DONE.equals(row.state)) {
-            Button open = smallButton("فتح", "#e50914");
+            Button open = smallButton("فتح", "#f0a32b");
             open.setOnClickListener(v -> openFile(row));
             buttons.addView(open);
         }
         if (!DownloadQueue.ACTIVE.equals(row.state) && !DownloadQueue.QUEUED.equals(row.state)) {
-            Button del = smallButton("مسح من القائمة", "#232323");
+            Button del = smallButton("مسح من القائمة", "#1f1a14");
             del.setOnClickListener(v -> {
                 DownloadQueue.remove(this, row.key);
                 refresh();

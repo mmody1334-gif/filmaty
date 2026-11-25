@@ -110,9 +110,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         root = new FrameLayout(this);
-        root.setBackgroundColor(Color.parseColor("#0b0b0f"));
+        root.setBackgroundColor(Color.parseColor("#0c0a08"));
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#0b0b0f"));
+        web.setBackgroundColor(Color.parseColor("#0c0a08"));
         root.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
@@ -123,7 +123,7 @@ public class MainActivity extends Activity {
         downloadsFab.setTextSize(18);
         downloadsFab.setGravity(Gravity.CENTER);
         GradientDrawable fabBg = new GradientDrawable();
-        fabBg.setColor(Color.parseColor("#e50914"));
+        fabBg.setColor(Color.parseColor("#f0a32b"));
         fabBg.setCornerRadius(dp(28));
         downloadsFab.setBackground(fabBg);
         downloadsFab.setOnClickListener(v ->
@@ -479,11 +479,11 @@ public class MainActivity extends Activity {
         @Override
         public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
             if (!req.isForMainFrame()) return;
-            String html = "<html dir='rtl'><body style='background:#0b0b0f;color:#eee;font-family:sans-serif;"
+            String html = "<html dir='rtl'><body style='background:#0c0a08;color:#eee;font-family:sans-serif;"
                     + "display:flex;flex-direction:column;align-items:center;justify-content:center;height:90vh;text-align:center'>"
                     + "<div style='font-size:48px'>📡</div><h2>مفيش اتصال بالإنترنت</h2>"
                     + "<p style='color:#aaa'>اتأكد من النت وجرب تاني</p>"
-                    + "<button onclick=\"location.href='" + HOME + "'\" style='background:#e50914;color:#fff;border:0;"
+                    + "<button onclick=\"location.href='" + HOME + "'\" style='background:#f0a32b;color:#fff;border:0;"
                     + "border-radius:8px;padding:12px 28px;font-size:16px;font-weight:bold'>إعادة المحاولة</button></body></html>";
             view.loadDataWithBaseURL(HOME, html, "text/html", "utf-8", null);
         }
