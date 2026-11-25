@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#0b0f19">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Reem+Kufi:wght@500;600;700&display=swap" rel="stylesheet">
   <title>فيلماتي | سينما وأفلام ومسلسلات بجودة فائقة</title>
   <!-- Telegram WebApp JS -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -102,7 +104,213 @@
     .sub-sz-md video::cue { font-size: 1.15rem; background: rgba(0,0,0,0.75); color: #ffffff; }
     .sub-sz-lg video::cue { font-size: 1.45rem; background: rgba(0,0,0,0.82); color: #fde047; }
     #hoverPreviewLayer { position: fixed; z-index: 45; width: 320px; border-radius: 12px; overflow: hidden; background: #16161c; border: 1px solid rgba(255,255,255,0.22); box-shadow: 0 24px 50px rgba(0,0,0,0.85); pointer-events: auto; }
-  </style>
+  
+    /* ===== Filmati "Sahra" redesign: noir cinema, saffron, editorial type ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Reem+Kufi:wght@500;600;700&display=swap');
+    :root { --ink:#0c0a08; --ink2:#15110d; --ink3:#1f1a14; --line:rgba(243,233,216,.12); --saffron:#f0a32b; --saffron2:#ffc66b; --sand:#f3e9d8; --mute:#a99f8e; --ease:cubic-bezier(.2,.8,.2,1); }
+    * { font-family: 'Tajawal', system-ui, sans-serif; }
+    h1, h2, h3, .display, #brandHomeBtn, #heroTitle, #modalTitle { font-family: 'Reem Kufi', 'Tajawal', serif; }
+    html { scroll-behavior: smooth; }
+    body { background: radial-gradient(900px 420px at 90% -8%, rgba(240,163,43,.16), transparent 60%), radial-gradient(700px 500px at -10% 40%, rgba(120,60,20,.12), transparent 60%), var(--ink) !important; color: var(--sand); padding-bottom: 92px !important; }
+    /* colour remap */
+    .bg-\[\#e50914\], .bg-brand-red, .hover\:bg-\[\#e50914\]:hover, .hover\:bg-\[\#f6121d\]:hover { background-color: var(--saffron) !important; color: #1b1206 !important; border-color: var(--saffron) !important; }
+    .border-\[\#e50914\] { border-color: var(--saffron) !important; }
+    .text-\[\#e50914\] { color: var(--saffron) !important; }
+    .bg-\[\#141414\], .bg-\[\#0b0b0f\] { background-color: var(--ink) !important; }
+    .bg-\[\#181818\], .bg-\[\#16161c\] { background-color: var(--ink2) !important; }
+    .bg-\[\#232323\] { background-color: var(--ink3) !important; }
+    .border-\[\#737373\], .border-neutral-800, .border-neutral-700 { border-color: var(--line) !important; }
+    .text-neutral-300, .text-neutral-400, .text-\[\#a3a3a3\] { color: var(--mute) !important; }
+    /* header: floating pill */
+    header.glass { position: sticky; top: 10px; margin: 10px 12px 0; padding: 6px 8px !important; border-radius: 22px; background: rgba(21,17,13,.72) !important; border: 1px solid var(--line) !important; backdrop-filter: blur(18px) saturate(1.3); box-shadow: 0 10px 40px -12px rgba(0,0,0,.7); }
+    body.hero-top header.glass { background: rgba(12,10,8,.35) !important; }
+    #brandHomeBtn { font-size: 1.7rem !important; letter-spacing: 0; background: linear-gradient(180deg,#ffd58a,#f0a32b); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+    header .min-w-\[44px\], #profileBtn { border-radius: 14px !important; background: transparent !important; border-color: transparent !important; }
+    header .min-w-\[44px\]:hover, #profileBtn:hover { background: rgba(243,233,216,.08) !important; }
+    #profileBtnAvatar { border-radius: 9px !important; }
+    #heroBanner { margin-top: -74px !important; height: 74dvh !important; border-radius: 0 0 34px 34px; }
+    .hero-scrim { background: linear-gradient(to top, #0c0a08 0%, rgba(12,10,8,.78) 32%, rgba(12,10,8,0) 66%), linear-gradient(to bottom, rgba(12,10,8,.55), rgba(12,10,8,0) 28%) !important; }
+    #heroContent { max-width: 34rem; padding: 16px 16px 6px; border-radius: 26px; background: linear-gradient(180deg, rgba(12,10,8,0), rgba(12,10,8,.35)); }
+    #heroTitle { font-weight: 700 !important; font-size: clamp(2.3rem, 9vw, 4.2rem) !important; line-height: 1.05 !important; text-shadow: 0 6px 30px rgba(0,0,0,.8); }
+    #heroTitleEn { color: var(--saffron2) !important; letter-spacing: .22em !important; text-transform: uppercase; font-size: .72rem !important; opacity: .9; }
+    #heroOverview { color: #e4d9c6 !important; font-size: .92rem !important; }
+    #heroContent .rounded { border-radius: 999px !important; }
+    #heroPlayBtn { border-radius: 999px !important; min-height: 54px !important; padding: 0 30px !important; font-size: 1.02rem !important; box-shadow: 0 14px 34px -10px rgba(240,163,43,.75), inset 0 1px 0 rgba(255,255,255,.4) !important; transition: transform .25s var(--ease); }
+    #heroPlayBtn:active { transform: scale(.96); }
+    #heroInfoBtn { border-radius: 999px !important; min-height: 54px !important; background: rgba(243,233,216,.1) !important; border: 1px solid var(--line); }
+    .hero-dot { height: 5px !important; border-radius: 9px; background: rgba(243,233,216,.28) !important; }
+    .hero-dot.on { background: var(--saffron) !important; width: 34px !important; }
+    /* search: big pill */
+    #searchInput { border-radius: 999px !important; min-height: 56px !important; background: var(--ink2) !important; border: 1px solid var(--line) !important; font-size: 1rem !important; padding-right: 54px !important; box-shadow: 0 10px 30px -14px rgba(0,0,0,.8); }
+    #searchInput:focus { border-color: var(--saffron) !important; box-shadow: 0 0 0 4px rgba(240,163,43,.16); }
+    /* chips -> editorial tabs */
+    .filter-btn:not(.platform-pill), .home-year-chip, .mood-chip { background: transparent !important; border: 0 !important; border-radius: 0 !important; color: var(--mute) !important; padding: 8px 4px !important; margin: 0 8px; min-height: 40px !important; font-weight: 800 !important; font-size: .95rem !important; position: relative; }
+    .filter-btn.active:not(.platform-pill), .home-year-chip.bg-\[\#e50914\] { background: transparent !important; color: var(--saffron2) !important; }
+    .filter-btn.active:not(.platform-pill)::after, .home-year-chip.bg-\[\#e50914\]::after { content: ''; position: absolute; inset: auto 0 0 0; height: 3px; border-radius: 3px; background: var(--saffron); }
+    .mood-chip { background: var(--ink2) !important; border: 1px solid var(--line) !important; border-radius: 16px !important; padding: 10px 16px !important; margin: 0 4px; color: var(--sand) !important; }
+    .platform-pill { background: var(--ink2) !important; border: 1px solid var(--line) !important; border-radius: 999px !important; padding: 6px 14px !important; }
+    .platform-pill:hover { border-color: var(--pbrand) !important; }
+    /* section titles */
+    .row-title h3 { font-size: 1.35rem !important; font-weight: 700 !important; position: relative; padding-right: 16px; }
+    .row-title h3::before { content: ''; position: absolute; right: 0; top: 18%; bottom: 18%; width: 5px; border-radius: 4px; background: var(--saffron); }
+    .row-more { color: var(--saffron2) !important; }
+    /* cards */
+    .row-track { gap: 14px !important; padding: 10px 4px 22px !important; }
+    .pcard { border-radius: 20px !important; background: var(--ink2) !important; border: 1px solid var(--line); box-shadow: 0 14px 30px -16px rgba(0,0,0,.9); transition: transform .35s var(--ease), box-shadow .35s var(--ease) !important; }
+    .pcard:active { transform: scale(.97); }
+    .pcard .pcard-info { padding: 60px 12px 12px !important; background: linear-gradient(to top, rgba(12,10,8,.97) 8%, rgba(12,10,8,.0)) !important; }
+    .pcard h4 { font-size: .9rem !important; font-weight: 800 !important; }
+    .pcard .absolute.top-2.right-2 { border-radius: 999px !important; background: rgba(12,10,8,.78) !important; color: var(--saffron2) !important; border: 1px solid rgba(240,163,43,.35); padding: 2px 8px !important; }
+    .top10-ribbon { border-radius: 999px !important; background: var(--saffron) !important; color: #1b1206 !important; }
+    @media (hover:hover) { .pcard:hover { box-shadow: 0 22px 50px -12px rgba(0,0,0,.9), 0 0 0 2px var(--saffron) !important; } }
+    #mediaGrid > a { border-radius: 20px !important; }
+    /* buttons everywhere */
+    button.rounded-md, .rounded-md { border-radius: 14px !important; }
+    .rounded-xl, .rounded-lg { border-radius: 20px !important; }
+    ::selection { background: var(--saffron); color: #1b1206; }
+    /* movie page */
+    #modalCard > div { border-radius: 28px !important; background: var(--ink2) !important; border: 1px solid var(--line) !important; box-shadow: 0 30px 80px -30px #000; }
+    #modalCard h3 { font-weight: 700 !important; font-size: 1.7rem !important; }
+    #modalPoster { border-radius: 16px !important; border-color: var(--line) !important; box-shadow: 0 16px 36px -14px #000; }
+    #btnPlayInApp { min-height: 58px !important; border-radius: 999px !important; background: var(--saffron) !important; color: #1b1206 !important; font-weight: 900 !important; font-size: 1.05rem !important; box-shadow: 0 16px 34px -12px rgba(240,163,43,.7); }
+    #serversRow button { border-radius: 16px !important; border-width: 1.5px !important; }
+    #serversRow button.bg-\[\#e50914\] { box-shadow: 0 0 0 4px rgba(240,163,43,.22); }
+    #playerContainer { border-radius: 0 0 24px 24px; overflow: hidden; }
+    /* bottom dock */
+    #fmDock { position: fixed; z-index: 50; inset: auto 14px 14px 14px; display: flex; justify-content: space-around; padding: 8px; border-radius: 26px; background: rgba(21,17,13,.82); backdrop-filter: blur(20px) saturate(1.4); border: 1px solid var(--line); box-shadow: 0 18px 50px -10px rgba(0,0,0,.9); max-width: 520px; margin: 0 auto; }
+    #fmDock button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 18px; color: var(--mute); font-size: .7rem; font-weight: 800; background: transparent; border: 0; transition: all .25s var(--ease); }
+    #fmDock button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    #fmDock button.on, #fmDock button:active { color: #1b1206; background: var(--saffron); }
+    @media (min-width: 900px) { #fmDock { display: none; } }
+    /* entry motion */
+    .row-wrap, #homeSections > section, #homeSections > div { animation: fmUp .6s var(--ease) both; }
+    @keyframes fmUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+    /* responsive: tablet / desktop / TV */
+    @media (min-width: 700px) { header.glass { margin: 14px 24px 0; } #heroBanner { height: 68dvh !important; } #heroContent { padding: 24px 32px 10px; } .pcard { width: 11rem !important; } #fmDock { max-width: 460px; } }
+    @media (min-width: 1100px) { header.glass { margin: 18px auto 0; max-width: 1280px; } #heroBanner { height: 78dvh !important; max-height: 760px; margin-top: -84px !important; } #heroContent { margin-inline-start: max(6vw, 40px); max-width: 40rem; } .pcard { width: 12.5rem !important; } #fmDock { display: flex; inset: auto 0 22px 0; width: 480px; } .row-title h3 { font-size: 1.6rem !important; } }
+    @media (min-width: 1700px) { html { font-size: 20px; } .pcard { width: 14.5rem !important; } header.glass { max-width: 1700px; } }
+    a:focus-visible, button:focus-visible, .pcard:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--saffron2) !important; outline-offset: 3px; border-radius: 16px; }
+    .pcard:focus-visible { transform: scale(1.06); z-index: 3; }
+
+      .top10-num { color: var(--ink) !important; -webkit-text-stroke-color: rgba(240,163,43,.55) !important; }
+    .top10-eg[data-platform="netflix"] { --rank-stroke: #f0a32b; }
+    header .nav-filter-link { display: none; }
+    @media (min-width: 1000px) { header .nav-filter-link { display: inline-flex; } }
+    /* ===== v2: rich layout (carousel card, spotlight, rich cards, filter panel, footer) ===== */
+    #heroBanner { margin: 14px auto 8px !important; width: calc(100% - 24px) !important; max-width: 1280px; height: 58dvh !important; min-height: 400px; max-height: 620px; border-radius: 30px !important; border: 1px solid var(--line); box-shadow: 0 30px 70px -30px #000, 0 0 0 1px rgba(240,163,43,.06); }
+    header.glass { margin-bottom: 0; }
+    .hero-scrim { background: linear-gradient(to left, rgba(12,10,8,.92) 0%, rgba(12,10,8,.55) 45%, rgba(12,10,8,.05) 80%), linear-gradient(to top, rgba(12,10,8,.9), transparent 55%) !important; }
+    #heroBanner > div.absolute { padding-bottom: 22px !important; }
+    #heroContent { background: none !important; padding: 0 6px !important; max-width: 30rem; }
+    #heroTitle { font-size: clamp(1.8rem, 6.5vw, 3.2rem) !important; }
+    .fm-arrow { position: absolute; top: 50%; z-index: 5; width: 46px; height: 46px; margin-top: -23px; border-radius: 50%; background: rgba(12,10,8,.55); backdrop-filter: blur(10px); border: 1px solid var(--line); color: var(--sand); display: none; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; transition: all .25s var(--ease); }
+    .fm-arrow:hover { background: var(--saffron); color: #1b1206; transform: scale(1.08); }
+    #fmPrev { left: 12px; } #fmNext { right: 12px; }
+    @media (min-width: 640px) { .fm-arrow { display: flex; } }
+    /* filter panel */
+    #searchInput { max-width: 100%; }
+    .filter-btn:not(.platform-pill) { margin: 0 6px; }
+    #fmSpotWrap { max-width: 1280px; margin: 18px auto 0; padding: 0 14px; }
+    .fm-h { font-family: 'Reem Kufi'; font-size: 1.35rem; font-weight: 700; padding-right: 16px; position: relative; margin-bottom: 12px; color: var(--sand); }
+    .fm-h::before { content: ''; position: absolute; right: 0; top: 18%; bottom: 18%; width: 5px; border-radius: 4px; background: var(--saffron); }
+    #fmSpot { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; }
+    #fmSpot::-webkit-scrollbar { display: none; }
+    .fm-tile { position: relative; flex: 0 0 82%; scroll-snap-align: start; aspect-ratio: 16/10; border-radius: 24px; overflow: hidden; background: var(--ink2); border: 1px solid var(--line); cursor: pointer; text-align: right; transition: transform .4s var(--ease); }
+    .fm-tile:active { transform: scale(.98); }
+    .fm-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .8s var(--ease); }
+    .fm-tile:hover img { transform: scale(1.07); }
+    .fm-tile::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(12,10,8,.95), rgba(12,10,8,.05) 70%); }
+    .fm-tile .fm-t { position: absolute; z-index: 2; inset: auto 0 0 0; padding: 14px 16px; }
+    .fm-tile b { display: block; font-family: 'Reem Kufi'; font-size: 1.15rem; color: #fff; }
+    .fm-tile span { font-size: .78rem; color: var(--saffron2); font-weight: 800; }
+    .fm-tile.big b { font-size: 1.6rem; }
+    .fm-tile .fm-go { position: absolute; z-index: 2; top: 14px; left: 14px; width: 44px; height: 44px; border-radius: 50%; background: var(--saffron); color: #1b1206; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 24px -8px rgba(240,163,43,.8); }
+    @media (min-width: 900px) { #fmSpot { display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; overflow: visible; } .fm-tile { flex: none; aspect-ratio: auto; min-height: 150px; } .fm-tile.big { grid-row: 1 / 3; min-height: 340px; } }
+    /* rich cards: poster, then title + stars below */
+    .pcard { background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
+    .pcard > div { aspect-ratio: auto !important; background: transparent !important; overflow: visible !important; }
+    .pcard img { aspect-ratio: 2/3; height: auto !important; border-radius: 20px; border: 1px solid var(--line); box-shadow: 0 18px 36px -16px #000; transition: transform .45s var(--ease), box-shadow .45s var(--ease); }
+    .pcard .pcard-info { position: static !important; padding: 10px 4px 0 !important; background: none !important; }
+    .pcard .pcard-info h4 { color: var(--sand) !important; }
+    @media (hover:hover) { .pcard:hover { transform: none !important; box-shadow: none !important; } .pcard:hover img { transform: translateY(-6px) scale(1.03); box-shadow: 0 26px 44px -14px #000, 0 0 0 2px var(--saffron); } }
+    .pcard:focus-visible img { box-shadow: 0 0 0 3px var(--saffron2); }
+    .pcard .top10-ribbon, .pcard .absolute.top-2.right-2 { z-index: 2; }
+    .pcard .pcard-info > div:last-child::after { content: ' ★★★★☆'; color: var(--saffron); letter-spacing: 1px; font-size: .62rem; }
+    /* rows as panels */
+    #homeSections > * { background: linear-gradient(180deg, rgba(243,233,216,.035), transparent); border: 1px solid var(--line); border-radius: 28px; padding: 14px 14px 4px; }
+    #homeSections { max-width: 1280px; margin-inline: auto; }
+    /* footer */
+    #fmFoot { margin-top: 40px; padding: 34px 20px 130px; background: linear-gradient(180deg, transparent, #090705 30%); border-top: 1px solid var(--line); }
+    #fmFoot .in { max-width: 1280px; margin: 0 auto; display: grid; gap: 26px; grid-template-columns: 1fr; }
+    #fmFoot h5 { font-weight: 900; color: var(--sand); margin-bottom: 10px; }
+    #fmFoot a, #fmFoot button.l { display: block; color: var(--mute); font-size: .9rem; padding: 5px 0; background: none; border: 0; cursor: pointer; text-align: right; }
+    #fmFoot a:hover, #fmFoot button.l:hover { color: var(--saffron2); }
+    #fmFoot .brand { font-family: 'Reem Kufi'; font-size: 2rem; background: linear-gradient(180deg,#ffd58a,#f0a32b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #fmFoot .apk { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 12px 22px; border-radius: 999px; background: var(--saffron); color: #1b1206 !important; font-weight: 900; }
+    @media (min-width: 800px) { #fmFoot .in { grid-template-columns: 2fr 1fr 1fr 1.3fr; } #fmFoot { padding-bottom: 60px; } }
+
+    /* ambient backdrop that follows hover / tap / scroll focus */
+    #fmBg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+    #fmBg i { position: absolute; inset: -4% 0 auto 0; height: 78vh; background-size: cover; background-position: center top; opacity: 0; transition: opacity .8s var(--ease), transform 6s linear; transform: scale(1.06); filter: saturate(1.15); -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent 100%); mask-image: linear-gradient(to bottom, #000 25%, transparent 100%); }
+    #fmBg i.on { opacity: .55; transform: scale(1); }
+    #fmBg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12,10,8,.2), var(--ink) 75%); }
+    body { background: var(--ink) !important; }
+    #homeSections > * { background: rgba(21,17,13,.62) !important; backdrop-filter: blur(14px); }
+    #heroBanner { transition: opacity .3s; }
+    #modalCard { position: relative; }
+    #modalCard::before { content: ''; position: absolute; z-index: -1; inset: 0 0 auto 0; height: 440px; background: var(--bd) center top / cover no-repeat; -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent); mask-image: linear-gradient(to bottom, #000 30%, transparent); opacity: .6; border-radius: 0 0 40px 40px; }
+    #modalCard > div { background: rgba(21,17,13,.78) !important; backdrop-filter: blur(16px); }
+    #fmSpotWrap { width: 100%; box-sizing: border-box; }
+    #homeSections > *:empty { display: none !important; }
+    #heroBanner, #heroBanner * { animation: none !important; }
+
+    /* v3: two suggest buttons + picker sheet; long chip rows removed */
+    .platform-dock, #moodDock { display: none !important; }
+    #homeSections > div:has(.home-year-chip) { display: none !important; }
+    #fmPickBar { max-width: 1280px; margin: 12px auto 0; padding: 0 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    #fmPickBar button { min-height: 58px; border-radius: 20px; font-weight: 900; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; border: 1px solid var(--line); color: var(--sand); background: rgba(21,17,13,.78); backdrop-filter: blur(14px); transition: transform .25s var(--ease), border-color .25s; }
+    #fmPickBar button:first-child { background: var(--saffron); color: #1b1206; border-color: var(--saffron); box-shadow: 0 14px 30px -12px rgba(240,163,43,.7); }
+    #fmPickBar button:active { transform: scale(.97); }
+    #fmPickBar svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    #fmSheet { position: fixed; inset: 0; z-index: 90; display: none; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.6); backdrop-filter: blur(6px); }
+    #fmSheet.open { display: flex; }
+    #fmSheet .box { width: 100%; max-width: 560px; max-height: 88dvh; overflow-y: auto; background: var(--ink2); border: 1px solid var(--line); border-radius: 28px 28px 0 0; padding: 18px 18px 22px; animation: fmUp .35s var(--ease) both; }
+    @media (min-width: 700px) { #fmSheet { align-items: center; } #fmSheet .box { border-radius: 28px; } }
+    #fmSheet h3 { font-family: 'Reem Kufi'; font-size: 1.5rem; color: var(--sand); }
+    #fmSheet .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    #fmSheet .x { width: 40px; height: 40px; border-radius: 50%; background: var(--ink3); color: var(--sand); border: 1px solid var(--line); cursor: pointer; }
+    #fmSheet h4 { margin: 16px 0 8px; font-weight: 900; color: var(--saffron2); font-size: .85rem; }
+    #fmSheet .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    #fmSheet .chips button { min-height: 42px; padding: 0 14px; border-radius: 999px; background: var(--ink3); border: 1px solid var(--line); color: var(--sand); font-weight: 800; font-size: .88rem; cursor: pointer; transition: all .2s; }
+    #fmSheet .chips button.on { background: var(--saffron); border-color: var(--saffron); color: #1b1206; }
+    #fmSheet .go { width: 100%; margin-top: 22px; min-height: 56px; border-radius: 999px; background: var(--saffron); color: #1b1206; font-weight: 900; font-size: 1.05rem; border: 0; cursor: pointer; box-shadow: 0 16px 34px -12px rgba(240,163,43,.7); }
+    body:has(#mediaModal:not(.hidden)) #fmDock { display: none !important; }
+    #fmBg i.p { filter: blur(26px) saturate(1.3); transform: scale(1.25); }
+
+    /* v4: typography + button system */
+    html, body, button, input, select, textarea, a, label, span, div, p, h1, h2, h3, h4, h5 { font-family: 'Tajawal', 'Cairo', system-ui, sans-serif !important; }
+    h1, h2, h3, #brandHomeBtn, #heroTitle, #modalTitle, .fm-h, #fmFoot .brand, .fm-tile b { font-family: 'Reem Kufi', 'Tajawal', serif !important; }
+    button, .filter-btn, .mood-chip, .home-year-chip, select { font-weight: 700; letter-spacing: 0; line-height: 1.2; }
+    button.rounded-md, button.rounded-lg, .nav-filter-link { border-radius: 14px !important; }
+    #fmSheet .box { padding: 22px 20px 24px; }
+    #fmSheet h3 { font-size: 1.6rem; font-weight: 700; }
+    #fmSheet h4 { margin: 20px 0 10px; font-size: 1rem; font-weight: 800; color: var(--sand); display: flex; align-items: center; gap: 8px; }
+    #fmSheet h4::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+    #fmSheet .chips { gap: 10px; }
+    #fmSheet .chips button { min-height: 46px; padding: 0 18px; border-radius: 14px; font-size: .95rem; font-weight: 700; background: rgba(243,233,216,.06); border: 1.5px solid var(--line); color: var(--sand); }
+    #fmSheet .chips button:hover { border-color: rgba(240,163,43,.6); }
+    #fmSheet .chips button.on { background: rgba(240,163,43,.16); border-color: var(--saffron); color: var(--saffron2); font-weight: 800; box-shadow: inset 0 0 0 1px var(--saffron); }
+    #fmSheet .chips button.on::before { content: '\2713'; margin-inline-end: 8px; font-weight: 900; }
+    #fmSheet .go { min-height: 58px; border-radius: 16px; font-size: 1.1rem; font-weight: 800; }
+    #fmSheet .x { width: 44px; height: 44px; font-size: 1rem; }
+    #fmPickBar button { font-size: 1.05rem; font-weight: 800; border-radius: 16px; }
+    .filter-btn:not(.platform-pill), .home-year-chip { font-size: 1rem !important; font-weight: 700 !important; }
+    .filter-btn.active:not(.platform-pill) { font-weight: 800 !important; }
+    #fmDock button { font-size: .72rem; font-weight: 700; }
+    #heroPlayBtn, #heroInfoBtn, #btnPlayInApp { font-weight: 800 !important; font-size: 1.05rem !important; }
+    #modalCard button, #serversRow button { font-weight: 700; font-size: .92rem; }
+    #fmSheet h3 { font-family: 'Tajawal', sans-serif !important; font-weight: 800; }
+</style>
 </head>
 <body class="min-h-screen flex flex-col pb-12">
 
@@ -248,10 +456,48 @@
   </aside>
 
   <!-- Cinematic hero carousel (full-bleed directly under transparent header) -->
+  
+  <div id="fmPickBar">
+    <button type="button" data-kind="movie"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 4v5M16 4v5"/></svg>نقترحلك فيلم</button>
+    <button type="button" data-kind="tv"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg>نقترحلك مسلسل</button>
+  </div>
+  <div id="fmSheet" role="dialog" aria-modal="true" aria-labelledby="fmSheetT"><div class="box">
+    <div class="hd"><h3 id="fmSheetT"></h3><button type="button" class="x" aria-label="إغلاق">✕</button></div>
+    <h4>السنة</h4><div class="chips" data-g="year"></div>
+    <h4>المزاج</h4><div class="chips" data-g="genre"></div>
+    <h4>المنصة</h4><div class="chips" data-g="plat"></div>
+    <button type="button" class="go">اعرض لي</button>
+  </div></div>
+<script>
+(function(){
+ var sh=document.getElementById('fmSheet'),kind='movie',sel={};
+ var YEARS=[['','كل السنين'],['2026','2026'],['2025','2025'],['2024','2024'],['2023','2023'],['2022','2022'],['2021','2021'],['2020','2020']];
+ var GM=[['','أي مزاج'],['35','😂 ضحك'],['27','👻 رعب'],['53','🧠 تشويق'],['9648','🔍 غموض'],['10749','💘 رومانسي'],['16','👨‍👩‍👧 أنيميشن وعيلة'],['18','😭 دراما'],['878','🚀 خيال علمي'],['28','💥 أكشن'],['80','🕵️ جريمة']];
+ var GT=[['','أي مزاج'],['35','😂 كوميدي'],['18','😭 دراما'],['80','🕵️ جريمة'],['9648','🔍 غموض'],['10759','💥 أكشن ومغامرة'],['10765','🚀 خيال'],['16','🎨 أنيميشن'],['10751','👨‍👩‍👧 عائلي']];
+ function plats(){var o=[['','كل المنصات']];document.querySelectorAll('.platform-pill').forEach(function(b){o.push([b.dataset.filter,b.textContent.replace(/^[^\p{L}\p{N}]+/u,'').trim()])});return o}
+ function clean(t){return t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu,'').trim()}
+ function fill(g,arr){var el=sh.querySelector('[data-g="'+g+'"]');el.innerHTML=arr.map(function(a){return '<button type="button" data-v="'+a[0]+'" class="'+(sel[g]===a[0]?'on':'')+'">'+clean(a[1])+'</button>'}).join('');
+  el.querySelectorAll('button').forEach(function(b){b.onclick=function(){sel[g]=b.dataset.v;el.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)})}})}
+ function open(k){kind=k;sel={year:'',genre:'',plat:''};document.getElementById('fmSheetT').textContent=k==='tv'?'نقترحلك مسلسل':'نقترحلك فيلم';fill('year',YEARS);fill('genre',k==='tv'?GT:GM);fill('plat',plats());sh.classList.add('open');var f=sh.querySelector('.chips button');if(f)f.focus()}
+ function close(){sh.classList.remove('open')}
+ document.querySelectorAll('#fmPickBar button').forEach(function(b){b.onclick=function(){open(b.dataset.kind)}});
+ sh.querySelector('.x').onclick=close;sh.onclick=function(e){if(e.target===sh)close()};
+ document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+ sh.querySelector('.go').onclick=function(){
+  var p={type:kind,sort:'popular',page:'1'};if(sel.year)p.year=sel.year;if(sel.genre)p.genre=sel.genre;if(sel.plat)p.collection=sel.plat;
+  var parts=[kind==='tv'?'📺 مسلسلات':'🎬 أفلام'];var t=function(g){var b=sh.querySelector('[data-g="'+g+'"] .on');return b&&b.dataset.v?b.textContent:''};
+  [t('genre'),t('plat'),sel.year].forEach(function(x){if(x)parts.push(x)});
+  close();try{clearActiveFilters()}catch(e){}
+  loadBrowse(p,parts.join(' • '));
+  var g=document.getElementById('mediaGrid');if(g)setTimeout(function(){g.scrollIntoView({behavior:'smooth',block:'start'})},250);
+ };
+})();
+</script>
   <section id="heroBanner" class="hidden relative w-full h-[62dvh] sm:h-[72dvh] min-h-[420px] max-h-[760px] overflow-hidden bg-[#0b0b0f] mb-4">
     <img id="heroImg" src="" alt="" fetchpriority="high" class="hero-slide on" />
     <img id="heroImg2" src="" alt="" class="hero-slide" aria-hidden="true" />
     <div class="hero-scrim absolute inset-0"></div>
+    <button id="fmNext" class="fm-arrow" type="button" aria-label="التالي">‹</button><button id="fmPrev" class="fm-arrow" type="button" aria-label="السابق">›</button>
     <div class="absolute inset-x-0 bottom-0 max-w-7xl mx-auto w-full px-4 sm:px-6 pb-8 sm:pb-14">
       <div id="heroContent" class="max-w-xl space-y-3">
         <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-neutral-200">
@@ -271,6 +517,7 @@
       <div id="heroDots" class="flex items-center gap-1.5 mt-5"></div>
     </div>
   </section>
+  <div id="fmSpotWrap" class="hidden"><div class="fm-h">تحت الضوء</div><div id="fmSpot"></div></div>
 
   <!-- Search Box & Branded Platform Dock -->
   <section class="px-4 sm:px-6 pt-3 pb-2 max-w-7xl mx-auto w-full space-y-2.5">
@@ -5446,5 +5693,71 @@
 
     applyUrlParams();
   </script>
+
+<nav id="fmDock" aria-label="التنقل">
+ <button type="button" class="on" data-act="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>الرئيسية</span></button>
+ <button type="button" data-act="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>بحث</span></button>
+ <button type="button" data-act="btnMoodPicker"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6 6.5.5-5 4.3 1.6 6.4L12 16.8 6.4 20.2 8 13.8 3 9.5 9.5 9z"/></svg><span>سهرة</span></button>
+ <button type="button" data-act="btnCalendar"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>الجدول</span></button>
+ <button type="button" data-act="profileBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span>حسابي</span></button>
+</nav>
+<script>
+document.querySelectorAll('#fmDock button').forEach(function(b){b.addEventListener('click',function(){var a=b.dataset.act;
+ if(a==='home'){window.scrollTo({top:0,behavior:'smooth'});}
+ else if(a==='search'){var i=document.getElementById('searchInput');if(i){i.scrollIntoView({block:'center',behavior:'smooth'});setTimeout(function(){i.focus()},350);}}
+ else{var t=document.getElementById(a);if(t)t.click();}
+});});
+</script>
+
+<footer id="fmFoot"><div class="in">
+ <div><div class="brand">فيلماتي</div><p style="color:var(--mute);font-size:.9rem;max-width:26rem;line-height:1.8">أفلام ومسلسلات بالعربي، سيرفرات متعددة وتشغيل سريع على كل أجهزتك.</p>
+ <a class="apk" href="https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk">تحميل تطبيق الأندرويد</a></div>
+ <div><h5>تصفح</h5><button class="l" data-go="trending">الرئيسية</button><button class="l" data-go="movie">أفلام</button><button class="l" data-go="tv">مسلسلات</button></div>
+ <div><h5>أدواتك</h5><button class="l" data-click="btnMoodPicker">اقترح لي سهرة</button><button class="l" data-click="btnCalendar">جدول الحلقات</button><button class="l" data-click="profileBtn">حسابي</button></div>
+ <div><h5>ملاحظة</h5><p style="color:var(--mute);font-size:.82rem;line-height:1.8">فيلماتي لا يستضيف أي ملفات. المحتوى من مصادر خارجية.</p></div>
+</div></footer>
+<script>
+(function(){
+ function $(i){return document.getElementById(i)}
+ document.querySelectorAll('#fmFoot [data-click]').forEach(function(b){b.onclick=function(){var t=$(b.dataset.click);if(t)t.click()}});
+ document.querySelectorAll('#fmFoot [data-go]').forEach(function(b){b.onclick=function(){var t=document.querySelector('[data-nav-filter="'+b.dataset.go+'"]')||document.querySelector('.filter-btn[data-filter="'+b.dataset.go+'"]');if(t)t.click();window.scrollTo({top:0,behavior:'smooth'})}});
+ function step(d){if(typeof heroItems==='undefined'||!heroItems.length)return;var n=heroItems.length;showHeroSlide((heroIdx+d+n)%n)}
+ if($('fmNext'))$('fmNext').onclick=function(){step(1)};if($('fmPrev'))$('fmPrev').onclick=function(){step(-1)};
+ function spot(){
+  var w=$('fmSpotWrap'),el=$('fmSpot');if(!w||!el||typeof heroItems==='undefined'||heroItems.length<2)return;
+  var IB=(typeof IMG_BASE!=='undefined'?IMG_BASE:'https://image.tmdb.org/t/p/w500').replace(/w\d+$/,'w780');
+  var arr=heroItems.slice(1,4);
+  el.innerHTML=arr.map(function(it,k){var t=it.media_type==='tv'||(!it.media_type&&it.name)?'tv':'movie';var ti=(it.title||it.name||'').replace(/</g,'&lt;');var yr=(it.release_date||it.first_air_date||'').slice(0,4);
+   return '<div class="fm-tile'+(k===0?' big':'')+'" role="button" tabindex="0" data-id="'+it.id+'" data-t="'+t+'"><img loading="lazy" alt="" src="'+IB+it.backdrop_path+'"><span class="fm-go">▶</span><div class="fm-t"><span>'+(t==='tv'?'مسلسل':'فيلم')+(yr?' • '+yr:'')+(it.vote_average?' • ★ '+it.vote_average.toFixed(1):'')+'</span><b>'+ti+'</b></div></div>'}).join('');
+  el.querySelectorAll('.fm-tile').forEach(function(x){var go=function(){openDetails(+x.dataset.id,x.dataset.t)};x.onclick=go;x.onkeydown=function(e){if(e.key==='Enter')go()}});
+  w.classList.remove('hidden');
+ }
+ var o=window.renderHeroBanner;window.renderHeroBanner=function(){o.apply(this,arguments);try{spot()}catch(e){}};
+ var obs=new MutationObserver(function(){try{spot()}catch(e){}});var h=$('heroTitle');if(h)obs.observe(h,{childList:true});
+})();
+</script>
+
+<div id="fmBg" aria-hidden="true"><i></i><i></i></div>
+<script>
+(function(){
+ var bg=document.getElementById('fmBg'),layers=bg.children,cur=0,map={},last='';
+ var IBG='https://image.tmdb.org/t/p/w1280';
+ function index(){try{Object.keys(homeData||{}).forEach(function(k){var a=homeData[k];if(Array.isArray(a))a.forEach(function(it){if(it&&it.id&&it.backdrop_path)map[it.id]=it.backdrop_path})});
+  if(typeof heroItems!=='undefined')heroItems.forEach(function(it){if(it.backdrop_path)map[it.id]=it.backdrop_path})}catch(e){}}
+ function set(u,poster){if(!u||u===last)return;last=u;var n=1-cur;layers[n].classList.toggle('p',!!poster);layers[n].style.backgroundImage='url('+u+')';layers[n].classList.add('on');layers[cur].classList.remove('on');cur=n}
+ function forCard(c){index();var id=c.getAttribute('data-media-id');var b=map[id];if(b)set(IBG+b);else{var im=c.querySelector('img');if(im&&im.src)set(im.src.replace('/w342/','/w500/'),true)}}
+ function card(e){return e.target.closest&&e.target.closest('.pcard')}
+ document.addEventListener('pointerover',function(e){if(e.pointerType==='touch')return;var c=card(e);if(c)forCard(c)});
+ document.addEventListener('focusin',function(e){var c=card(e);if(c)forCard(c)});
+ document.addEventListener('touchstart',function(e){var c=card(e);if(c)forCard(c)},{passive:true});
+ var t;function scan(){var best=null,bd=1e9,mid=innerHeight*.5,midx=innerWidth*.5;document.querySelectorAll('.pcard').forEach(function(c){var r=c.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth)return;var d=Math.abs((r.top+r.height/2)-mid)*2+Math.abs((r.left+r.width/2)-midx);if(d<bd){bd=d;best=c}});if(best)forCard(best)}
+ function sched(){clearTimeout(t);t=setTimeout(scan,140)}
+ window.addEventListener('scroll',sched,{passive:true});document.addEventListener('scroll',sched,{passive:true,capture:true});
+ setTimeout(function(){index();scan()},2500);
+ var h=document.getElementById('heroTitle');if(h)new MutationObserver(function(){if(typeof heroItem!=='undefined'&&heroItem&&heroItem.backdrop_path)set(IBG+heroItem.backdrop_path)}).observe(h,{childList:true});
+ // movie page backdrop
+ var od=window.openDetails;if(od)window.openDetails=function(id){index();var b=map[id];var mc=document.getElementById('modalCard');if(mc&&b){mc.style.setProperty('--bd','url('+IBG+b+')');set(IBG+b)}return od.apply(this,arguments)};
+})();
+</script>
 </body>
 </html>
