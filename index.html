@@ -311,6 +311,8 @@
     #modalCard button, #serversRow button { font-weight: 700; font-size: .92rem; }
     #fmSheet h3 { font-family: 'Tajawal', sans-serif !important; font-weight: 800; }
     @media (min-width: 640px) and (max-width: 1099px) { #heroContent { margin-inline: 66px !important; } }
+    .fm-inst-row { display: flex; flex-wrap: wrap; gap: 10px; } #fmFoot .apk.alt { background: rgba(243,233,216,.08); color: var(--sand) !important; border: 1px solid var(--line); } #fmFoot button.apk { border: 0; cursor: pointer; }
+    #fmInstHelp { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.7); display: none; align-items: flex-end; justify-content: center; } #fmInstHelp.open { display: flex; } #fmInstHelp .b { width: min(480px,100%); background: #15110d; border: 1px solid var(--line); border-radius: 26px 26px 0 0; padding: 24px 22px 28px; color: var(--sand); line-height: 1.9; } #fmInstHelp h4 { font-family: 'Reem Kufi', sans-serif !important; font-size: 1.4rem; margin-bottom: 8px; } #fmInstHelp button { margin-top: 14px; width: 100%; min-height: 50px; border-radius: 14px; background: var(--saffron); color: #1b1206; font-weight: 800; border: 0; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col pb-12">
@@ -361,6 +363,7 @@
       <button id="drawerClose" type="button" aria-label="إغلاق القائمة" class="min-w-[44px] min-h-[44px] rounded-full bg-[#232323] border border-[#737373] text-white flex items-center justify-center hover:border-white transition">✕</button>
     </div>
     <nav class="p-3 space-y-1 text-sm font-bold">
+      <button type="button" class="fmInstallBtn w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[#1b1206] font-black" style="background:var(--saffron)"><span>ثبت الموقع على جهازك</span><span>⬇</span></button>
       <div>
         <button class="drawer-group-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/70 text-white hover:bg-slate-800 transition" data-group="movies">
           <span>🎬 أفلام</span><span class="drawer-arrow text-slate-400">▾</span>
@@ -5712,7 +5715,7 @@ document.querySelectorAll('#fmDock button').forEach(function(b){b.addEventListen
 
 <footer id="fmFoot"><div class="in">
  <div><div class="brand">فيلماتي</div><p style="color:var(--mute);font-size:.9rem;max-width:26rem;line-height:1.8">أفلام ومسلسلات بالعربي، سيرفرات متعددة وتشغيل سريع على كل أجهزتك.</p>
- <a class="apk" href="https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk">تحميل تطبيق الأندرويد</a></div>
+ <div class="fm-inst-row"><button type="button" class="apk fmInstallBtn">ثبت الموقع</button><a class="apk alt" href="https://github.com/mmody1334-gif/filmaty/releases/latest/download/filmaty.apk">تحميل تطبيق الأندرويد</a></div></div>
  <div><h5>تصفح</h5><button class="l" data-go="trending">الرئيسية</button><button class="l" data-go="movie">أفلام</button><button class="l" data-go="tv">مسلسلات</button></div>
  <div><h5>أدواتك</h5><button class="l" data-click="btnMoodPicker">اقترح لي سهرة</button><button class="l" data-click="btnCalendar">جدول الحلقات</button><button class="l" data-click="profileBtn">حسابي</button></div>
  <div><h5>ملاحظة</h5><p style="color:var(--mute);font-size:.82rem;line-height:1.8">فيلماتي لا يستضيف أي ملفات. المحتوى من مصادر خارجية.</p></div>
@@ -5758,6 +5761,28 @@ document.querySelectorAll('#fmDock button').forEach(function(b){b.addEventListen
  var h=document.getElementById('heroTitle');if(h)new MutationObserver(function(){if(typeof heroItem!=='undefined'&&heroItem&&heroItem.backdrop_path)set(IBG+heroItem.backdrop_path)}).observe(h,{childList:true});
  // movie page backdrop
  var od=window.openDetails;if(od)window.openDetails=function(id){index();var b=map[id];var mc=document.getElementById('modalCard');if(mc&&b){mc.style.setProperty('--bd','url('+IBG+b+')');set(IBG+b)}return od.apply(this,arguments)};
+})();
+</script>
+<div id="fmInstHelp"><div class="b"><h4 id="fmInstT">ثبت فيلماتي</h4><div id="fmInstB"></div><button type="button" id="fmInstOk">تمام</button></div></div>
+<script>
+(function(){
+ var dp=null,ua=navigator.userAgent,ios=/iphone|ipad|ipod/i.test(ua),standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone||/FilmatyApp\//.test(ua);
+ var help=document.getElementById('fmInstHelp');
+ function show(t,h){document.getElementById('fmInstT').textContent=t;document.getElementById('fmInstB').innerHTML=h;help.classList.add('open')}
+ document.getElementById('fmInstOk').onclick=function(){help.classList.remove('open')};
+ help.onclick=function(e){if(e.target===help)help.classList.remove('open')};
+ window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();dp=e});
+ window.addEventListener('appinstalled',function(){dp=null;document.querySelectorAll('.fmInstallBtn').forEach(function(b){b.style.display='none'})});
+ document.querySelectorAll('.fmInstallBtn').forEach(function(b){
+  if(standalone){b.style.display='none';return}
+  b.addEventListener('click',function(){
+   var d=document.getElementById('drawerClose');
+   if(dp){dp.prompt();dp.userChoice.finally(function(){dp=null});return}
+   if(ios){show('ثبت على الآيفون','اضغط زر المشاركة في سفاري، ثم اختر <b>إضافة إلى الشاشة الرئيسية</b>.');return}
+   if(/android/i.test(ua)){show('ثبت على الأندرويد','افتح قائمة المتصفح (النقاط الثلاث) واختر <b>تثبيت التطبيق</b> أو <b>إضافة إلى الشاشة الرئيسية</b>. لو الخيار مش ظاهر، حمّل التطبيق من زر الأندرويد في الأسفل.');return}
+   show('ثبت على الكمبيوتر','اضغط أيقونة التثبيت في شريط العنوان، أو من قائمة المتصفح اختر <b>تثبيت فيلماتي</b>.');
+  });
+ });
 })();
 </script>
 </body>
