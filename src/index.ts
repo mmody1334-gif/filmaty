@@ -14,7 +14,16 @@ import {
   type BotCodePayload,
 } from "./engine/botcode.ts";
 import { getHome, recordView } from "./engine/home.ts";
-import { getProfile, normalizeUsername, saveProfile } from "./engine/profile.ts";
+import {
+  checkProfilePin,
+  emptyProfile,
+  getProfile,
+  isValidPin,
+  normalizeUsername,
+  profileHasPin,
+  saveProfile,
+  setProfilePin,
+} from "./engine/profile.ts";
 import { searchTitles, TMDB_BASE, tmdbApiKey } from "./engine/search.ts";
 import {
   BROWSE_COLLECTIONS,
@@ -898,8 +907,30 @@ async function handleApiProfileGet(
   if (!username) {
     return jsonResponse({ ok: false, error: "invalid_username" }, 400);
   }
+  const pinState = await checkProfilePin(env, username, url.searchParams.get("p"));
+  if (pinState === "bad" || pinState === "too_many") {
+    // Protected profile: never return data without the right PIN.
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        exists: true,
+        hasPin: true,
+        locked: true,
+        error: pinState === "too_many" ? "too_many" : "bad_pin",
+        profile: emptyProfile(username),
+      }),
+      {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+          ...corsHeaders(),
+        },
+      },
+    );
+  }
   const { exists, profile } = await getProfile(env, username);
-  return new Response(JSON.stringify({ ok: true, exists, profile }), {
+  return new Response(JSON.stringify({ ok: true, exists, hasPin: pinState === "ok", profile }), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
@@ -925,8 +956,24 @@ async function handleApiProfilePost(
   if (!username) {
     return jsonResponse({ ok: false, error: "invalid_username" }, 400);
   }
+  const pinState = await checkProfilePin(env, username, body?.pin);
+  if (pinState === "bad" || pinState === "too_many") {
+    return jsonResponse(
+      { ok: false, error: pinState === "too_many" ? "too_many" : "bad_pin", locked: true },
+      403,
+    );
+  }
+  // Set (first time) or change (already authenticated) the 4-digit PIN.
+  const wantedPin = pinState === "ok" ? body?.newPin : body?.setPin;
+  if (wantedPin !== undefined && wantedPin !== null && wantedPin !== "") {
+    if (!isValidPin(wantedPin)) {
+      return jsonResponse({ ok: false, error: "invalid_pin" }, 400);
+    }
+    await setProfilePin(env, username, wantedPin);
+  }
+  const hasPin = pinState === "ok" || (await profileHasPin(env, username));
   const profile = await saveProfile(env, username, body || {});
-  return new Response(JSON.stringify({ ok: true, profile }), {
+  return new Response(JSON.stringify({ ok: true, hasPin, profile }), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
