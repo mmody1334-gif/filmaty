@@ -445,3 +445,67 @@ export async function saveProfile(
 
   return merged;
 }
+
+// ---- Optional 4-digit PIN protection for a profile ----------------------
+// The PIN is never stored: only an HMAC keyed by SIGNING_SECRET is kept in KV
+// (written once when the PIN is set), so a KV leak alone reveals nothing.
+// Wrong guesses are rate limited per username.
+const PIN_KEY_PREFIX = "pin:v1:";
+const PIN_FAIL_PREFIX = "pinfail:v1:";
+const PIN_MAX_FAILS = 8;
+const PIN_FAIL_WINDOW_SECONDS = 15 * 60;
+
+export function isValidPin(raw: unknown): raw is string {
+  return typeof raw === "string" && /^\d{4}$/.test(raw);
+}
+
+async function pinMac(env: Env, username: string, pin: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(String(env.SIGNING_SECRET || "")),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`pin|${username}|${pin}`));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function profileHasPin(env: Env, username: string): Promise<boolean> {
+  try {
+    return Boolean(await env.CACHE?.get(`${PIN_KEY_PREFIX}${username}`));
+  } catch {
+    return false;
+  }
+}
+
+export async function setProfilePin(env: Env, username: string, pin: string): Promise<void> {
+  await env.CACHE?.put(`${PIN_KEY_PREFIX}${username}`, await pinMac(env, username, pin));
+  try {
+    await env.CACHE?.delete(`${PIN_FAIL_PREFIX}${username}`);
+  } catch {
+    /* ignore */
+  }
+}
+
+export type PinCheck = "ok" | "no_pin" | "bad" | "too_many";
+
+/** Check a PIN against a protected profile (no_pin when the profile has none). */
+export async function checkProfilePin(env: Env, username: string, pin: unknown): Promise<PinCheck> {
+  const stored = await env.CACHE?.get(`${PIN_KEY_PREFIX}${username}`);
+  if (!stored) return "no_pin";
+  const failKey = `${PIN_FAIL_PREFIX}${username}`;
+  const fails = Number((await env.CACHE?.get(failKey)) || 0) || 0;
+  if (fails >= PIN_MAX_FAILS) return "too_many";
+  if (isValidPin(pin) && (await pinMac(env, username, pin)) === stored) return "ok";
+  // Only wrong non-empty guesses count: a missing PIN is just a locked prompt.
+  if (isValidPin(pin)) {
+    try {
+      await env.CACHE?.put(failKey, String(fails + 1), { expirationTtl: PIN_FAIL_WINDOW_SECONDS });
+    } catch {
+      /* ignore */
+    }
+  }
+  return "bad";
+}
