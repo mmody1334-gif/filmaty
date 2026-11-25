@@ -120,17 +120,19 @@ public class MainActivity extends Activity {
         // Floating shortcut to the downloads screen (badge = running + queued).
         downloadsFab = new TextView(this);
         downloadsFab.setText("⬇️");
-        downloadsFab.setTextSize(18);
+        downloadsFab.setTextSize(14);
         downloadsFab.setGravity(Gravity.CENTER);
         GradientDrawable fabBg = new GradientDrawable();
         fabBg.setColor(Color.parseColor("#f0a32b"));
-        fabBg.setCornerRadius(dp(28));
+        fabBg.setCornerRadii(new float[]{0,0,dp(16),dp(16),dp(16),dp(16),0,0});
+        fabBg.setAlpha(215);
+        downloadsFab.setAlpha(0.92f);
         downloadsFab.setBackground(fabBg);
         downloadsFab.setOnClickListener(v ->
                 startActivity(new Intent(this, DownloadsActivity.class)));
-        FrameLayout.LayoutParams fabLp = new FrameLayout.LayoutParams(dp(56), dp(56));
-        fabLp.gravity = Gravity.BOTTOM | Gravity.START;
-        fabLp.setMargins(dp(16), 0, 0, dp(24));
+        FrameLayout.LayoutParams fabLp = new FrameLayout.LayoutParams(dp(30), dp(64));
+        fabLp.gravity = Gravity.CENTER_VERTICAL | Gravity.START;
+        fabLp.setMargins(0, dp(60), 0, 0);
         root.addView(downloadsFab, fabLp);
 
         IntentFilter dlFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
@@ -420,7 +422,7 @@ public class MainActivity extends Activity {
     private void updateDownloadsBadge() {
         if (downloadsFab == null) return;
         int n = DownloadQueue.runningCount(this) + DownloadQueue.queuedCount(this);
-        downloadsFab.setText(n > 0 ? "⬇️ " + n : "⬇️");
+        downloadsFab.setText(n > 0 ? "⬇️\n" + n : "⬇️");
     }
 
     private int dp(int v) {
